@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+/* Design tokens. Marigold accent on a cool neutral, tuned for both themes. */
+@theme {
+  --font-sans: 'Inter', 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-display: 'Manrope', 'Inter', system-ui, sans-serif;
+  --color-brand-50: #fff6e5;
+  --color-brand-100: #ffe8bf;
+  --color-brand-500: #d98e04;
+  --color-brand-600: #b86e00;
+  --color-brand-700: #8f5400;
+  --color-ink: #18202b;
+  --color-leaf-600: #2f7a55;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-ink antialiased;
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
