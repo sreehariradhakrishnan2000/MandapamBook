@@ -21,7 +21,19 @@ export type AuditAction =
   | 'auth.password_reset'
   | 'auth.phone_verified'
   | 'user.role_changed'
-  | 'user.status_changed';
+  | 'user.status_changed'
+  | 'owner.kyc_updated'
+  | 'listing.created'
+  | 'listing.updated'
+  | 'listing.submitted'
+  | 'listing.deleted'
+  | 'pricing.changed'
+  | 'calendar.blocked'
+  | 'calendar.unblocked'
+  | 'media.rejected'
+  | 'staff.invited'
+  | 'staff.updated'
+  | 'staff.removed';
 
 export interface AuditEntry {
   action: AuditAction;
