@@ -25,8 +25,10 @@ Plan and architecture: [docs/architecture.md](docs/architecture.md).
 ```sh
 pnpm install
 cp .env.example .env          # then replace every change-me value
-docker compose up -d postgres redis mailpit seaweedfs
+docker compose up -d postgres redis mailpit seaweedfs   # or point DATABASE_URL at Neon
 pnpm --filter @mandapambook/shared build
+pnpm --filter @mandapambook/api db:migrate
+pnpm --filter @mandapambook/api db:seed
 pnpm --filter @mandapambook/api dev   # http://localhost:4000/health
 pnpm --filter @mandapambook/web start # http://localhost:4200
 ```
@@ -43,6 +45,8 @@ Or run everything in containers: `docker compose up --build`, then open http://l
 | `pnpm build`        | Build shared, API and web       |
 | `pnpm format`       | Prettier                        |
 | `pnpm secrets:scan` | gitleaks over the git history   |
+
+Database workflow and integrity rules: [docs/database.md](docs/database.md).
 
 ## Contributing
 
