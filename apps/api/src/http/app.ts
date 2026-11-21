@@ -1,0 +1,82 @@
+import cors from 'cors';
+import express, { type Express } from 'express';
+import helmet from 'helmet';
+import type { Logger } from 'pino';
+import { pinoHttp } from 'pino-http';
+import type { Env } from '../config/env.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { requestId } from './middleware/requestId.js';
+import { healthRouter, type ReadinessCheck } from './routes/health.js';
+
+export interface AppDeps {
+  env: Pick<Env, 'CORS_ORIGINS' | 'BODY_LIMIT' | 'TRUST_PROXY_HOPS'>;
+  logger: Logger;
+  readinessChecks: Record<string, ReadinessCheck>;
+}
+
+export function createApp({ env, logger, readinessChecks }: AppDeps): Express {
+  const app = express();
+
+  app.disable('x-powered-by');
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
+
+  app.use(requestId);
+  app.use(
+    pinoHttp({
+      logger,
+      genReqId: (req) => req.id,
+      customLogLevel: (req, res, err) => {
+        // A failing readiness probe is an expected state, already logged per check.
+        if (req.url === '/ready') return res.statusCode >= 500 ? 'warn' : 'silent';
+        if (err || res.statusCode >= 500) return 'error';
+        return res.statusCode >= 400 ? 'warn' : 'info';
+      },
+      autoLogging: { ignore: (req) => req.url === '/health' },
+    }),
+  );
+
+  // The API serves JSON only, so the CSP can be maximally strict.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      },
+      crossOriginResourcePolicy: { policy: 'same-site' },
+      frameguard: { action: 'deny' },
+      strictTransportSecurity: { maxAge: 63072000, includeSubDomains: true, preload: true },
+    }),
+  );
+
+  const allowed = new Set(env.CORS_ORIGINS);
+  app.use(
+    cors({
+      // Requests without an Origin header (same-origin, curl, server-to-server) are not CORS.
+      origin: (origin, cb) => cb(null, !origin || allowed.has(origin)),
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-CSRF-Token',
+        'X-Request-Id',
+        'Idempotency-Key',
+      ],
+      exposedHeaders: ['X-Request-Id'],
+      maxAge: 600,
+    }),
+  );
+
+  app.use(express.json({ limit: env.BODY_LIMIT, strict: true }));
+  app.use(express.urlencoded({ extended: false, limit: env.BODY_LIMIT }));
+
+  app.use(healthRouter(readinessChecks));
+
+  const api = express.Router();
+  app.use('/api/v1', api);
+
+  app.use(notFound);
+  app.use(errorHandler);
+
+  return app;
+}
