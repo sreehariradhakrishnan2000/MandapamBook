@@ -15,6 +15,7 @@ import type { ObjectStorage } from './infra/storage.js';
 import { FieldCrypto } from './lib/field-crypto.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { AuditService } from './modules/audit/audit.service.js';
+import { catalogRouter } from './modules/catalog/catalog.routes.js';
 import { AccessTokenService } from './modules/auth/access-tokens.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { AuthService } from './modules/auth/auth.service.js';
@@ -97,6 +98,7 @@ export function buildContainer(deps: ContainerDeps): Container {
 
   const api = Router();
   api.use(limiters.middleware('apiPerIp', byIp));
+  api.use(catalogRouter({ db }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
   api.use(
     '/owner',

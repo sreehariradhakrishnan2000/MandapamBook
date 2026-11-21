@@ -601,3 +601,37 @@ describe.skipIf(!hasTestDb)('owner listings', () => {
     });
   });
 });
+
+describe.skipIf(!hasTestDb)('public catalog', () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await createHarness();
+    await h.db.insert(cities).values({
+      name: 'Kollam',
+      slug: `kollam-${randomBytes(3).toString('hex')}`,
+      district: 'Kollam',
+      state: 'Kerala',
+    });
+  });
+  afterAll(async () => {
+    await h?.close();
+  });
+
+  it('lists active cities and amenities without authentication', async () => {
+    const c = new Client(h.app);
+    const cityRes = await c.send('get', '/api/v1/cities');
+    expect(cityRes.status).toBe(200);
+    expect(cityRes.headers['cache-control']).toBe('public, max-age=300');
+    expect(cityRes.body.items.length).toBeGreaterThan(0);
+    expect(Object.keys(cityRes.body.items[0]).sort()).toEqual([
+      'district',
+      'id',
+      'name',
+      'nameI18n',
+      'slug',
+      'state',
+    ]);
+    const amenityRes = await c.send('get', '/api/v1/amenities');
+    expect(amenityRes.status).toBe(200);
+  });
+});
