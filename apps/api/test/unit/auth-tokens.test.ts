@@ -151,6 +151,8 @@ describe('auth env validation', () => {
     REDIS_URL: 'redis://localhost:6379',
     CSRF_SECRET: k(),
     OTP_SECRET: k(),
+    FIELD_ENCRYPTION_KEYS: `f1:${k()}`,
+    STORAGE_PROVIDER: 'memory',
   };
 
   it('parses key rings with the first key as signer', () => {

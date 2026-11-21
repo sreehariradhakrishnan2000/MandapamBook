@@ -11,6 +11,8 @@ const valid = {
   REFRESH_TOKEN_KEYS: `r1:${randomBytes(32).toString('base64url')}`,
   CSRF_SECRET: randomBytes(32).toString('base64url'),
   OTP_SECRET: randomBytes(32).toString('base64url'),
+  FIELD_ENCRYPTION_KEYS: `f1:${randomBytes(32).toString('base64url')}`,
+  STORAGE_PROVIDER: 'memory',
 };
 
 describe('loadEnv', () => {
@@ -51,7 +53,17 @@ describe('loadEnv', () => {
         APP_BASE_URL: 'https://mandapambook.in',
         REDIS_URL: 'rediss://default:x@cache.example:6379',
         EMAIL_PROVIDER: 'smtp',
+        STORAGE_PROVIDER: 's3',
+        S3_ACCESS_KEY_ID: 'test-only-key-id',
+        S3_SECRET_ACCESS_KEY: 'test-only-secret',
       }),
     ).not.toThrow();
+  });
+
+  it('requires S3 credentials for the s3 provider and 32-byte encryption keys', () => {
+    expect(() => loadEnv({ ...valid, STORAGE_PROVIDER: 's3' })).toThrow(/S3_ACCESS_KEY_ID/);
+    expect(() =>
+      loadEnv({ ...valid, FIELD_ENCRYPTION_KEYS: `f1:${randomBytes(48).toString('base64url')}` }),
+    ).toThrow(/exactly 32 bytes/);
   });
 });
