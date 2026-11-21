@@ -1,5 +1,6 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
-import express, { type Express } from 'express';
+import express, { type Express, type Router } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
@@ -12,9 +13,11 @@ export interface AppDeps {
   env: Pick<Env, 'CORS_ORIGINS' | 'BODY_LIMIT' | 'TRUST_PROXY_HOPS'>;
   logger: Logger;
   readinessChecks: Record<string, ReadinessCheck>;
+  /** Versioned API routes, mounted at /api/v1. */
+  api?: Router;
 }
 
-export function createApp({ env, logger, readinessChecks }: AppDeps): Express {
+export function createApp({ env, logger, readinessChecks, api }: AppDeps): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -69,11 +72,11 @@ export function createApp({ env, logger, readinessChecks }: AppDeps): Express {
 
   app.use(express.json({ limit: env.BODY_LIMIT, strict: true }));
   app.use(express.urlencoded({ extended: false, limit: env.BODY_LIMIT }));
+  app.use(cookieParser());
 
   app.use(healthRouter(readinessChecks));
 
-  const api = express.Router();
-  app.use('/api/v1', api);
+  app.use('/api/v1', api ?? express.Router());
 
   app.use(notFound);
   app.use(errorHandler);
