@@ -33,6 +33,11 @@ export default tseslint.config(
     },
   },
   {
+    // Tests assert on rows they just inserted; `row!` is clearer there than repeated guards.
+    files: ['apps/api/test/**/*.ts', 'packages/shared/test/**/*.ts'],
+    rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
+  },
+  {
     // Business logic must never import a concrete payment provider; only the factory may.
     files: ['apps/api/src/**/*.ts'],
     ignores: ['apps/api/src/modules/payments/factory.ts', 'apps/api/src/modules/payments/*/**'],
