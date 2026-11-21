@@ -47,7 +47,7 @@ Or run everything in containers: `docker compose up --build`, then open http://l
 | `pnpm format`       | Prettier                        |
 | `pnpm secrets:scan` | gitleaks over the git history   |
 
-Database workflow and integrity rules: [docs/database.md](docs/database.md). Auth, tokens and permissions: [docs/auth.md](docs/auth.md).
+Database workflow and integrity rules: [docs/database.md](docs/database.md). Auth, tokens and permissions: [docs/auth.md](docs/auth.md). Owner onboarding, KYC, uploads and pricing: [docs/owners.md](docs/owners.md).
 
 ## Contributing
 

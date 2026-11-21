@@ -35,6 +35,15 @@ Method: STRIDE per trust boundary. This document grows each phase; the Phase 8 r
 | E      | Owner staff escalating to pricing or payouts       | Permission-based RBAC, explicit staff permission set, tests              | 2, 3  |
 | E      | Compromised dependency or action                   | Lockfile, 7-day package age, SHA-pinned actions, audit, CodeQL, Trivy    | 0     |
 
+## Phase 3 controls in place
+
+- KYC theft from DB dumps or logs: AES-256-GCM field encryption with row/column-bound associated data; masked API responses and audit entries
+- Malicious uploads: type and size bound into the presigned URL; magic-byte check on confirm deletes mismatches; no SVG; private bucket with short-lived signed reads
+- IDOR on owner resources: every owner route loads through scope-filtered queries (22-route test matrix)
+- Staff privilege creep: staff limited to calendar and venue views, optionally per venue; owners cannot convert existing accounts into staff
+- Calendar abuse: owner blocks share the booking exclusion constraint; past dates refused
+- Open items: EXIF stripping/re-encoding (Phase 8), stale-upload cleanup job (Phase 5)
+
 ## Phase 2 controls in place
 
 - Credential stuffing: per-IP and per-email limits, lockout with alert email, generic errors, dummy hash for unknown emails
