@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday, timezone: Asia/Kolkata }
+    target-branch: develop
+    open-pull-requests-limit: 10
+    cooldown: { default-days: 7 }
+    commit-message: { prefix: 'build', include: scope }
+    groups:
+      angular:
+        patterns: ['@angular/*', '@angular-devkit/*', 'angular-eslint']
+      lint-and-format:
+        patterns: ['eslint*', '@eslint/*', 'typescript-eslint', 'prettier', '@commitlint/*']
+      test:
+        patterns: ['vitest', '@vitest/*', 'supertest', '@types/supertest', 'jsdom']
+      types:
+        patterns: ['@types/*']
+
+  - package-ecosystem: docker
+    directories: ['/docker']
+    schedule: { interval: weekly, day: monday, timezone: Asia/Kolkata }
+    target-branch: develop
+    commit-message: { prefix: 'build' }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday, timezone: Asia/Kolkata }
+    target-branch: develop
+    commit-message: { prefix: 'ci' }
+    groups:
+      actions:
+        patterns: ['*']
