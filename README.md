@@ -25,6 +25,7 @@ Plan and architecture: [docs/architecture.md](docs/architecture.md).
 ```sh
 pnpm install
 cp .env.example .env          # then replace every change-me value
+node scripts/generate-secrets.mjs >> .env   # auth key rings and secrets
 docker compose up -d postgres redis mailpit seaweedfs   # or point DATABASE_URL at Neon
 pnpm --filter @mandapambook/shared build
 pnpm --filter @mandapambook/api db:migrate
@@ -46,7 +47,7 @@ Or run everything in containers: `docker compose up --build`, then open http://l
 | `pnpm format`       | Prettier                        |
 | `pnpm secrets:scan` | gitleaks over the git history   |
 
-Database workflow and integrity rules: [docs/database.md](docs/database.md).
+Database workflow and integrity rules: [docs/database.md](docs/database.md). Auth, tokens and permissions: [docs/auth.md](docs/auth.md).
 
 ## Contributing
 

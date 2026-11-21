@@ -35,6 +35,16 @@ Method: STRIDE per trust boundary. This document grows each phase; the Phase 8 r
 | E      | Owner staff escalating to pricing or payouts       | Permission-based RBAC, explicit staff permission set, tests              | 2, 3  |
 | E      | Compromised dependency or action                   | Lockfile, 7-day package age, SHA-pinned actions, audit, CodeQL, Trivy    | 0     |
 
+## Phase 2 controls in place
+
+- Credential stuffing: per-IP and per-email limits, lockout with alert email, generic errors, dummy hash for unknown emails
+- Token theft: 15-minute access tokens in memory only; refresh rotation with family revocation on reuse; hashed storage; key rings with `kid`
+- CSRF on cookie endpoints: signed double-submit plus Origin check; SameSite=Strict `__Host-` cookies
+- Privilege escalation: permission checks, super-admin-only role changes, no self role change, admins cannot act on admins; tokens cut off on role change
+- IDOR: owner scope enforced in queries, 404 for foreign resources, tested per route
+- Account enumeration: identical responses for register, login and reset
+- Open redirect after login: return URLs restricted to in-app paths
+
 ## Phase 0 controls in place
 
 - Env validation fails fast and never prints values
