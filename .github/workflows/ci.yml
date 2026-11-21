@@ -82,6 +82,8 @@ jobs:
       DATABASE_URL: postgres://ci:test-only-ci-password@localhost:5432/mandapambook_test
       TEST_DATABASE_URL: postgres://ci:test-only-ci-password@localhost:5432/mandapambook_test
       REDIS_URL: redis://localhost:6379
+      # Auth integration tests use real Redis for revocation and rate limiting in CI.
+      TEST_REDIS_URL: redis://localhost:6379
       CORS_ORIGINS: http://localhost:4200
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
