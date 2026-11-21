@@ -34,7 +34,7 @@ export default tseslint.config(
   },
   {
     // Tests assert on rows they just inserted; `row!` is clearer there than repeated guards.
-    files: ['apps/api/test/**/*.ts', 'packages/shared/test/**/*.ts'],
+    files: ['apps/api/test/**/*.ts', 'packages/shared/test/**/*.ts', 'apps/web/src/**/*.spec.ts'],
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
   {
