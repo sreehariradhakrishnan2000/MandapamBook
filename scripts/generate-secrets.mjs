@@ -12,6 +12,7 @@ const kid = (prefix) => `${prefix}${new Date().toISOString().slice(0, 10).replac
 if (process.argv.includes('--rotate')) {
   console.log(`# Prepend to ACCESS_TOKEN_KEYS:  ${kid('a')}:${secret()},`);
   console.log(`# Prepend to REFRESH_TOKEN_KEYS: ${kid('r')}:${secret()},`);
+  console.log(`# Prepend to FIELD_ENCRYPTION_KEYS: ${kid('f')}:${secret()},`);
   console.log(
     '# Remove the old access key after 1 hour, the old refresh key after REFRESH_TOKEN_REMEMBER_DAYS.',
   );
@@ -20,4 +21,5 @@ if (process.argv.includes('--rotate')) {
   console.log(`REFRESH_TOKEN_KEYS=${kid('r')}:${secret()}`);
   console.log(`CSRF_SECRET=${secret()}`);
   console.log(`OTP_SECRET=${secret()}`);
+  console.log(`FIELD_ENCRYPTION_KEYS=${kid('f')}:${secret()}`);
 }
