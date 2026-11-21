@@ -23,6 +23,7 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next)
     status = err.status;
     body = { code: err.code, message: err.message, correlationId };
     if (err.details !== undefined) body.details = err.details;
+    if (err.headers) res.set(err.headers);
   } else if (err instanceof ZodError) {
     status = 400;
     body = {

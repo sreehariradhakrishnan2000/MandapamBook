@@ -9,6 +9,47 @@ const csv = z.string().transform((v) =>
 
 const booleanString = z.enum(['true', 'false']).transform((v) => v === 'true');
 
+export interface KeyRingEntry {
+  kid: string;
+  secret: Buffer;
+}
+
+/**
+ * A key ring: "kid1:base64url,kid0:base64url". The first key signs; every key verifies,
+ * so a new key can be prepended and the old one removed once its tokens have expired.
+ * Each secret must be at least 32 bytes.
+ */
+const keyRing = csv.transform((entries, ctx): KeyRingEntry[] => {
+  const ring: KeyRingEntry[] = [];
+  for (const entry of entries) {
+    const [kid, encoded] = entry.split(':');
+    if (!kid || !encoded || !/^[A-Za-z0-9_-]{1,32}$/.test(kid)) {
+      ctx.addIssue({ code: 'custom', message: 'each entry must be <kid>:<base64url secret>' });
+      return z.NEVER;
+    }
+    const secret = Buffer.from(encoded, 'base64url');
+    if (secret.length < 32) {
+      ctx.addIssue({ code: 'custom', message: `key "${kid}" must be at least 32 bytes` });
+      return z.NEVER;
+    }
+    if (ring.some((k) => k.kid === kid)) {
+      ctx.addIssue({ code: 'custom', message: `duplicate kid "${kid}"` });
+      return z.NEVER;
+    }
+    ring.push({ kid, secret });
+  }
+  if (ring.length === 0) {
+    ctx.addIssue({ code: 'custom', message: 'at least one key is required' });
+    return z.NEVER;
+  }
+  return ring;
+});
+
+const secret32 = z
+  .string()
+  .transform((v) => Buffer.from(v, 'base64url'))
+  .refine((b) => b.length >= 32, 'must be at least 32 bytes (base64url)');
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
@@ -17,14 +58,35 @@ export const envSchema = z.object({
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
   /** Comma-separated exact origins allowed by CORS. No wildcards. */
   CORS_ORIGINS: csv.pipe(z.array(z.url()).min(1)),
+  /** Public URL of the web app, used in email links. */
+  APP_BASE_URL: z.url().default('http://localhost:4200'),
   DATABASE_URL: z.url().refine((u) => u.startsWith('postgres'), 'must be a postgres:// URL'),
-  REDIS_URL: z.url().refine((u) => u.startsWith('redis'), 'must be a redis:// URL'),
+  REDIS_URL: z.url().refine((u) => /^rediss?:\/\//.test(u), 'must be a redis:// or rediss:// URL'),
   /** JSON request body limit, e.g. "100kb". */
   BODY_LIMIT: z
     .string()
     .regex(/^\d+(kb|mb)$/)
     .default('100kb'),
   ENABLE_API_DOCS: booleanString.default(false),
+
+  // --- Auth ---
+  /** HS256 signing keys for access tokens. Separate from the refresh-token keys. */
+  ACCESS_TOKEN_KEYS: keyRing,
+  /** HMAC keys for hashing refresh tokens at rest. Separate from the access-token keys. */
+  REFRESH_TOKEN_KEYS: keyRing,
+  /** HMAC key for signed double-submit CSRF tokens. */
+  CSRF_SECRET: secret32,
+  /** HMAC key for email tokens and OTP codes at rest. */
+  OTP_SECRET: secret32,
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+  REFRESH_TOKEN_REMEMBER_DAYS: z.coerce.number().int().min(1).max(30).default(30),
+  LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(20).default(5),
+  LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+  /** Check new passwords against Have I Been Pwned (k-anonymity; only a hash prefix is sent). */
+  HIBP_ENABLED: booleanString.default(false),
+  EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
+  OTP_PROVIDER: z.enum(['console']).default('console'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -46,9 +108,24 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new EnvValidationError(`Invalid environment configuration:\n${problems}`);
   }
   const env = result.data;
-  if (env.NODE_ENV === 'production' && env.CORS_ORIGINS.some((o) => o.startsWith('http://'))) {
+  const problems: string[] = [];
+  if (env.NODE_ENV === 'production') {
+    if (env.CORS_ORIGINS.some((o) => o.startsWith('http://'))) {
+      problems.push('CORS_ORIGINS: production origins must use https');
+    }
+    if (env.APP_BASE_URL.startsWith('http://')) problems.push('APP_BASE_URL: must use https');
+    if (!env.REDIS_URL.startsWith('rediss://'))
+      problems.push('REDIS_URL: production requires TLS (rediss://)');
+    if (env.EMAIL_PROVIDER === 'console')
+      problems.push('EMAIL_PROVIDER: console is not allowed in production');
+  }
+  const accessSecrets = new Set(env.ACCESS_TOKEN_KEYS.map((k) => k.secret.toString('hex')));
+  if (env.REFRESH_TOKEN_KEYS.some((k) => accessSecrets.has(k.secret.toString('hex')))) {
+    problems.push('REFRESH_TOKEN_KEYS: must not reuse an access-token key');
+  }
+  if (problems.length > 0) {
     throw new EnvValidationError(
-      'Invalid environment configuration:\n  - CORS_ORIGINS: production origins must use https',
+      `Invalid environment configuration:\n${problems.map((p) => `  - ${p}`).join('\n')}`,
     );
   }
   return env;

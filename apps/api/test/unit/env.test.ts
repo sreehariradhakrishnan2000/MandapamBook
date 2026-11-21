@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { EnvValidationError, loadEnv } from '../../src/config/env.js';
 
@@ -6,6 +7,10 @@ const valid = {
   CORS_ORIGINS: 'http://localhost:4200, http://localhost:8080',
   DATABASE_URL: 'postgres://app:pw@localhost:5432/mandapambook',
   REDIS_URL: 'redis://localhost:6379',
+  ACCESS_TOKEN_KEYS: `a1:${randomBytes(32).toString('base64url')}`,
+  REFRESH_TOKEN_KEYS: `r1:${randomBytes(32).toString('base64url')}`,
+  CSRF_SECRET: randomBytes(32).toString('base64url'),
+  OTP_SECRET: randomBytes(32).toString('base64url'),
 };
 
 describe('loadEnv', () => {
@@ -39,7 +44,14 @@ describe('loadEnv', () => {
   it('rejects http origins in production', () => {
     expect(() => loadEnv({ ...valid, NODE_ENV: 'production' })).toThrow(/https/);
     expect(() =>
-      loadEnv({ ...valid, NODE_ENV: 'production', CORS_ORIGINS: 'https://mandapambook.in' }),
+      loadEnv({
+        ...valid,
+        NODE_ENV: 'production',
+        CORS_ORIGINS: 'https://mandapambook.in',
+        APP_BASE_URL: 'https://mandapambook.in',
+        REDIS_URL: 'rediss://default:x@cache.example:6379',
+        EMAIL_PROVIDER: 'smtp',
+      }),
     ).not.toThrow();
   });
 });
