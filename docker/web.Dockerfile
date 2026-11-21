@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1.7
+# Build the Angular app, then serve static files from an unprivileged nginx (port 8080).
+ARG NODE_IMAGE=node:24-alpine
+
+FROM ${NODE_IMAGE} AS build
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH HUSKY=0 CI=true NG_CLI_ANALYTICS=false
+RUN corepack enable
+WORKDIR /repo
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/web/package.json apps/web/
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter "@mandapambook/web..."
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+RUN pnpm --filter @mandapambook/web build
+
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
+ENV API_UPSTREAM=http://api:4000
+COPY docker/default.conf.template /etc/nginx/templates/default.conf.template
+COPY docker/security-headers.inc /etc/nginx/conf.d/security-headers.inc
+COPY --from=build /repo/apps/web/dist/web/browser /usr/share/nginx/html
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1
