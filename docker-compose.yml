@@ -50,14 +50,18 @@ services:
       TRUST_PROXY_HOPS: 1
       DATABASE_URL: postgres://${POSTGRES_USER:-mandapambook}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandapambook}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      mailpit: { condition: service_started }
     read_only: true
     security_opt: ['no-new-privileges:true']
     cap_drop: [ALL]
 
-  # Same image as the API; runs the maintenance sweep (hold expiry, completion, upload cleanup).
+  # Same image as the API; runs the maintenance sweep (hold expiry, completion, upload
+  # cleanup, refunds, payouts) and delivers queued notifications.
   worker:
     build: { context: ., dockerfile: docker/api.Dockerfile }
     command: ['node', 'dist/worker.js']
@@ -66,8 +70,12 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgres://${POSTGRES_USER:-mandapambook}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandapambook}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Booking emails (with invoice PDFs) go to Mailpit: http://localhost:8025
+      EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
     depends_on:
       postgres: { condition: service_healthy }
+      mailpit: { condition: service_started }
     healthcheck:
       disable: true
     read_only: true
