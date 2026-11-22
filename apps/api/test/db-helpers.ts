@@ -9,7 +9,10 @@ export const hasTestDb = Boolean(TEST_DATABASE_URL);
 
 export function createTestPool(max = 5): pg.Pool {
   if (!TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not set');
-  return new pg.Pool({ connectionString: TEST_DATABASE_URL, max });
+  const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL, max, keepAlive: true });
+  // The remote test database occasionally drops idle connections; the pool recovers.
+  pool.on('error', () => undefined);
+  return pool;
 }
 
 export function testDb(pool: pg.Pool): Db {

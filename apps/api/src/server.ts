@@ -12,7 +12,7 @@ import { ConsoleEmailSender, ConsoleSmsSender } from './modules/notifications/se
 async function main(): Promise<void> {
   const env = loadEnv(); // fail fast on bad config
   const logger = createLogger(env);
-  const pool = createPgPool(env);
+  const pool = createPgPool(env, logger);
   const redis = createRedis(env);
   redis.on('error', (err) => logger.warn({ err }, 'redis error'));
   await redis

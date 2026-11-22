@@ -19,7 +19,7 @@ import { runSweep } from './jobs/sweeper.js';
 async function main(): Promise<void> {
   const env = loadEnv();
   const logger = createLogger(env).child({ component: 'worker' });
-  const pool = createPgPool(env);
+  const pool = createPgPool(env, logger);
   const db = createDb(pool);
   const settings = new SettingsService(db);
   const bookingService = new BookingService(

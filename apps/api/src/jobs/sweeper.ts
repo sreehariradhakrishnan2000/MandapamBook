@@ -43,6 +43,13 @@ export async function runSweep(deps: {
 }): Promise<SweepResult> {
   const { pool, db, bookingService, storage, logger } = deps;
   const client = await pool.connect();
+  let broken: Error | undefined;
+  // A failure on the lock connection itself must not crash the worker.
+  const onClientError = (err: Error) => {
+    broken = err;
+    logger.warn({ err }, 'sweep lock connection lost');
+  };
+  client.on('error', onClientError);
   try {
     const { rows } = await client.query<{ locked: boolean }>(
       'SELECT pg_try_advisory_lock($1) AS locked',
@@ -113,9 +120,15 @@ export async function runSweep(deps: {
         logger.info(result, 'sweep finished');
       return result;
     } finally {
-      await client.query('SELECT pg_advisory_unlock($1)', [SWEEP_LOCK_KEY]);
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [SWEEP_LOCK_KEY]);
+      } catch (err) {
+        // The lock connection broke. Closing it releases the session lock server-side.
+        broken = err instanceof Error ? err : new Error(String(err));
+      }
     }
   } finally {
-    client.release();
+    client.off('error', onClientError);
+    client.release(broken);
   }
 }
