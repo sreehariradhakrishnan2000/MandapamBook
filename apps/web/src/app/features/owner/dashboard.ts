@@ -13,11 +13,21 @@ import { StatusChip } from './status-chip';
     <section class="flex flex-col gap-6 py-4">
       <header class="flex flex-wrap items-center justify-between gap-3">
         <h1 class="font-display text-2xl font-bold">My venues</h1>
-        <a
-          routerLink="bookings"
-          class="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium"
-          >Bookings</a
-        >
+        <nav class="flex gap-2 text-sm" aria-label="Venue tools">
+          <a routerLink="bookings" class="rounded-md border border-slate-300 px-3 py-2 font-medium"
+            >Bookings</a
+          >
+          <a routerLink="reviews" class="rounded-md border border-slate-300 px-3 py-2 font-medium"
+            >Reviews</a
+          >
+          @if (isOwner) {
+            <a
+              routerLink="earnings"
+              class="rounded-md border border-slate-300 px-3 py-2 font-medium"
+              >Earnings</a
+            >
+          }
+        </nav>
         @if (isOwner) {
           <div class="flex gap-3 text-sm">
             <a routerLink="profile" class="rounded-md border border-slate-300 px-3 py-2 font-medium"

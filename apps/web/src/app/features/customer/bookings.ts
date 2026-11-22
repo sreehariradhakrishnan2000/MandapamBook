@@ -18,9 +18,13 @@ import {
   SLOT_LABELS,
   STATUS_LABELS,
 } from '../../core/booking-api.service';
+import { API } from '../../core/auth/auth.service';
+import { FileDownload } from '../../core/file-download';
+import { InsightsApi } from '../../core/insights-api.service';
 import { InrPipe } from '../../shared/inr.pipe';
 
 const CANCELLABLE = new Set(['HELD', 'PENDING_PAYMENT', 'AWAITING_OWNER', 'CONFIRMED']);
+const INVOICEABLE = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED']);
 
 @Component({
   selector: 'app-my-bookings',
@@ -123,6 +127,69 @@ export class MyBookings implements OnInit {
           }
         </dl>
 
+        @if (invoiceable()) {
+          <button
+            type="button"
+            class="w-fit rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium"
+            [disabled]="downloading()"
+            (click)="downloadInvoice()"
+          >
+            {{ downloading() ? 'Preparing invoice…' : 'Download invoice (PDF)' }}
+          </button>
+        }
+
+        @if (b.status === 'COMPLETED') {
+          <section
+            class="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm"
+            aria-labelledby="review-h"
+          >
+            <h2 id="review-h" class="font-semibold">Your review</h2>
+            @if (b.review; as r) {
+              <p>
+                Thank you. You rated this venue
+                <span class="font-semibold">{{ r.rating }} out of 5</span>.
+              </p>
+            } @else {
+              <fieldset class="flex flex-col gap-1">
+                <legend class="mb-1">How was the venue?</legend>
+                <div class="flex gap-1" role="radiogroup" aria-label="Rating out of 5">
+                  @for (n of stars; track n) {
+                    <button
+                      type="button"
+                      role="radio"
+                      class="rounded px-1 text-2xl leading-none"
+                      [class.text-amber-500]="n <= rating()"
+                      [class.text-slate-300]="n > rating()"
+                      [attr.aria-checked]="n === rating()"
+                      [attr.aria-label]="n + (n === 1 ? ' star' : ' stars')"
+                      (click)="rating.set(n)"
+                    >
+                      ★
+                    </button>
+                  }
+                </div>
+              </fieldset>
+              <label class="flex flex-col gap-1"
+                >What should other families know? (optional)
+                <textarea
+                  class="rounded-md border border-slate-300 px-2 py-1.5"
+                  rows="3"
+                  maxlength="2000"
+                  [(ngModel)]="reviewBody"
+                ></textarea>
+              </label>
+              <button
+                type="button"
+                class="w-fit rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+                [disabled]="rating() === 0 || submitting()"
+                (click)="submitReview()"
+              >
+                Post review
+              </button>
+            }
+          </section>
+        }
+
         @if (cancellable()) {
           <section
             class="flex flex-col gap-2 rounded-lg border border-red-200 bg-white p-4 text-sm"
@@ -188,6 +255,14 @@ export class MyBookings implements OnInit {
 })
 export class BookingDetailPage implements OnInit {
   private readonly api = inject(BookingApi);
+  private readonly insights = inject(InsightsApi);
+  private readonly files = inject(FileDownload);
+  protected readonly stars = [1, 2, 3, 4, 5];
+  protected readonly rating = signal(0);
+  protected readonly submitting = signal(false);
+  protected readonly downloading = signal(false);
+  protected readonly invoiceable = signal(false);
+  protected reviewBody = '';
   readonly id = input.required<string>();
   protected readonly slotLabels = SLOT_LABELS;
   protected readonly statusLabels = STATUS_LABELS;
@@ -206,6 +281,32 @@ export class BookingDetailPage implements OnInit {
     const b = await this.api.booking(this.id());
     this.b.set(b);
     this.cancellable.set(CANCELLABLE.has(b.status));
+    this.invoiceable.set(INVOICEABLE.has(b.status));
+  }
+
+  protected async downloadInvoice(): Promise<void> {
+    this.downloading.set(true);
+    this.error.set(null);
+    try {
+      await this.files.download(`${API}/bookings/${this.id()}/invoice.pdf`, 'invoice.pdf');
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    } finally {
+      this.downloading.set(false);
+    }
+  }
+
+  protected async submitReview(): Promise<void> {
+    this.submitting.set(true);
+    this.error.set(null);
+    try {
+      await this.insights.createReview(this.id(), this.rating(), this.reviewBody.trim());
+      await this.load();
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    } finally {
+      this.submitting.set(false);
+    }
   }
 
   protected async startCancel(): Promise<void> {

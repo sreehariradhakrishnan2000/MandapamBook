@@ -6,6 +6,7 @@ import {
   auditoriums,
   bookingAddons,
   bookingStatusHistory,
+  reviews,
   bookings,
   cities,
   halls,
@@ -141,8 +142,13 @@ export function bookingsRouter(deps: {
         .where(eq(bookingStatusHistory.bookingId, b.id))
         .orderBy(asc(bookingStatusHistory.createdAt)),
     ]);
+    const [review] = await db
+      .select({ id: reviews.id, rating: reviews.rating })
+      .from(reviews)
+      .where(eq(reviews.bookingId, b.id));
     res.set('Cache-Control', 'no-store').json({
       ...summary,
+      review: review ?? null,
       subtotalPaise: b.subtotalPaise,
       addonsPaise: b.addonsPaise,
       gstPaise: b.gstPaise,

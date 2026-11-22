@@ -44,6 +44,24 @@ export const ADMIN_ROUTES: Routes = [
     loadComponent: () => import('./settings').then((m) => m.AdminSettings),
   },
   {
+    path: 'reports',
+    title: 'Reports · MandapamBook',
+    canMatch: [withPermission('report:view')],
+    loadComponent: () => import('./insights').then((m) => m.AdminReports),
+  },
+  {
+    path: 'payouts',
+    title: 'Owner payouts · MandapamBook',
+    canMatch: [withPermission('payout:manage')],
+    loadComponent: () => import('./insights').then((m) => m.AdminPayouts),
+  },
+  {
+    path: 'reviews',
+    title: 'Review moderation · MandapamBook',
+    canMatch: [withPermission('review:moderate')],
+    loadComponent: () => import('./insights').then((m) => m.AdminReviews),
+  },
+  {
     path: 'audit',
     title: 'Audit log · MandapamBook',
     canMatch: [withPermission('audit:view')],

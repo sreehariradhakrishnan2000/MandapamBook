@@ -107,6 +107,7 @@ export interface BookingDetail extends BookingSummary {
   platformFeePaise: number;
   cancellationTiers: CancellationTier[];
   history: { toStatus: BookingStatus; at: string }[];
+  review: { id: string; rating: number } | null;
 }
 
 export interface RefundPreview {

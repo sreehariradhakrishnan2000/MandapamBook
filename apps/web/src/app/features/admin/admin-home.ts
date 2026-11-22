@@ -78,6 +78,24 @@ export class AdminHome implements OnInit {
       hint: 'Commission, fees and GST',
       permission: 'report:view',
     },
+    {
+      link: 'reports',
+      title: 'Reports',
+      hint: 'Bookings, collections and commission; CSV export',
+      permission: 'report:view',
+    },
+    {
+      link: 'payouts',
+      title: 'Owner payouts',
+      hint: 'Record transfers to venue owners',
+      permission: 'payout:manage',
+    },
+    {
+      link: 'reviews',
+      title: 'Reviews',
+      hint: 'Hide or restore customer reviews',
+      permission: 'review:moderate',
+    },
     { link: 'audit', title: 'Audit log', hint: 'Who did what, and when', permission: 'audit:view' },
   ];
   protected readonly tiles = signal<Tile[]>(
