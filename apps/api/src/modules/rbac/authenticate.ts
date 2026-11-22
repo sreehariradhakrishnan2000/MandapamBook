@@ -46,7 +46,7 @@ export function createAuthenticate(
           revocations.isFamilyRevoked(claims.familyId),
           revocations.getUserCutoff(claims.userId),
         ]);
-        if (tokenRevoked || familyRevoked || (cutoff !== null && claims.issuedAt <= cutoff)) {
+        if (tokenRevoked || familyRevoked || (cutoff !== null && claims.issuedAtMs <= cutoff)) {
           throw errors.unauthenticated('Your session has ended. Sign in again.');
         }
         req.auth = claims;
