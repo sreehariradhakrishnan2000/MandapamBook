@@ -140,9 +140,16 @@ export const bookingStatusHistory = pgTable(
     toStatus: bookingStatus('to_status').notNull(),
     actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
     reason: text('reason'),
+    /** Set once the worker has turned this transition into notifications (outbox). */
+    notifiedAt: timestamp('notified_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
-  (t) => [index('booking_status_history_booking_idx').on(t.bookingId, t.createdAt)],
+  (t) => [
+    index('booking_status_history_booking_idx').on(t.bookingId, t.createdAt),
+    index('booking_status_history_outbox_idx')
+      .on(t.createdAt)
+      .where(sql`${t.notifiedAt} IS NULL`),
+  ],
 );
 
 /**
