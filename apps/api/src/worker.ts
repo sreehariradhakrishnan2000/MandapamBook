@@ -11,13 +11,15 @@ import { MemoryObjectStorage, type ObjectStorage, S3ObjectStorage } from './infr
 import { AuditService } from './modules/audit/audit.service.js';
 import { BookingService } from './modules/bookings/booking.service.js';
 import { QuoteService } from './modules/bookings/quote.service.js';
+import { createPaymentProvider } from './modules/payments/factory.js';
+import { PaymentService } from './modules/payments/payment.service.js';
 import { SettingsService } from './modules/settings/settings.service.js';
 import { runSweep } from './jobs/sweeper.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
   const logger = createLogger(env).child({ component: 'worker' });
-  const pool = createPgPool(env);
+  const pool = createPgPool(env, logger);
   const db = createDb(pool);
   const settings = new SettingsService(db);
   const bookingService = new BookingService(
@@ -25,6 +27,13 @@ async function main(): Promise<void> {
     new QuoteService(db, settings),
     settings,
     new AuditService(db, logger),
+  );
+  const payments = new PaymentService(
+    db,
+    createPaymentProvider(env),
+    settings,
+    new AuditService(db, logger),
+    logger,
   );
   const storage: ObjectStorage =
     env.STORAGE_PROVIDER === 's3'
@@ -44,7 +53,7 @@ async function main(): Promise<void> {
     if (running) return;
     running = true;
     try {
-      await runSweep({ pool, db, bookingService, storage, logger });
+      await runSweep({ pool, db, bookingService, storage, payments, logger });
     } catch (err) {
       logger.error({ err }, 'sweep failed');
     } finally {

@@ -100,6 +100,20 @@ export const envSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: booleanString.default(true),
+
+  // --- Payments ---
+  /** Which gateway to use. Switching gateways is only this change plus its credentials. */
+  PAYMENT_PROVIDER: z.enum(['mock', 'razorpay']).default('mock'),
+  /** Mock gateway: signs checkout results (like a gateway key secret). */
+  MOCK_PAYMENT_KEY_SECRET: secret32.optional(),
+  /** Mock gateway: signs webhooks. Separate from the key secret, as real gateways do. */
+  MOCK_PAYMENT_WEBHOOK_SECRET: secret32.optional(),
+  RAZORPAY_KEY_ID: z
+    .string()
+    .regex(/^rzp_(test|live)_[A-Za-z0-9]+$/)
+    .optional(),
+  RAZORPAY_KEY_SECRET: z.string().min(16).optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(16).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -133,6 +147,26 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       problems.push('EMAIL_PROVIDER: console is not allowed in production');
     if (env.STORAGE_PROVIDER === 'memory')
       problems.push('STORAGE_PROVIDER: memory is not allowed in production');
+    if (env.PAYMENT_PROVIDER === 'mock')
+      problems.push('PAYMENT_PROVIDER: the mock gateway is not allowed in production');
+    if (env.RAZORPAY_KEY_ID?.startsWith('rzp_test_'))
+      problems.push('RAZORPAY_KEY_ID: test keys are not allowed in production');
+  }
+  if (
+    env.PAYMENT_PROVIDER === 'mock' &&
+    (!env.MOCK_PAYMENT_KEY_SECRET || !env.MOCK_PAYMENT_WEBHOOK_SECRET)
+  ) {
+    problems.push(
+      'MOCK_PAYMENT_KEY_SECRET / MOCK_PAYMENT_WEBHOOK_SECRET: required when PAYMENT_PROVIDER=mock',
+    );
+  }
+  if (
+    env.PAYMENT_PROVIDER === 'razorpay' &&
+    (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET || !env.RAZORPAY_WEBHOOK_SECRET)
+  ) {
+    problems.push(
+      'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET / RAZORPAY_WEBHOOK_SECRET: required when PAYMENT_PROVIDER=razorpay',
+    );
   }
   if (env.STORAGE_PROVIDER === 's3' && (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY)) {
     problems.push('S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY: required when STORAGE_PROVIDER=s3');

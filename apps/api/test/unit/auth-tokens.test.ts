@@ -153,6 +153,8 @@ describe('auth env validation', () => {
     OTP_SECRET: k(),
     FIELD_ENCRYPTION_KEYS: `f1:${k()}`,
     STORAGE_PROVIDER: 'memory',
+    MOCK_PAYMENT_KEY_SECRET: k(),
+    MOCK_PAYMENT_WEBHOOK_SECRET: k(),
   };
 
   it('parses key rings with the first key as signer', () => {

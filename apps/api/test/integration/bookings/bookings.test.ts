@@ -391,6 +391,7 @@ describe.skipIf(!hasTestDb)('search, quotes, holds and bookings', { timeout: 120
         'get',
         `/api/v1/auditoriums?city=${citySlug}&date=${date}&slot=MORNING`,
       );
+      expect(search.status, JSON.stringify(search.body)).toBe(200);
       expect(search.body.items).toHaveLength(1);
       const res = await second.c.send('post', '/api/v1/bookings', {
         hallId,

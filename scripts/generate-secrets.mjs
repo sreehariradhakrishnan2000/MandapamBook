@@ -22,4 +22,6 @@ if (process.argv.includes('--rotate')) {
   console.log(`CSRF_SECRET=${secret()}`);
   console.log(`OTP_SECRET=${secret()}`);
   console.log(`FIELD_ENCRYPTION_KEYS=${kid('f')}:${secret()}`);
+  console.log(`MOCK_PAYMENT_KEY_SECRET=${secret()}`);
+  console.log(`MOCK_PAYMENT_WEBHOOK_SECRET=${secret()}`);
 }

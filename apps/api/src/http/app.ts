@@ -70,6 +70,8 @@ export function createApp({ env, logger, readinessChecks, api }: AppDeps): Expre
     }),
   );
 
+  // Payment webhooks are verified over the exact bytes received, so keep them raw.
+  app.use('/api/v1/payments/webhooks', express.raw({ type: () => true, limit: '256kb' }));
   app.use(express.json({ limit: env.BODY_LIMIT, strict: true }));
   app.use(express.urlencoded({ extended: false, limit: env.BODY_LIMIT }));
   app.use(cookieParser());

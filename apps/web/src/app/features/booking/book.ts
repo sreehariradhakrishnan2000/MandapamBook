@@ -20,6 +20,7 @@ import {
   type VenuePage,
 } from '../../core/booking-api.service';
 import { InrPipe } from '../../shared/inr.pipe';
+import { PaymentAdapter } from '../payments/payment-adapter';
 
 /**
  * Booking flow: choose date, slot, guests and add-ons → see the server's price breakdown →
@@ -27,7 +28,7 @@ import { InrPipe } from '../../shared/inr.pipe';
  */
 @Component({
   selector: 'app-book',
-  imports: [FormsModule, RouterLink, InrPipe],
+  imports: [FormsModule, RouterLink, InrPipe, PaymentAdapter],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-5 py-4">
@@ -50,9 +51,7 @@ import { InrPipe } from '../../shared/inr.pipe';
               <span class="font-mono text-lg font-bold tabular-nums">{{ countdown() }}</span> or the
               slot is released.
             </p>
-            <p class="text-sm text-slate-600">
-              Online payment opens in the next release. Until then the hold expires automatically.
-            </p>
+            <app-payment-adapter [bookingId]="hold.id" [amountPaise]="hold.quote.payNowPaise" />
           } @else {
             <p>This hold has expired and the slot was released. You can try again.</p>
           }

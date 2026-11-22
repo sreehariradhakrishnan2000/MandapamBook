@@ -17,6 +17,7 @@ import {
 } from '../src/infra/revocation-store.js';
 import { MemoryObjectStorage } from '../src/infra/storage.js';
 import { hashPassword } from '../src/modules/auth/password.js';
+import { MockPaymentProvider } from '../src/modules/payments/mock/mock-provider.js';
 import { MemoryEmailSender, MemorySmsSender } from '../src/modules/notifications/senders.js';
 import { createTestPool, testDb } from './db-helpers.js';
 import { silentLogger } from './helpers.js';
@@ -49,6 +50,9 @@ export function testAuthEnv(overrides: Partial<AuthEnv> = {}): AuthEnv {
     LOGIN_LOCKOUT_MINUTES: 15,
     HIBP_ENABLED: false,
     FIELD_ENCRYPTION_KEYS: [{ kid: 'f1', secret: FIELD_KEY }],
+    PAYMENT_PROVIDER: 'mock',
+    MOCK_PAYMENT_KEY_SECRET: randomBytes(32),
+    MOCK_PAYMENT_WEBHOOK_SECRET: randomBytes(32),
     ...overrides,
   };
 }
@@ -62,6 +66,7 @@ export interface Harness {
   sms: MemorySmsSender;
   revocations: RevocationStore;
   storage: MemoryObjectStorage;
+  gateway: MockPaymentProvider;
   close(): Promise<void>;
 }
 
@@ -86,6 +91,10 @@ export async function createHarness(
     : null;
   const revocations = redis ? new RedisRevocationStore(redis) : new MemoryRevocationStore();
   const env = testAuthEnv(opts.env);
+  const gateway = new MockPaymentProvider(
+    env.MOCK_PAYMENT_KEY_SECRET!,
+    env.MOCK_PAYMENT_WEBHOOK_SECRET!,
+  );
   // Every test request comes from one IP, so per-IP limits are raised unless a test
   // sets them explicitly (see rate-limit.test.ts). Per-account limits keep real values.
   const generous = { points: 10_000, windowSeconds: 60 };
@@ -98,6 +107,7 @@ export async function createHarness(
     email,
     sms,
     storage,
+    paymentProvider: gateway,
     limitOverrides: {
       apiPerIp: generous,
       loginPerIp: generous,
@@ -123,6 +133,7 @@ export async function createHarness(
     sms,
     revocations,
     storage,
+    gateway,
     close: async () => {
       await pool.end();
       await redis?.quit();

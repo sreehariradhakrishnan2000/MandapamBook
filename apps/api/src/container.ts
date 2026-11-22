@@ -27,6 +27,14 @@ import { RefreshTokenService } from './modules/auth/refresh-tokens.js';
 import type { EmailSender, SmsSender } from './modules/notifications/senders.js';
 import { ownerRouter } from './modules/owners/owner.routes.js';
 import { createAuthenticate } from './modules/rbac/authenticate.js';
+import {
+  type PaymentEnv,
+  createPaymentProvider,
+  providerRoutes,
+} from './modules/payments/factory.js';
+import { PaymentService } from './modules/payments/payment.service.js';
+import { paymentsRouter } from './modules/payments/payments.routes.js';
+import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
 
 export type AuthEnv = Pick<
@@ -44,7 +52,8 @@ export type AuthEnv = Pick<
   | 'LOGIN_LOCKOUT_MINUTES'
   | 'HIBP_ENABLED'
   | 'FIELD_ENCRYPTION_KEYS'
->;
+> &
+  PaymentEnv;
 
 export interface ContainerDeps {
   env: AuthEnv;
@@ -55,6 +64,8 @@ export interface ContainerDeps {
   email: EmailSender;
   sms: SmsSender;
   storage: ObjectStorage;
+  /** Tests inject a provider with known secrets; otherwise it is built from env. */
+  paymentProvider?: PaymentProvider;
   breaches?: BreachChecker;
   limitOverrides?: Partial<Record<LimitName, LimitSpec>>;
 }
@@ -62,6 +73,7 @@ export interface ContainerDeps {
 export interface Container {
   api: Router;
   bookings: BookingService;
+  payments: PaymentService;
   auth: AuthService;
   audit: AuditService;
   accessTokens: AccessTokenService;
@@ -106,13 +118,42 @@ export function buildContainer(deps: ContainerDeps): Container {
   const settings = new SettingsService(db);
   const quotes = new QuoteService(db, settings);
   const bookingService = new BookingService(db, quotes, settings, audit);
+  const provider = deps.paymentProvider ?? createPaymentProvider(env);
+  const paymentService = new PaymentService(db, provider, settings, audit, deps.logger);
   api.use(catalogRouter({ db, storage: deps.storage }));
-  api.use(bookingsRouter({ db, quotes, bookings: bookingService, limiters, authenticate }));
+  api.use(
+    bookingsRouter({
+      db,
+      quotes,
+      bookings: bookingService,
+      payments: paymentService,
+      limiters,
+      authenticate,
+    }),
+  );
+  // Provider-hosted pages (the mock checkout) are public, so they mount before the
+  // authenticated /payments routes.
+  const extra = providerRoutes(provider, {
+    db,
+    payments: paymentService,
+    appBaseUrl: env.APP_BASE_URL,
+    logger: deps.logger,
+  });
+  if (extra) api.use(extra);
+  api.use(paymentsRouter({ payments: paymentService, authenticate, limiters }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
   api.use(
     '/owner',
     limiters.middleware('apiPerUser', byIp),
-    ownerRouter({ db, authenticate, audit, auth, crypto, storage: deps.storage }),
+    ownerRouter({
+      db,
+      authenticate,
+      audit,
+      auth,
+      crypto,
+      storage: deps.storage,
+      payments: paymentService,
+    }),
   );
   api.use(
     '/admin',
@@ -125,6 +166,7 @@ export function buildContainer(deps: ContainerDeps): Container {
       crypto,
       email: deps.email,
       settings,
+      payments: paymentService,
       appBaseUrl: env.APP_BASE_URL,
     }),
   );
@@ -132,6 +174,7 @@ export function buildContainer(deps: ContainerDeps): Container {
   return {
     api,
     bookings: bookingService,
+    payments: paymentService,
     auth,
     audit,
     accessTokens,

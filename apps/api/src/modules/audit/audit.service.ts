@@ -46,7 +46,14 @@ export type AuditAction =
   | 'booking.held'
   | 'booking.cancelled'
   | 'booking.accepted'
-  | 'booking.balance_received';
+  | 'booking.balance_received'
+  | 'booking.declined'
+  | 'payment.order_created'
+  | 'payment.verify_failed'
+  | 'payment.webhook_rejected'
+  | 'payment.amount_mismatch'
+  | 'payment.captured'
+  | 'payment.refunded';
 
 export interface AuditEntry {
   action: AuditAction;

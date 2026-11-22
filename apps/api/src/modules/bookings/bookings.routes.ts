@@ -16,6 +16,7 @@ import { type RateLimiters, byIp } from '../../http/middleware/rate-limit.js';
 import { auditContext } from '../audit/audit.service.js';
 import { parseId } from '../owners/scoped.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
+import type { PaymentService } from '../payments/payment.service.js';
 import type { BookingService } from './booking.service.js';
 import type { QuoteService } from './quote.service.js';
 
@@ -41,6 +42,7 @@ export function bookingsRouter(deps: {
   db: Db;
   quotes: QuoteService;
   bookings: BookingService;
+  payments: PaymentService;
   limiters: RateLimiters;
   authenticate: RequestHandler;
 }): Router {
@@ -154,8 +156,30 @@ export function bookingsRouter(deps: {
     const me = currentUser(req);
     const id = parseId(req.params['id']);
     const { reason } = cancelBookingSchema.parse(req.body ?? {});
-    const result = await service.cancel(me.userId, id, reason, auditContext(req));
-    res.json({ id: result.booking.id, status: result.booking.status, refund: result.refund });
+    const ctx = auditContext(req);
+    const result = await service.cancel(me.userId, id, reason, ctx);
+    // Refund what the policy allows; the booking moves to REFUNDED once it is paid out.
+    const refund =
+      result.refund.refundPaise > 0
+        ? await deps.payments.refundBooking({
+            bookingId: id,
+            amountPaise: result.refund.refundPaise,
+            purpose: 'customer_cancel',
+            reason: reason ?? 'Cancelled by customer',
+            actorId: me.userId,
+            ctx,
+          })
+        : null;
+    const [after] = await db
+      .select({ status: bookings.status })
+      .from(bookings)
+      .where(eq(bookings.id, id));
+    res.json({
+      id,
+      status: after?.status ?? result.booking.status,
+      refund: result.refund,
+      refundStatus: refund?.status ?? 'NONE',
+    });
   });
 
   return r;

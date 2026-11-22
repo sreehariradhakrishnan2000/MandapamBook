@@ -5,6 +5,7 @@ import type { Db } from '../../db/client.js';
 import { auditoriums, bookings, cities, halls, users } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
+import type { PaymentService } from '../payments/payment.service.js';
 import { bookingSummary } from '../bookings/bookings.routes.js';
 import { StaleBookingError, transition } from '../bookings/state-machine.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
@@ -19,8 +20,9 @@ export function bookingsInboxRouter(deps: {
   db: Db;
   scoped: ScopedResources;
   audit: AuditService;
+  payments: PaymentService;
 }): Router {
-  const { db, scoped, audit } = deps;
+  const { db, scoped, audit, payments } = deps;
   const r = Router();
   const PAID = ['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED'] as const;
 
@@ -116,6 +118,29 @@ export function bookingsInboxRouter(deps: {
         );
       throw err;
     }
+  });
+
+  /** Declines a paid request: the booking is cancelled and everything paid online is refunded. */
+  r.post('/bookings/:id/reject', requirePermission('booking:approve'), async (req, res) => {
+    const me = currentUser(req);
+    const { scope, booking } = await loadScoped(req);
+    requireOwner(scope);
+    const refund = await payments.cancelAwaitingOwner(
+      booking.id,
+      'rejected_by_owner',
+      me.userId,
+      auditContext(req),
+    );
+    const [after] = await db
+      .select({ status: bookings.status })
+      .from(bookings)
+      .where(eq(bookings.id, booking.id));
+    res.json({
+      id: booking.id,
+      status: after?.status,
+      refundStatus: refund.status,
+      refundPaise: refund.amountPaise,
+    });
   });
 
   /** Records that the balance was paid at the venue. */
