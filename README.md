@@ -32,6 +32,7 @@ pnpm --filter @mandapambook/api db:migrate
 pnpm --filter @mandapambook/api db:seed
 pnpm --filter @mandapambook/api dev   # http://localhost:4000/health
 pnpm --filter @mandapambook/web start # http://localhost:4200
+pnpm --filter @mandapambook/api worker # hold expiry and other maintenance
 ```
 
 Or run everything in containers: `docker compose up --build`, then open http://localhost:8080. Mailpit's inbox is at http://localhost:8025.
@@ -47,7 +48,7 @@ Or run everything in containers: `docker compose up --build`, then open http://l
 | `pnpm format`       | Prettier                        |
 | `pnpm secrets:scan` | gitleaks over the git history   |
 
-Database workflow and integrity rules: [docs/database.md](docs/database.md). Auth, tokens and permissions: [docs/auth.md](docs/auth.md). Owner onboarding, KYC, uploads and pricing: [docs/owners.md](docs/owners.md). Admin review, KYC verification and settings: [docs/admin.md](docs/admin.md).
+Database workflow and integrity rules: [docs/database.md](docs/database.md). Auth, tokens and permissions: [docs/auth.md](docs/auth.md). Owner onboarding, KYC, uploads and pricing: [docs/owners.md](docs/owners.md). Admin review, KYC verification and settings: [docs/admin.md](docs/admin.md). Search, pricing, holds and the booking state machine: [docs/bookings.md](docs/bookings.md).
 
 ## Contributing
 
