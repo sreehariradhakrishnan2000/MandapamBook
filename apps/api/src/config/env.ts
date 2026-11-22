@@ -52,6 +52,13 @@ const secret32 = z
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /**
+   * Which deployment this is, when NODE_ENV=production. "staging" keeps every production
+   * safeguard but allows the mock payment gateway (shown with the TEST MODE banner) and
+   * Razorpay test keys. Unset means "production", the strict default, so forgetting it can
+   * never loosen production.
+   */
+  APP_ENV: z.enum(['staging', 'production']).optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Number of trusted reverse-proxy hops in front of the API (affects req.ip). */
@@ -161,6 +168,10 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   }
   const env = result.data;
   const problems: string[] = [];
+  if (env.APP_ENV && env.NODE_ENV !== 'production') {
+    problems.push('APP_ENV: only meaningful with NODE_ENV=production');
+  }
+  const staging = env.APP_ENV === 'staging';
   if (env.NODE_ENV === 'production') {
     if (env.CORS_ORIGINS.some((o) => o.startsWith('http://'))) {
       problems.push('CORS_ORIGINS: production origins must use https');
@@ -172,10 +183,13 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       problems.push(`EMAIL_PROVIDER: ${env.EMAIL_PROVIDER} is not allowed in production`);
     if (env.STORAGE_PROVIDER === 'memory')
       problems.push('STORAGE_PROVIDER: memory is not allowed in production');
-    if (env.PAYMENT_PROVIDER === 'mock')
+    // Staging may take test payments; real production may not.
+    if (!staging && env.PAYMENT_PROVIDER === 'mock')
       problems.push('PAYMENT_PROVIDER: the mock gateway is not allowed in production');
-    if (env.RAZORPAY_KEY_ID?.startsWith('rzp_test_'))
+    if (!staging && env.RAZORPAY_KEY_ID?.startsWith('rzp_test_'))
       problems.push('RAZORPAY_KEY_ID: test keys are not allowed in production');
+    if (staging && env.RAZORPAY_KEY_ID?.startsWith('rzp_live_'))
+      problems.push('RAZORPAY_KEY_ID: live keys are not allowed in staging');
   }
   if (
     env.PAYMENT_PROVIDER === 'mock' &&
