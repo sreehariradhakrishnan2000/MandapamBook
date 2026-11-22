@@ -24,6 +24,7 @@ import { RefreshTokenService } from './modules/auth/refresh-tokens.js';
 import type { EmailSender, SmsSender } from './modules/notifications/senders.js';
 import { ownerRouter } from './modules/owners/owner.routes.js';
 import { createAuthenticate } from './modules/rbac/authenticate.js';
+import { SettingsService } from './modules/settings/settings.service.js';
 
 export type AuthEnv = Pick<
   Env,
@@ -105,7 +106,21 @@ export function buildContainer(deps: ContainerDeps): Container {
     limiters.middleware('apiPerUser', byIp),
     ownerRouter({ db, authenticate, audit, auth, crypto, storage: deps.storage }),
   );
-  api.use('/admin', adminRouter({ db, auth, audit, authenticate }));
+  const settings = new SettingsService(db);
+  api.use(
+    '/admin',
+    adminRouter({
+      db,
+      auth,
+      audit,
+      authenticate,
+      storage: deps.storage,
+      crypto,
+      email: deps.email,
+      settings,
+      appBaseUrl: env.APP_BASE_URL,
+    }),
+  );
 
   return { api, auth, audit, accessTokens, refreshTokens, limiters, authenticate };
 }

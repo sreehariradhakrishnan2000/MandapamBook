@@ -6,7 +6,13 @@ import type { Logger } from 'pino';
  */
 export interface EmailMessage {
   to: string;
-  template: 'verify_email' | 'password_reset' | 'account_exists' | 'security_alert';
+  template:
+    | 'verify_email'
+    | 'password_reset'
+    | 'account_exists'
+    | 'security_alert'
+    | 'listing_decision'
+    | 'kyc_decision';
   subject: string;
   text: string;
 }

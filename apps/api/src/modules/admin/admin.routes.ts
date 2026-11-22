@@ -1,12 +1,20 @@
 import { type RequestHandler, Router } from 'express';
-import { and, desc, eq, lt, type SQL } from 'drizzle-orm';
-import { roleChangeSchema } from '@mandapambook/shared';
+import { and, count, desc, eq, ilike, lt, or, type SQL } from 'drizzle-orm';
+import { adminUserQuerySchema, roleChangeSchema } from '@mandapambook/shared';
 import { z } from 'zod';
 import type { Db } from '../../db/client.js';
-import { auditLogs, users } from '../../db/schema/index.js';
+import { auditLogs, ownerProfiles, users } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
+import type { ObjectStorage } from '../../infra/storage.js';
+import type { FieldCrypto } from '../../lib/field-crypto.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
 import type { AuthService } from '../auth/auth.service.js';
+import type { EmailSender } from '../notifications/senders.js';
+import { parseId } from '../owners/scoped.js';
+import type { SettingsService } from '../settings/settings.service.js';
+import { kycReviewRouter } from './kyc-review.routes.js';
+import { escapeLike, listingsReviewRouter } from './listings-review.routes.js';
+import { masterDataRouter } from './masterdata.routes.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 
 const statusChangeSchema = z.strictObject({
@@ -28,11 +36,92 @@ export interface AdminRouterDeps {
   auth: AuthService;
   audit: AuditService;
   authenticate: RequestHandler;
+  storage: ObjectStorage;
+  crypto: FieldCrypto;
+  email: EmailSender;
+  settings: SettingsService;
+  appBaseUrl: string;
 }
 
-export function adminRouter({ db, auth, audit, authenticate }: AdminRouterDeps): Router {
+/** Safe user fields for admin screens: never password hashes or lockout internals. */
+const userSummary = {
+  id: users.id,
+  email: users.email,
+  fullName: users.fullName,
+  phone: users.phone,
+  role: users.role,
+  status: users.status,
+  emailVerifiedAt: users.emailVerifiedAt,
+  phoneVerifiedAt: users.phoneVerifiedAt,
+  lastLoginAt: users.lastLoginAt,
+  lockedUntil: users.lockedUntil,
+  createdAt: users.createdAt,
+};
+
+export function adminRouter(deps: AdminRouterDeps): Router {
+  const { db, auth, audit, authenticate } = deps;
   const r = Router();
   r.use(authenticate);
+  r.use(
+    listingsReviewRouter({
+      db,
+      audit,
+      storage: deps.storage,
+      email: deps.email,
+      appBaseUrl: deps.appBaseUrl,
+    }),
+  );
+  r.use(
+    kycReviewRouter({
+      db,
+      audit,
+      crypto: deps.crypto,
+      email: deps.email,
+      appBaseUrl: deps.appBaseUrl,
+    }),
+  );
+  r.use(masterDataRouter({ db, audit, settings: deps.settings }));
+
+  r.get('/users', requirePermission('user:manage'), async (req, res) => {
+    const q = adminUserQuerySchema.parse(req.query);
+    const where = and(
+      q.role ? eq(users.role, q.role) : undefined,
+      q.status ? eq(users.status, q.status) : undefined,
+      q.q
+        ? or(
+            ilike(users.email, `%${escapeLike(q.q)}%`),
+            ilike(users.fullName, `%${escapeLike(q.q)}%`),
+            ilike(users.phone, `%${escapeLike(q.q)}%`),
+          )
+        : undefined,
+    );
+    const [items, [{ total } = { total: 0 }]] = await Promise.all([
+      db
+        .select(userSummary)
+        .from(users)
+        .where(where)
+        .orderBy(desc(users.createdAt))
+        .limit(q.limit)
+        .offset(q.offset),
+      db.select({ total: count() }).from(users).where(where),
+    ]);
+    res.set('Cache-Control', 'no-store').json({ items, total, limit: q.limit, offset: q.offset });
+  });
+
+  r.get('/users/:id', requirePermission('user:manage'), async (req, res) => {
+    const id = parseId(req.params['id']);
+    const [user] = await db
+      .select({
+        ...userSummary,
+        businessName: ownerProfiles.businessName,
+        kycStatus: ownerProfiles.kycStatus,
+      })
+      .from(users)
+      .leftJoin(ownerProfiles, eq(ownerProfiles.userId, users.id))
+      .where(eq(users.id, id));
+    if (!user) throw errors.notFound('User not found');
+    res.set('Cache-Control', 'no-store').json(user);
+  });
 
   /** Changing roles is super-admin only; every change is audited and ends the user's sessions. */
   r.patch('/users/:id/role', requirePermission('user:role_change'), async (req, res) => {
