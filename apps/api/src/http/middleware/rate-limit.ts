@@ -27,6 +27,9 @@ export const LIMITS = {
   otpSendPerPhone: { points: 5, windowSeconds: 60 * 60 },
   otpVerifyPerUser: { points: 10, windowSeconds: 15 * 60 },
   refreshPerIp: { points: 60, windowSeconds: 60 },
+  // Holds lock a date for everyone else; cap how often one customer can do that.
+  holdPerUser: { points: 6, windowSeconds: 60 * 60 },
+  quotePerIp: { points: 120, windowSeconds: 60 },
 } satisfies Record<string, LimitSpec>;
 
 export type LimitName = keyof typeof LIMITS;

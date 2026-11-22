@@ -42,7 +42,11 @@ export type AuditAction =
   | 'owner.kyc_rejected'
   | 'owner.kyc_revealed'
   | 'masterdata.changed'
-  | 'settings.changed';
+  | 'settings.changed'
+  | 'booking.held'
+  | 'booking.cancelled'
+  | 'booking.accepted'
+  | 'booking.balance_received';
 
 export interface AuditEntry {
   action: AuditAction;
