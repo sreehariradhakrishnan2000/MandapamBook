@@ -13,6 +13,8 @@ const valid = {
   OTP_SECRET: randomBytes(32).toString('base64url'),
   FIELD_ENCRYPTION_KEYS: `f1:${randomBytes(32).toString('base64url')}`,
   STORAGE_PROVIDER: 'memory',
+  MOCK_PAYMENT_KEY_SECRET: randomBytes(32).toString('base64url'),
+  MOCK_PAYMENT_WEBHOOK_SECRET: randomBytes(32).toString('base64url'),
 };
 
 describe('loadEnv', () => {
@@ -56,6 +58,10 @@ describe('loadEnv', () => {
         STORAGE_PROVIDER: 's3',
         S3_ACCESS_KEY_ID: 'test-only-key-id',
         S3_SECRET_ACCESS_KEY: 'test-only-secret',
+        PAYMENT_PROVIDER: 'razorpay',
+        RAZORPAY_KEY_ID: 'rzp_live_testonly123',
+        RAZORPAY_KEY_SECRET: 'test-only-razorpay-secret',
+        RAZORPAY_WEBHOOK_SECRET: 'test-only-webhook-secret',
       }),
     ).not.toThrow();
   });
