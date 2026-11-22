@@ -80,9 +80,18 @@ export class InvoiceService {
    * Gives a paid booking its invoice number on first request. Numbers are sequential and
    * gap-free per financial year: the counter row is locked by the UPDATE, so concurrent
    * requests never share a number.
+   *
+   * The booking row is locked first, so concurrent first requests for the same booking
+   * queue up and the later ones find the invoice the first one created. Without the lock,
+   * both saw "no invoice", and the second insert hit invoices_booking_key (a 500).
    */
   async ensureNumber(bookingId: string, tx?: Tx): Promise<{ number: string; issuedAt: Date }> {
     const run = async (t: Tx) => {
+      await t
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(eq(bookings.id, bookingId))
+        .for('update');
       const [existing] = await t.select().from(invoices).where(eq(invoices.bookingId, bookingId));
       if (existing) return { number: existing.number, issuedAt: existing.issuedAt };
       const issuedAt = new Date();
