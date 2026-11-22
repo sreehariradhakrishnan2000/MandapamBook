@@ -32,6 +32,11 @@ export interface PriceSnapshot {
   gstBasisPoints: number;
   platformFeePaise: number;
   cancellationTiers: CancellationTier[];
+  /** Which kind of rule set the base price (BASE, WEEKEND, MUHURTHAM, ...). */
+  ruleKind?: string;
+  advancePercent?: number;
+  /** Advance on venue charges + GST, excluding the platform fee. */
+  venueAdvancePaise?: number;
 }
 
 export const bookings = pgTable(
