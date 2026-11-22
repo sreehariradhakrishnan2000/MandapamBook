@@ -1,0 +1,1 @@
+ALTER TABLE "owner_profiles" ADD COLUMN "kyc_rejection_reason" text;

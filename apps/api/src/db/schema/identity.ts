@@ -68,6 +68,8 @@ export const ownerProfiles = pgTable(
     kycStatus: kycStatus('kyc_status').notNull().default('NOT_STARTED'),
     kycReviewedBy: uuid('kyc_reviewed_by').references(() => users.id),
     kycReviewedAt: timestamp('kyc_reviewed_at', { withTimezone: true }),
+    /** Shown to the owner when KYC is rejected; cleared on resubmission. */
+    kycRejectionReason: text('kyc_rejection_reason'),
     ...timestamps(),
   },
   (t) => [

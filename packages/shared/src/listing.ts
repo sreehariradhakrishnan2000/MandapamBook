@@ -49,6 +49,8 @@ export interface OwnerProfileView {
   bankAccountMasked: string | null;
   ifsc: string | null;
   kycStatus: 'NOT_STARTED' | 'SUBMITTED' | 'VERIFIED' | 'REJECTED';
+  /** Set when an admin rejected the details; cleared when the owner saves them again. */
+  kycRejectionReason: string | null;
 }
 
 // ---------------------------------------------------------------- listings

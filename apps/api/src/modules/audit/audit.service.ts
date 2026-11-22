@@ -33,7 +33,16 @@ export type AuditAction =
   | 'media.rejected'
   | 'staff.invited'
   | 'staff.updated'
-  | 'staff.removed';
+  | 'staff.removed'
+  | 'listing.approved'
+  | 'listing.rejected'
+  | 'listing.suspended'
+  | 'listing.reinstated'
+  | 'owner.kyc_verified'
+  | 'owner.kyc_rejected'
+  | 'owner.kyc_revealed'
+  | 'masterdata.changed'
+  | 'settings.changed';
 
 export interface AuditEntry {
   action: AuditAction;

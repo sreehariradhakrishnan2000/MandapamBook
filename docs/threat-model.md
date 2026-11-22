@@ -35,6 +35,15 @@ Method: STRIDE per trust boundary. This document grows each phase; the Phase 8 r
 | E      | Owner staff escalating to pricing or payouts       | Permission-based RBAC, explicit staff permission set, tests              | 2, 3  |
 | E      | Compromised dependency or action                   | Lockfile, 7-day package age, SHA-pinned actions, audit, CodeQL, Trivy    | 0     |
 
+## Phase 4 controls in place
+
+- Insider misuse of KYC: full numbers only via an explicit reveal with a stated purpose, audited per call; lists show masked values
+- Approving unsafe listings: approval requires verified KYC and a complete listing; owners can never set status
+- Conflicting admin actions: status transitions are conditional updates, so concurrent decisions cannot both apply
+- Silent config tampering: platform settings bounded, super-admin only, audited with full before/after
+- Search injection: LIKE wildcards escaped; parameterised queries throughout
+- Self-dealing: admins cannot review their own KYC or change their own role
+
 ## Phase 3 controls in place
 
 - KYC theft from DB dumps or logs: AES-256-GCM field encryption with row/column-bound associated data; masked API responses and audit entries
