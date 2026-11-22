@@ -1,0 +1,7 @@
+name: MandapamBook CodeQL config
+
+# Test code is never shipped: its fixtures (cookie middleware without CSRF, fake tokens) are
+# deliberate and would only add noise. Application code is always analysed.
+paths-ignore:
+  - '**/test/**'
+  - 'apps/e2e/**'
