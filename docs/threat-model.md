@@ -35,6 +35,15 @@ Method: STRIDE per trust boundary. This document grows each phase; the Phase 8 r
 | E      | Owner staff escalating to pricing or payouts       | Permission-based RBAC, explicit staff permission set, tests              | 2, 3  |
 | E      | Compromised dependency or action                   | Lockfile, 7-day package age, SHA-pinned actions, audit, CodeQL, Trivy    | 0     |
 
+## Phase 5 controls in place
+
+- Price tampering: quote and hold requests cannot carry prices; the server prices from its own rules and freezes a snapshot
+- Double booking and hold races: exclusion constraint plus inline expiry inside the hold transaction; eight-way race tested
+- Calendar flooding: one unpaid hold per customer (unique index), 6 holds/hour per user, 10-minute expiry, verified email required
+- Lost updates on bookings: version-checked transitions; illegal transitions throw
+- Customer privacy toward venues: contact details shown to owners only once a booking is paid; availability never reveals who booked
+- Stuck holds if Redis fails: expiry lives in Postgres and the sweeper, not in Redis
+
 ## Phase 4 controls in place
 
 - Insider misuse of KYC: full numbers only via an explicit reveal with a stated purpose, audited per call; lists show masked values

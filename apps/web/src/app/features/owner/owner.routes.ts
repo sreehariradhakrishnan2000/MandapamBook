@@ -20,6 +20,11 @@ export const OWNER_ROUTES: Routes = [
     loadComponent: () => import('./staff').then((m) => m.OwnerStaff),
   },
   {
+    path: 'bookings',
+    title: 'Bookings · MandapamBook',
+    loadComponent: () => import('./bookings-inbox').then((m) => m.OwnerBookingsInbox),
+  },
+  {
     path: 'venues/new',
     title: 'Add a venue · MandapamBook',
     canMatch: [withPermission('auditorium:create')],

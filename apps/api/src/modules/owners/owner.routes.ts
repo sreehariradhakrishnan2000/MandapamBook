@@ -4,6 +4,7 @@ import type { FieldCrypto } from '../../lib/field-crypto.js';
 import type { ObjectStorage } from '../../infra/storage.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AuthService } from '../auth/auth.service.js';
+import { bookingsInboxRouter } from './bookings-inbox.routes.js';
 import { calendarRouter } from './calendar.routes.js';
 import { listingsRouter } from './listings.routes.js';
 import { mediaRouter } from './media.routes.js';
@@ -34,5 +35,6 @@ export function ownerRouter(deps: OwnerRouterDeps): Router {
   r.use(calendarRouter({ db, scoped, audit }));
   r.use(mediaRouter({ db, scoped, storage, audit }));
   r.use(staffRouter({ db, scoped, auth, audit }));
+  r.use(bookingsInboxRouter({ db, scoped, audit }));
   return r;
 }

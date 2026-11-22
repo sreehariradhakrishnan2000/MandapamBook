@@ -25,3 +25,12 @@ export function pgErrorCode(err: unknown): string | undefined {
   }
   return undefined;
 }
+
+/** Name of the violated constraint or index, when Postgres reports one. */
+export function pgConstraint(err: unknown): string | undefined {
+  for (let e: unknown = err; e && typeof e === 'object'; e = (e as { cause?: unknown }).cause) {
+    const name = (e as { constraint?: unknown }).constraint;
+    if (typeof name === 'string') return name;
+  }
+  return undefined;
+}

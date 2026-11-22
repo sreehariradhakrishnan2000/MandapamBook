@@ -1,5 +1,4 @@
 import type { Routes } from '@angular/router';
-import { PlaceholderPage } from '../../shared/placeholder-page';
 
 export const CUSTOMER_ROUTES: Routes = [
   {
@@ -10,10 +9,11 @@ export const CUSTOMER_ROUTES: Routes = [
   {
     path: 'bookings',
     title: 'My bookings · MandapamBook',
-    component: PlaceholderPage,
-    data: {
-      heading: 'My bookings',
-      description: 'Your bookings, payments and invoices will appear here.',
-    },
+    loadComponent: () => import('./bookings').then((m) => m.MyBookings),
+  },
+  {
+    path: 'bookings/:id',
+    title: 'Booking · MandapamBook',
+    loadComponent: () => import('./bookings').then((m) => m.BookingDetailPage),
   },
 ];

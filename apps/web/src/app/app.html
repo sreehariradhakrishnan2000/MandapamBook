@@ -20,6 +20,9 @@
         @if (auth.hasPermission('audit:view')) {
           <a routerLink="/admin" class="hover:text-brand-700">Admin</a>
         }
+        @if (auth.hasPermission('booking:create')) {
+          <a routerLink="/account/bookings" class="hover:text-brand-700">My bookings</a>
+        }
         <a routerLink="/account" class="hover:text-brand-700">{{ user.fullName.split(' ')[0] }}</a>
         <button type="button" (click)="signOut()" class="text-slate-600 hover:text-brand-700">
           Sign out

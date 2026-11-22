@@ -54,7 +54,7 @@ describe.skipIf(!hasTestDb)('schema constraints', () => {
 
     it('requires a hold expiry while a booking is held', async () => {
       const v = {
-        ...bookingValues(f, { date: uniqueDate(), slot: 'MORNING' }),
+        ...bookingValues(f, { date: uniqueDate(), slot: 'MORNING', status: 'HELD' }),
         holdExpiresAt: null,
       };
       expect(await sqlState(() => db.insert(bookings).values(v))).toBe(PG_ERROR.CHECK_VIOLATION);
