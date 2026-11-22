@@ -41,6 +41,11 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
               }}
             </dd>
           </dl>
+          @if (p.kycStatus === 'REJECTED' && p.kycRejectionReason) {
+            <p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              We could not verify these details: {{ p.kycRejectionReason }}
+            </p>
+          }
           <p class="mt-2 text-sm text-slate-600">To change these, enter all details again below.</p>
         }
       }
