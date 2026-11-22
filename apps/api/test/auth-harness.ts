@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Express } from 'express';
 import { Redis } from 'ioredis';
 import type pg from 'pg';
@@ -15,6 +15,7 @@ import {
   RedisRevocationStore,
   type RevocationStore,
 } from '../src/infra/revocation-store.js';
+import { MemoryObjectStorage } from '../src/infra/storage.js';
 import { hashPassword } from '../src/modules/auth/password.js';
 import { MemoryEmailSender, MemorySmsSender } from '../src/modules/notifications/senders.js';
 import { createTestPool, testDb } from './db-helpers.js';
@@ -24,6 +25,14 @@ export const ORIGIN = 'http://localhost:4200';
 export const PASSWORD = 'correct horse battery staple';
 
 const key = () => randomBytes(32).toString('base64url');
+
+/**
+ * A fixed field-encryption key shared by every harness and test file (Vitest re-evaluates
+ * this module per file, so a random one would differ per file). Test files share one
+ * database and admin lists decrypt rows other files wrote, so per-file keys made those rows
+ * undecryptable: a 500 that depended on test ordering. Test data only, never a real key.
+ */
+const FIELD_KEY = createHash('sha256').update('mandapambook test field encryption key').digest();
 
 export function testAuthEnv(overrides: Partial<AuthEnv> = {}): AuthEnv {
   return {
@@ -39,6 +48,7 @@ export function testAuthEnv(overrides: Partial<AuthEnv> = {}): AuthEnv {
     LOGIN_MAX_FAILURES: 5,
     LOGIN_LOCKOUT_MINUTES: 15,
     HIBP_ENABLED: false,
+    FIELD_ENCRYPTION_KEYS: [{ kid: 'f1', secret: FIELD_KEY }],
     ...overrides,
   };
 }
@@ -51,6 +61,7 @@ export interface Harness {
   email: MemoryEmailSender;
   sms: MemorySmsSender;
   revocations: RevocationStore;
+  storage: MemoryObjectStorage;
   close(): Promise<void>;
 }
 
@@ -65,6 +76,7 @@ export async function createHarness(
   const db = testDb(pool);
   const email = new MemoryEmailSender();
   const sms = new MemorySmsSender();
+  const storage = new MemoryObjectStorage();
   const redisUrl = process.env.TEST_REDIS_URL;
   const redis = redisUrl
     ? new Redis(redisUrl, {
@@ -85,6 +97,7 @@ export async function createHarness(
     revocations,
     email,
     sms,
+    storage,
     limitOverrides: {
       apiPerIp: generous,
       loginPerIp: generous,
@@ -109,6 +122,7 @@ export async function createHarness(
     email,
     sms,
     revocations,
+    storage,
     close: async () => {
       await pool.end();
       await redis?.quit();
@@ -167,7 +181,7 @@ export class Client {
   }
 
   async send(
-    method: 'get' | 'post' | 'patch' | 'delete',
+    method: 'get' | 'post' | 'put' | 'patch' | 'delete',
     path: string,
     body?: object,
     opts: { csrf?: boolean; bearer?: string | null } = {},

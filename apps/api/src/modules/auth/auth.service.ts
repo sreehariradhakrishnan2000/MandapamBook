@@ -397,7 +397,14 @@ export class AuthService {
     const row = await this.consumeEmailToken(token, 'PASSWORD_RESET');
     await this.db
       .update(users)
-      .set({ passwordHash: await hashPassword(password), failedLoginCount: 0, lockedUntil: null })
+      .set({
+        passwordHash: await hashPassword(password),
+        failedLoginCount: 0,
+        lockedUntil: null,
+        // Opening the emailed link proves the user controls the address.
+        emailVerifiedAt: sql`COALESCE(${users.emailVerifiedAt}, now())`,
+        status: sql`CASE WHEN ${users.status} = 'PENDING_VERIFICATION' THEN 'ACTIVE'::user_status ELSE ${users.status} END`,
+      })
       .where(eq(users.id, row.userId));
     await this.revokeAllSessions(row.userId, 'password_reset');
     await this.audit.record(
@@ -409,6 +416,12 @@ export class AuthService {
       },
       ctx,
     );
+  }
+
+  /** Invited accounts (e.g. owner staff) choose their password through the reset flow. */
+  async sendSetPasswordEmail(userId: string): Promise<void> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, userId));
+    if (user) await this.sendEmailToken(user, 'PASSWORD_RESET');
   }
 
   private async sendEmailToken(

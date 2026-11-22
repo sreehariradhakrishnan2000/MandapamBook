@@ -19,12 +19,15 @@
     "db:check": "drizzle-kit check"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/s3-request-presigner": "^3.1169.0",
     "@mandapambook/shared": "workspace:*",
     "argon2": "^0.45.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
+    "file-type": "^22.3.0",
     "helmet": "^8.3.0",
     "ioredis": "^5.11.1",
     "jose": "^6.2.17",

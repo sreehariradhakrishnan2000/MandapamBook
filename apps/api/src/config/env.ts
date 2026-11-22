@@ -87,6 +87,19 @@ export const envSchema = z.object({
   HIBP_ENABLED: booleanString.default(false),
   EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
   OTP_PROVIDER: z.enum(['console']).default('console'),
+
+  // --- Data protection ---
+  /** AES-256-GCM keys for PAN and bank details ("kid:base64url", exactly 32 bytes each). */
+  FIELD_ENCRYPTION_KEYS: keyRing,
+
+  // --- Object storage (S3-compatible) ---
+  STORAGE_PROVIDER: z.enum(['s3', 'memory']).default('s3'),
+  S3_ENDPOINT: z.url().optional(),
+  S3_REGION: z.string().min(1).default('us-east-1'),
+  S3_BUCKET: z.string().min(3).default('mandapambook-media'),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_FORCE_PATH_STYLE: booleanString.default(true),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -118,6 +131,14 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       problems.push('REDIS_URL: production requires TLS (rediss://)');
     if (env.EMAIL_PROVIDER === 'console')
       problems.push('EMAIL_PROVIDER: console is not allowed in production');
+    if (env.STORAGE_PROVIDER === 'memory')
+      problems.push('STORAGE_PROVIDER: memory is not allowed in production');
+  }
+  if (env.STORAGE_PROVIDER === 's3' && (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY)) {
+    problems.push('S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY: required when STORAGE_PROVIDER=s3');
+  }
+  if (env.FIELD_ENCRYPTION_KEYS.some((k) => k.secret.length !== 32)) {
+    problems.push('FIELD_ENCRYPTION_KEYS: each key must be exactly 32 bytes (AES-256)');
   }
   const accessSecrets = new Set(env.ACCESS_TOKEN_KEYS.map((k) => k.secret.toString('hex')));
   if (env.REFRESH_TOKEN_KEYS.some((k) => accessSecrets.has(k.secret.toString('hex')))) {

@@ -28,10 +28,14 @@ RUN apk upgrade --no-cache \
  && mkdir -p /etc/nginx/templates /etc/nginx/conf.d /usr/share/nginx/html \
  && chown nginx:nginx /etc/nginx/conf.d
 ENV API_UPSTREAM=http://api:4000
+# Origin of the S3-compatible store that browsers upload photos to (added to CSP connect-src),
+# e.g. https://br-xxxx.storage.c-16.us-east-1.aws.neon.tech
+ENV STORAGE_ORIGIN=""
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY --chmod=0755 docker/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
+# web-entrypoint.sh renders /etc/nginx/templates/*.template into /etc/nginx/conf.d/ at start.
 COPY docker/default.conf.template /etc/nginx/templates/default.conf.template
-COPY docker/security-headers.inc /etc/nginx/conf.d/security-headers.inc
+COPY docker/security-headers.inc.template /etc/nginx/templates/security-headers.inc.template
 COPY --from=build /repo/apps/web/dist/web/browser /usr/share/nginx/html
 USER nginx
 EXPOSE 8080

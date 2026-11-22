@@ -11,8 +11,11 @@ import {
   byIp,
 } from './http/middleware/rate-limit.js';
 import type { RevocationStore } from './infra/revocation-store.js';
+import type { ObjectStorage } from './infra/storage.js';
+import { FieldCrypto } from './lib/field-crypto.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { AuditService } from './modules/audit/audit.service.js';
+import { catalogRouter } from './modules/catalog/catalog.routes.js';
 import { AccessTokenService } from './modules/auth/access-tokens.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import { AuthService } from './modules/auth/auth.service.js';
@@ -36,6 +39,7 @@ export type AuthEnv = Pick<
   | 'LOGIN_MAX_FAILURES'
   | 'LOGIN_LOCKOUT_MINUTES'
   | 'HIBP_ENABLED'
+  | 'FIELD_ENCRYPTION_KEYS'
 >;
 
 export interface ContainerDeps {
@@ -46,6 +50,7 @@ export interface ContainerDeps {
   revocations: RevocationStore;
   email: EmailSender;
   sms: SmsSender;
+  storage: ObjectStorage;
   breaches?: BreachChecker;
   limitOverrides?: Partial<Record<LimitName, LimitSpec>>;
 }
@@ -89,11 +94,17 @@ export function buildContainer(deps: ContainerDeps): Container {
   );
   const authenticate = createAuthenticate(accessTokens, deps.revocations);
   const csrf = createCsrf(env.CSRF_SECRET, env.CORS_ORIGINS);
+  const crypto = new FieldCrypto(env.FIELD_ENCRYPTION_KEYS);
 
   const api = Router();
   api.use(limiters.middleware('apiPerIp', byIp));
+  api.use(catalogRouter({ db }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
-  api.use('/owner', limiters.middleware('apiPerUser', byIp), ownerRouter({ db, authenticate }));
+  api.use(
+    '/owner',
+    limiters.middleware('apiPerUser', byIp),
+    ownerRouter({ db, authenticate, audit, auth, crypto, storage: deps.storage }),
+  );
   api.use('/admin', adminRouter({ db, auth, audit, authenticate }));
 
   return { api, auth, audit, accessTokens, refreshTokens, limiters, authenticate };

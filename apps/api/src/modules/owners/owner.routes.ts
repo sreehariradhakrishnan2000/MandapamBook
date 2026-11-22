@@ -1,60 +1,38 @@
 import { type RequestHandler, Router } from 'express';
-import { and, asc, eq } from 'drizzle-orm';
-import { z } from 'zod';
 import type { Db } from '../../db/client.js';
-import { auditoriums, halls } from '../../db/schema/index.js';
-import { errors } from '../../http/errors.js';
-import { currentUser, requirePermission } from '../rbac/authenticate.js';
-import { auditoriumScopeCondition, resolveOwnerScope } from '../rbac/owner-scope.js';
+import type { FieldCrypto } from '../../lib/field-crypto.js';
+import type { ObjectStorage } from '../../infra/storage.js';
+import type { AuditService } from '../audit/audit.service.js';
+import type { AuthService } from '../auth/auth.service.js';
+import { calendarRouter } from './calendar.routes.js';
+import { listingsRouter } from './listings.routes.js';
+import { mediaRouter } from './media.routes.js';
+import { profileRouter } from './profile.routes.js';
+import { ScopedResources } from './scoped.js';
+import { staffRouter } from './staff.routes.js';
 
 export interface OwnerRouterDeps {
   db: Db;
   authenticate: RequestHandler;
+  audit: AuditService;
+  auth: AuthService;
+  crypto: FieldCrypto;
+  storage: ObjectStorage;
 }
 
 /**
- * Read-only owner venue endpoints (full CRUD arrives in Phase 3). Every query is filtered
- * by the caller's owner scope; another owner's venue is indistinguishable from a missing one.
+ * Owner-side API. Every route requires a permission and loads resources through
+ * ScopedResources, so an owner or staff member can only reach their own venues.
  */
-export function ownerRouter({ db, authenticate }: OwnerRouterDeps): Router {
+export function ownerRouter(deps: OwnerRouterDeps): Router {
+  const { db, authenticate, audit, auth, crypto, storage } = deps;
+  const scoped = new ScopedResources(db);
   const r = Router();
   r.use(authenticate);
-
-  const summary = {
-    id: auditoriums.id,
-    name: auditoriums.name,
-    slug: auditoriums.slug,
-    status: auditoriums.status,
-    cityId: auditoriums.cityId,
-    updatedAt: auditoriums.updatedAt,
-  };
-
-  r.get('/auditoriums', requirePermission('booking:view_venue'), async (req, res) => {
-    const scope = await resolveOwnerScope(db, currentUser(req));
-    const items = await db
-      .select(summary)
-      .from(auditoriums)
-      .where(auditoriumScopeCondition(scope))
-      .orderBy(asc(auditoriums.name));
-    res.json({ items });
-  });
-
-  r.get('/auditoriums/:id', requirePermission('booking:view_venue'), async (req, res) => {
-    const id = z.uuid().safeParse(req.params['id']);
-    if (!id.success) throw errors.notFound();
-    const scope = await resolveOwnerScope(db, currentUser(req));
-    const [venue] = await db
-      .select(summary)
-      .from(auditoriums)
-      .where(and(eq(auditoriums.id, id.data), auditoriumScopeCondition(scope)));
-    if (!venue) throw errors.notFound();
-    const hallRows = await db
-      .select({ id: halls.id, name: halls.name, seatingCapacity: halls.seatingCapacity })
-      .from(halls)
-      .where(eq(halls.auditoriumId, venue.id))
-      .orderBy(asc(halls.name));
-    res.json({ ...venue, halls: hallRows });
-  });
-
+  r.use(profileRouter({ db, crypto, audit }));
+  r.use(listingsRouter({ db, scoped, audit, storage }));
+  r.use(calendarRouter({ db, scoped, audit }));
+  r.use(mediaRouter({ db, scoped, storage, audit }));
+  r.use(staffRouter({ db, scoped, auth, audit }));
   return r;
 }
