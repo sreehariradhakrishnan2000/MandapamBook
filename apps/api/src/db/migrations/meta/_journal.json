@@ -22,6 +22,13 @@
       "when": 1795292761136,
       "tag": "0002_booking_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795320810415,
+      "tag": "0003_kyc_rejection_reason",
+      "breakpoints": true
     }
   ]
 }

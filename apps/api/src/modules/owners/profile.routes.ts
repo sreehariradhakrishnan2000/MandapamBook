@@ -24,6 +24,7 @@ export function profileView(row: ProfileRow, crypto: FieldCrypto): OwnerProfileV
     // IFSC identifies a bank branch (public information), so it is shown in full.
     ifsc: row.ifscEnc ? crypto.decrypt(row.ifscEnc, ctx(row.userId, 'ifsc')) : null,
     kycStatus: row.kycStatus,
+    kycRejectionReason: row.kycRejectionReason,
   };
 }
 
@@ -66,6 +67,7 @@ export function profileRouter(deps: { db: Db; crypto: FieldCrypto; audit: AuditS
         kycStatus: 'SUBMITTED',
         kycReviewedBy: null,
         kycReviewedAt: null,
+        kycRejectionReason: null,
       })
       .where(eq(ownerProfiles.userId, me.userId))
       .returning();
