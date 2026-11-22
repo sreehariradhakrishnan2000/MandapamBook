@@ -8,6 +8,7 @@ import { todayInIst } from '../lib/time.js';
 import type { BookingService } from '../modules/bookings/booking.service.js';
 import type { PaymentService } from '../modules/payments/payment.service.js';
 import type { NotificationService } from '../modules/notifications/notification.service.js';
+import type { PayoutService } from '../modules/payouts/payout.service.js';
 import { transition } from '../modules/bookings/state-machine.js';
 
 /** Arbitrary constant: only one process at a time may run the sweep. */
@@ -23,6 +24,7 @@ export interface SweepResult {
   refundsProcessed: number;
   notificationsQueued: number;
   notificationsSent: number;
+  payoutsAccrued: number;
 }
 
 /**
@@ -43,6 +45,7 @@ export async function runSweep(deps: {
   storage: ObjectStorage;
   payments?: PaymentService;
   notifications?: NotificationService;
+  payouts?: PayoutService;
   logger: Logger;
 }): Promise<SweepResult> {
   const { pool, db, bookingService, storage, logger } = deps;
@@ -69,6 +72,7 @@ export async function runSweep(deps: {
         refundsProcessed: 0,
         notificationsQueued: 0,
         notificationsSent: 0,
+        payoutsAccrued: 0,
       };
     try {
       const expiredHolds = await db.transaction((tx) => bookingService.expireStale(tx));
@@ -113,6 +117,7 @@ export async function runSweep(deps: {
 
       const declinedRequests = deps.payments ? await deps.payments.declineOverdueRequests() : 0;
       const refundsProcessed = deps.payments ? await deps.payments.retryRefunds() : 0;
+      const payoutsAccrued = deps.payouts ? await deps.payouts.accrue() : 0;
       // Last, so this sweep's own transitions are announced in the same pass.
       const notificationsQueued = deps.notifications ? await deps.notifications.processOutbox() : 0;
       const notificationsSent = deps.notifications
@@ -128,6 +133,7 @@ export async function runSweep(deps: {
         refundsProcessed,
         notificationsQueued,
         notificationsSent,
+        payoutsAccrued,
       };
       if (
         expiredHolds ||
@@ -136,7 +142,8 @@ export async function runSweep(deps: {
         declinedRequests ||
         refundsProcessed ||
         notificationsQueued ||
-        notificationsSent
+        notificationsSent ||
+        payoutsAccrued
       )
         logger.info(result, 'sweep finished');
       return result;

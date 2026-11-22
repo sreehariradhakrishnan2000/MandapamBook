@@ -21,6 +21,8 @@ export const PERMISSIONS = [
   'kyc:review',
   /** Hide or restore customer reviews (every change is audited). */
   'review:moderate',
+  /** Mark owner payouts as paid (audited). */
+  'payout:manage',
   // owner side (scoped to the owner's own venues)
   'auditorium:create',
   'auditorium:update',
@@ -50,6 +52,7 @@ const PLATFORM_ADMIN: Permission[] = [
   'booking:view_all',
   'kyc:review',
   'review:moderate',
+  'payout:manage',
 ];
 
 const OWNER: Permission[] = [

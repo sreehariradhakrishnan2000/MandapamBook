@@ -111,3 +111,55 @@ export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
 export const platformSettingsUpdateSchema = platformSettingsSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Change at least one setting');
+
+/** Report window by event date (inclusive). Defaults to the current Indian financial year. */
+export const reportQuerySchema = z
+  .object({ from: z.iso.date().optional(), to: z.iso.date().optional() })
+  .refine((q) => !q.from || !q.to || q.from <= q.to, 'from must be on or before to')
+  .refine(
+    (q) => !q.from || !q.to || Date.parse(q.to) - Date.parse(q.from) <= 3 * 366 * 86_400_000,
+    'Report window is limited to three years',
+  );
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
+
+export const payoutQuerySchema = z.object({
+  status: z.enum(['PENDING', 'SCHEDULED', 'PAID', 'ON_HOLD']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+});
+
+export const markPayoutPaidSchema = z.strictObject({
+  /** Bank transfer reference (UTR) or similar. */
+  reference: z
+    .string()
+    .trim()
+    .min(4)
+    .max(64)
+    .regex(/^[A-Za-z0-9/_-]+$/, 'Letters, digits, / _ - only'),
+});
+
+export interface ReportSummary {
+  from: string;
+  to: string;
+  bookingsByStatus: Record<string, number>;
+  bookingValuePaise: number;
+  collectedOnlinePaise: number;
+  refundedPaise: number;
+  platformFeesPaise: number;
+  commissionPaise: number;
+  payoutsPendingPaise: number;
+  payoutsPaidPaise: number;
+  topCities: { city: string; bookings: number; valuePaise: number }[];
+}
+
+export interface OwnerEarnings {
+  from: string;
+  to: string;
+  bookings: number;
+  bookingValuePaise: number;
+  collectedOnlinePaise: number;
+  commissionPaise: number;
+  netPaise: number;
+  paidOutPaise: number;
+  pendingPaise: number;
+}

@@ -45,6 +45,8 @@ export type AuditAction =
   | 'settings.changed'
   | 'booking.held'
   | 'booking.cancelled'
+  | 'report.exported'
+  | 'payout.marked_paid'
   | 'review.replied'
   | 'review.moderated'
   | 'booking.accepted'
