@@ -17,6 +17,11 @@ RUN pnpm --filter @mandapambook/web build
 
 FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 ENV API_UPSTREAM=http://api:4000
+# The base image lags Alpine security fixes: patch OS packages, then drop back to the
+# image's unprivileged nginx user (uid 101).
+USER root
+RUN apk upgrade --no-cache
+USER 101
 COPY docker/default.conf.template /etc/nginx/templates/default.conf.template
 COPY docker/security-headers.inc /etc/nginx/conf.d/security-headers.inc
 COPY --from=build /repo/apps/web/dist/web/browser /usr/share/nginx/html
