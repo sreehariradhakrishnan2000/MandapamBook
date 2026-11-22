@@ -6,7 +6,8 @@ import { createDb } from './db/client.js';
 import { createApp } from './http/app.js';
 import { createPgPool, createRedis } from './infra/connections.js';
 import { RedisRevocationStore } from './infra/revocation-store.js';
-import { MemoryObjectStorage, type ObjectStorage, S3ObjectStorage } from './infra/storage.js';
+import { createObjectStorage } from './infra/storage.js';
+import { type Sweeps, startSweeps } from './jobs/scheduler.js';
 import { createEmailSender, ConsoleSmsSender } from './modules/notifications/senders.js';
 
 async function main(): Promise<void> {
@@ -19,17 +20,7 @@ async function main(): Promise<void> {
     .connect()
     .catch((err: unknown) => logger.warn({ err }, 'redis not reachable at startup'));
 
-  const storage: ObjectStorage =
-    env.STORAGE_PROVIDER === 's3'
-      ? new S3ObjectStorage({
-          endpoint: env.S3_ENDPOINT,
-          region: env.S3_REGION,
-          bucket: env.S3_BUCKET,
-          accessKeyId: env.S3_ACCESS_KEY_ID ?? '',
-          secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? '',
-          forcePathStyle: env.S3_FORCE_PATH_STYLE,
-        })
-      : new MemoryObjectStorage();
+  const storage = createObjectStorage(env);
 
   // loadEnv refuses EMAIL_PROVIDER=console in production.
   const container = buildContainer({
@@ -62,10 +53,23 @@ async function main(): Promise<void> {
   server.requestTimeout = 30_000;
   server.listen(env.PORT, () => logger.info({ port: env.PORT }, 'api listening'));
 
+  // No separate worker on this host (e.g. a free tier without workers): sweep in-process.
+  const sweeps: Sweeps | null = env.RUN_JOBS_IN_PROCESS
+    ? startSweeps({
+        env,
+        logger: logger.child({ component: 'sweeps' }),
+        pool,
+        db: createDb(pool),
+        storage,
+      })
+    : null;
+
   const shutdown = (signal: string): void => {
     logger.info({ signal }, 'shutting down');
     server.close(() => {
-      void Promise.allSettled([pool.end(), redis.quit()]).then(() => process.exit(0));
+      void (sweeps?.stop() ?? Promise.resolve())
+        .then(() => Promise.allSettled([pool.end(), redis.quit()]))
+        .then(() => process.exit(0));
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };

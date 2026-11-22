@@ -7,6 +7,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import type { Env } from '../config/env.js';
 
 export interface UploadTarget {
   url: string;
@@ -155,4 +156,29 @@ export class MemoryObjectStorage implements ObjectStorage {
   put(key: string, body: Buffer, contentType: string): void {
     this.objects.set(key, { body, contentType });
   }
+}
+
+/** The configured object store: S3-compatible, or in-memory for development and tests. */
+export function createObjectStorage(
+  env: Pick<
+    Env,
+    | 'STORAGE_PROVIDER'
+    | 'S3_ENDPOINT'
+    | 'S3_REGION'
+    | 'S3_BUCKET'
+    | 'S3_ACCESS_KEY_ID'
+    | 'S3_SECRET_ACCESS_KEY'
+    | 'S3_FORCE_PATH_STYLE'
+  >,
+): ObjectStorage {
+  if (env.STORAGE_PROVIDER !== 's3') return new MemoryObjectStorage();
+  return new S3ObjectStorage({
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION,
+    bucket: env.S3_BUCKET,
+    // loadEnv requires both when STORAGE_PROVIDER=s3.
+    accessKeyId: env.S3_ACCESS_KEY_ID ?? '',
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY ?? '',
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+  });
 }

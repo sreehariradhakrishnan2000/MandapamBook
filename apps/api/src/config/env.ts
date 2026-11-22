@@ -74,6 +74,14 @@ export const envSchema = z.object({
     .regex(/^\d+(kb|mb)$/)
     .default('100kb'),
   ENABLE_API_DOCS: booleanString.default(false),
+  /** Seconds between maintenance sweeps (worker, or the API with RUN_JOBS_IN_PROCESS). */
+  SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(3600).default(30),
+  /**
+   * Run the maintenance sweeps inside the API process instead of a separate worker. For
+   * hosts without a free worker tier. Safe alongside workers: the sweep takes an advisory
+   * lock, so only one process sweeps at a time.
+   */
+  RUN_JOBS_IN_PROCESS: booleanString.default(false),
 
   // --- Auth ---
   /** HS256 signing keys for access tokens. Separate from the refresh-token keys. */

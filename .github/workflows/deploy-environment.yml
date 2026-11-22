@@ -1,13 +1,16 @@
 name: Deploy to one environment
 
-# Reusable: migrate (separate step, direct DB connection), trigger the host's deploy hook
-# with the image tags, then wait until /ready reports healthy on the new version.
+# Reusable: migrate (separate step, direct DB connection), point each Render service at the
+# new image through its deploy hook, then wait until /ready reports healthy on the new version.
 #
 # Per-environment configuration (Settings → Environments → staging / production):
-#   secrets:   MIGRATION_DATABASE_URL  direct (non-pooled) Postgres URL for migrations
-#              DEPLOY_HOOK_URL         host deploy hook; receives api/web image references
-#              DEPLOY_HOOK_TOKEN       bearer token for the hook (optional)
-#   variables: API_BASE_URL            e.g. https://api.staging.mandapambook.in
+#   secrets:   MIGRATION_DATABASE_URL     direct (non-pooled) Postgres URL for migrations
+#              RENDER_DEPLOY_HOOK_API     the API service's deploy hook URL (contains its key)
+#              RENDER_DEPLOY_HOOK_WEB     the web service's deploy hook URL
+#              RENDER_DEPLOY_HOOK_WORKER  optional: only with a separate worker service. On
+#                                         Render's free tier the API runs the jobs instead
+#                                         (RUN_JOBS_IN_PROCESS=true).
+#   variables: API_BASE_URL               the API's public URL, e.g. https://….onrender.com
 #   production: add required reviewers — that is the approval gate.
 
 on:
@@ -54,11 +57,13 @@ jobs:
       - name: Check configuration
         env:
           HAS_DB: ${{ secrets.MIGRATION_DATABASE_URL != '' }}
-          HAS_HOOK: ${{ secrets.DEPLOY_HOOK_URL != '' }}
+          HAS_API_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API != '' }}
+          HAS_WEB_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB != '' }}
           API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
           missing=""
-          [ "$HAS_HOOK" = "true" ] || missing="$missing DEPLOY_HOOK_URL"
+          [ "$HAS_API_HOOK" = "true" ] || missing="$missing RENDER_DEPLOY_HOOK_API"
+          [ "$HAS_WEB_HOOK" = "true" ] || missing="$missing RENDER_DEPLOY_HOOK_WEB"
           [ -n "$API_BASE_URL" ] || missing="$missing API_BASE_URL"
           if [ "${{ inputs.run_migrations }}" = "true" ] && [ "$HAS_DB" != "true" ]; then missing="$missing MIGRATION_DATABASE_URL"; fi
           if [ -n "$missing" ]; then echo "::error::Environment ${{ inputs.environment }} is missing:$missing"; exit 1; fi
@@ -72,17 +77,26 @@ jobs:
           docker run --rm -e NODE_ENV=production -e MIGRATION_DATABASE_URL -e DATABASE_URL="$MIGRATION_DATABASE_URL" \
             "$API_IMAGE" node dist/db/migrate.js
 
-      - name: Trigger deploy
+      # Render deploy hooks take the image to deploy as a URL-encoded imgURL parameter; it
+      # must match the service's image apart from the tag. The hook URLs carry their key, so
+      # they stay secrets and are never echoed. Render deploys asynchronously, so for a short
+      # while web and API may run different versions; expand-only migrations make that safe.
+      - name: Deploy on Render
         env:
-          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
-          DEPLOY_HOOK_TOKEN: ${{ secrets.DEPLOY_HOOK_TOKEN }}
+          HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          HOOK_WEB: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
+          HOOK_WORKER: ${{ secrets.RENDER_DEPLOY_HOOK_WORKER }}
         run: |
-          body=$(printf '{"environment":"%s","api_image":"%s","web_image":"%s","version":"%s"}' \
-            "${{ inputs.environment }}" "$API_IMAGE" "$WEB_IMAGE" "${{ inputs.image_tag }}")
-          auth=()
-          [ -n "$DEPLOY_HOOK_TOKEN" ] && auth=(-H "Authorization: Bearer $DEPLOY_HOOK_TOKEN")
-          curl --fail-with-body -sS -X POST "${auth[@]}" -H 'Content-Type: application/json' \
-            --data "$body" "$DEPLOY_HOOK_URL"
+          deploy() {
+            local name="$1" hook="$2" image="$3"
+            local img; img=$(jq -rn --arg v "$image" '$v | @uri')
+            echo "deploying $name -> $image"
+            curl --fail-with-body -sS -o /dev/null -w "  render accepted ($name): HTTP %{http_code}\n" \
+              -X POST "${hook}&imgURL=${img}"
+          }
+          deploy api "$HOOK_API" "$API_IMAGE"
+          [ -z "$HOOK_WORKER" ] || deploy worker "$HOOK_WORKER" "$API_IMAGE"
+          deploy web "$HOOK_WEB" "$WEB_IMAGE"
 
       - name: Smoke test (/health and /ready on the new deployment)
         env:
