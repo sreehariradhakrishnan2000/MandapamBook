@@ -6,14 +6,14 @@ the deploy workflow points each Render service at the new image through its depl
 
 ## Components
 
-| Component      | Image / command                                                             | Scale | Notes                                                                                                                                                                                                                       |
-| -------------- | --------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API            | `ghcr.io/<owner>/mandapambook-api:<sha>` (lowercase), `node dist/server.js` | 2+    | Stateless; behind a TLS-terminating proxy (`TRUST_PROXY_HOPS=1`)                                                                                                                                                            |
-| Worker         | same image, `node dist/worker.js`                                           | 1+    | Sweep (holds, completion, refunds, payouts, uploads) and email delivery. An advisory lock keeps sweeps from overlapping, so extra workers are safe. Without a worker (free tier), set `RUN_JOBS_IN_PROCESS=true` on the API |
-| Web            | `ghcr.io/<owner>/mandapambook-web:<sha>`                                    | 1+    | nginx, non-root, strict CSP                                                                                                                                                                                                 |
-| Postgres       | managed (Neon)                                                              |       | Pooled URL for the app, **direct** URL for migrations                                                                                                                                                                       |
-| Redis          | managed (Upstash, `rediss://`)                                              |       | Rate limits and token revocation. Rebuildable: losing it only resets counters                                                                                                                                               |
-| Object storage | S3-compatible, private bucket                                               |       | Presigned uploads/downloads only                                                                                                                                                                                            |
+| Component      | Image / command                                                                   | Scale | Notes                                                                                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API            | `ghcr.io/<owner>/mandapambook-api:<sha>` (lowercase), `node dist/server.js`       | 2+    | Stateless; behind a TLS-terminating proxy (`TRUST_PROXY_HOPS=1`)                                                                                                                                                            |
+| Worker         | same image, `node dist/worker.js`                                                 | 1+    | Sweep (holds, completion, refunds, payouts, uploads) and email delivery. An advisory lock keeps sweeps from overlapping, so extra workers are safe. Without a worker (free tier), set `RUN_JOBS_IN_PROCESS=true` on the API |
+| Web            | `ghcr.io/<owner>/mandapambook-web:<sha>`                                          | 1+    | nginx, non-root, strict CSP                                                                                                                                                                                                 |
+| Postgres       | managed (Neon)                                                                    |       | Pooled URL for the app, **direct** URL for migrations                                                                                                                                                                       |
+| Redis          | Render Key Value (staging: internal `redis://`, `noeviction`), or TLS `rediss://` |       | Rate limits and token revocation. Rebuildable: losing it only resets counters                                                                                                                                               |
+| Object storage | S3-compatible, private bucket                                                     |       | Presigned uploads/downloads only                                                                                                                                                                                            |
 
 ## Environments and the pipeline
 
@@ -45,9 +45,11 @@ with unsafe settings: http origins, console or file email, memory storage, mock 
 `rzp_test_` keys, non-TLS Redis.
 
 Staging runs with `NODE_ENV=production` and `APP_ENV=staging`. It keeps all of those rules
-except the payment ones: the mock gateway (with the TEST MODE banner) and `rzp_test_` keys
-are allowed, and `rzp_live_` keys are refused. If `APP_ENV` is unset, the strict production
-rules apply, so a missing variable can never loosen production.
+with two exceptions. The mock gateway (with the TEST MODE banner) and `rzp_test_` keys are
+allowed, and `rzp_live_` keys are refused. Plain `redis://` is also allowed, for a host's
+private-network Redis such as Render Key Value's internal URL, which never leaves that
+network. If `APP_ENV` is unset, the strict production rules apply, so a missing variable can
+never loosen production.
 
 ## Hosting on Render
 
@@ -133,7 +135,7 @@ shows who did what.
 | Symptom                                      | Check                                         | Action                                                                                                        |
 | -------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `/ready` failing on `database`               | Neon status, connection limits                | Wait out a cold start; otherwise scale or fail over                                                           |
-| `/ready` failing on `redis`                  | Upstash status                                | Logins, holds and refresh fail closed. Restore Redis; nothing to recover                                      |
+| `/ready` failing on `redis`                  | Render Key Value / Redis provider status      | Logins, holds and refresh fail closed. Restore Redis; nothing to recover                                      |
 | Payments captured but bookings not confirmed | `webhook_events` rows with `processing_error` | Fix the cause; the gateway retries. The browser verify path also confirms                                     |
 | Refunds stuck in `PENDING`                   | Worker logs, `refunds` table                  | The worker retries every sweep; check gateway credentials                                                     |
 | Emails not arriving                          | `notifications` rows `FAILED` / `last_error`  | Fix SMTP; re-queue with `UPDATE notifications SET status='QUEUED', attempts=0, next_attempt_at=now() WHERE …` |

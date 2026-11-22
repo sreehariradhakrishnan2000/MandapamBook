@@ -118,10 +118,20 @@ describe('loadEnv', () => {
 
     it('keeps every other production safeguard in staging', () => {
       const staging = { ...prodLike, APP_ENV: 'staging' };
-      expect(() => loadEnv({ ...staging, REDIS_URL: 'redis://r:6379' })).toThrow(/TLS/);
       expect(() => loadEnv({ ...staging, EMAIL_PROVIDER: 'console' })).toThrow(/console/);
       expect(() => loadEnv({ ...staging, STORAGE_PROVIDER: 'memory' })).toThrow(/memory/);
       expect(() => loadEnv({ ...staging, CORS_ORIGINS: 'http://x.example' })).toThrow(/https/);
+    });
+
+    it('lets staging use private-network redis://, while production requires TLS', () => {
+      const privateRedis = 'redis://red-abc123:6379';
+      expect(loadEnv({ ...prodLike, APP_ENV: 'staging', REDIS_URL: privateRedis }).REDIS_URL).toBe(
+        privateRedis,
+      );
+      expect(() => loadEnv({ ...prodLike, REDIS_URL: privateRedis })).toThrow(/TLS/);
+      expect(() =>
+        loadEnv({ ...prodLike, APP_ENV: 'production', REDIS_URL: privateRedis }),
+      ).toThrow(/TLS/);
     });
 
     it('allows Razorpay test keys only in staging, and live keys only in production', () => {
