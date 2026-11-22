@@ -207,12 +207,15 @@ describe.skipIf(!hasTestDb)('notifications and invoices', { timeout: 120_000 }, 
     const a = await paidBooking();
     const b = await paidBooking();
     const inv = new InvoiceService(h.db);
-    const results = await Promise.all([
-      inv.ensureNumber(a.bookingId),
+    // Concurrent first requests, two for the same booking: all must succeed, and the
+    // same booking must get one number.
+    const [b1, ...forA] = await Promise.all([
       inv.ensureNumber(b.bookingId),
-      inv.ensureNumber(a.bookingId).catch(() => null),
+      ...Array.from({ length: 5 }, () => inv.ensureNumber(a.bookingId)),
     ]);
-    const numbers = new Set(results.filter(Boolean).map((r) => r!.number));
+    const aNumbers = new Set(forA.map((r) => r.number));
+    expect(aNumbers.size).toBe(1);
+    const numbers = new Set([b1.number, ...aNumbers]);
     expect(numbers.size).toBe(2);
     for (const n of numbers) expect(n).toMatch(/^MB\/\d{4}-\d{2}\/\d{6}$/);
     // Asking again returns the same number.
