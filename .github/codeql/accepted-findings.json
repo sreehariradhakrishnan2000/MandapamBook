@@ -16,5 +16,11 @@
     "path": "apps/api/src/modules/auth/password.ts",
     "line": "const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase();",
     "reason": "Not password storage: the Have I Been Pwned range API requires SHA-1 and only a 5-char prefix is sent (k-anonymity). Passwords are stored with argon2id (hashPassword)."
+  },
+  {
+    "rule": "js/missing-rate-limiting",
+    "path": "apps/api/src/modules/payments/payments.routes.ts",
+    "line": "r.post('/payments/verify', requirePermission('booking:create'), async (req, res) => {",
+    "reason": "Behind the app-wide apiPerIp limit (our wrapper, not modelled by CodeQL). The check is an HMAC-SHA256 signature over the gateway's order and payment ids, which can't be brute-forced, and it only confirms the caller's own booking."
   }
 ]
