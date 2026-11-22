@@ -1,1 +1,26 @@
-[]
+[
+  {
+    "rule": "js/missing-rate-limiting",
+    "path": "apps/api/src/modules/auth/auth.routes.ts",
+    "line": "r.post('/login', limiters.middleware('loginPerIp', byIp), async (req, res) => {",
+    "reason": "Rate-limited by our rate-limiter-flexible wrapper, which CodeQL does not model: loginPerIp here, loginPerEmail in AuthService.login, plus the app-wide apiPerIp. Covered by rate-limit.test.ts."
+  },
+  {
+    "rule": "js/missing-rate-limiting",
+    "path": "apps/api/src/modules/auth/auth.routes.ts",
+    "line": "r.post('/verify-email', limiters.middleware('verifyEmailPerIp', byIp), async (req, res) => {",
+    "reason": "Rate-limited by verifyEmailPerIp (30 per hour) through our rate-limiter-flexible wrapper, which CodeQL does not model, plus the app-wide apiPerIp. Covered by rate-limit.test.ts (429)."
+  },
+  {
+    "rule": "js/missing-rate-limiting",
+    "path": "apps/api/src/modules/auth/auth.routes.ts",
+    "line": "r.post('/otp/verify', authenticate, async (req, res) => {",
+    "reason": "AuthService.verifyPhoneOtp consumes otpVerifyPerUser (10 per 15 min) before checking the code, plus the app-wide apiPerIp limit."
+  },
+  {
+    "rule": "js/insufficient-password-hash",
+    "path": "apps/api/src/modules/auth/password.ts",
+    "line": "const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase();",
+    "reason": "Not password storage: the Have I Been Pwned range API requires SHA-1 and only a 5-char prefix is sent (k-anonymity). Passwords are stored with argon2id (hashPassword)."
+  }
+]

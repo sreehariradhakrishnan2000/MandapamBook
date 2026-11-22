@@ -2,16 +2,19 @@
  * Seed entrypoint.
  *   pnpm db:seed              master data + fictional sample venues (dev/test only)
  *   pnpm db:seed --master     master data only (allowed in production)
+ *   SEED_DEMO_PASSWORD=...    also give demo accounts for every role that password (dev only)
  */
 import pg from 'pg';
 import { z } from 'zod';
 import { createDb } from '../client.js';
+import { seedDemoUsers } from './demo-users.js';
 import { seedMasterData, seedSampleData } from './seed.js';
 
 const env = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     DATABASE_URL: z.url(),
+    SEED_DEMO_PASSWORD: z.union([z.literal(''), z.string().min(10)]).optional(),
   })
   .safeParse(process.env);
 
@@ -39,6 +42,10 @@ try {
     console.error(
       `Sample data: ${sample.auditoriumsCreated} venues created, ${sample.auditoriumsSkipped} already present.`,
     );
+    if (env.data.SEED_DEMO_PASSWORD) {
+      const n = await seedDemoUsers(db, env.data.SEED_DEMO_PASSWORD);
+      console.error(`Demo accounts: ${n} users can sign in with SEED_DEMO_PASSWORD.`);
+    }
   }
 } catch (err) {
   console.error('Seed failed:', err instanceof Error ? err.message : err);

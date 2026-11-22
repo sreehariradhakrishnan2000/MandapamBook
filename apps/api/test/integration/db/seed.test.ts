@@ -11,7 +11,10 @@ import {
 } from '../../../src/db/schema/index.js';
 import { AMENITIES, CITIES } from '../../../src/db/seed/master-data.js';
 import { SAMPLE_AUDITORIUMS } from '../../../src/db/seed/sample-data.js';
+import { DEMO_USERS, seedDemoUsers } from '../../../src/db/seed/demo-users.js';
 import { seedMasterData, seedSampleData } from '../../../src/db/seed/seed.js';
+import { verifyPassword } from '../../../src/modules/auth/password.js';
+import { ownerStaff, users } from '../../../src/db/schema/index.js';
 import { createTestPool, hasTestDb, testDb } from '../../db-helpers.js';
 
 describe.skipIf(!hasTestDb)('seed', () => {
@@ -70,5 +73,21 @@ describe.skipIf(!hasTestDb)('seed', () => {
     expect(row!.value).toBe(999);
     const [{ n }] = (await db.select({ n: count() }).from(platformSettings)) as [{ n: number }];
     expect(n).toBeGreaterThanOrEqual(5);
+  });
+
+  it('creates demo accounts for every role with the given password, idempotently', async () => {
+    await seedDemoUsers(db, 'test-only-demo-password');
+    await seedDemoUsers(db, 'test-only-demo-password');
+    for (const demo of DEMO_USERS) {
+      const [u] = await db.select().from(users).where(eq(users.email, demo.email));
+      expect(u?.role).toBe(demo.role);
+      expect(await verifyPassword(u!.passwordHash!, 'test-only-demo-password')).toBe(true);
+    }
+    const [staff] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, 'staff.kerala@example.test'));
+    const links = await db.select().from(ownerStaff).where(eq(ownerStaff.userId, staff!.id));
+    expect(links).toHaveLength(1);
   });
 });
