@@ -29,6 +29,13 @@
       "when": 1795320810415,
       "tag": "0003_kyc_rejection_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795323255077,
+      "tag": "0004_booking_holds_and_refunds",
+      "breakpoints": true
     }
   ]
 }

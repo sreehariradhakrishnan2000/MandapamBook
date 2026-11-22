@@ -105,7 +105,8 @@ export function bookingValues(
   f: VenueFixture,
   opts: { date: string; slot: Slot; hallId?: string; status?: Status },
 ): typeof bookings.$inferInsert {
-  const status = opts.status ?? 'HELD';
+  // CONFIRMED occupies the slot like a hold but is not limited to one per customer.
+  const status = opts.status ?? 'CONFIRMED';
   return {
     refCode: `MB-${randomUUID().slice(0, 8).toUpperCase()}`,
     customerId: f.customerId,

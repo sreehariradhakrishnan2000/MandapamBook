@@ -73,6 +73,8 @@ export const bookings = pgTable(
     cancellationReason: text('cancellation_reason'),
     cancelledBy: uuid('cancelled_by').references(() => users.id),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    /** Refund owed when a paid booking was cancelled, fixed at cancellation time (Phase 6 pays it). */
+    refundDuePaise: bigint('refund_due_paise', { mode: 'number' }),
     /** Optimistic lock for state transitions. */
     version: integer('version').notNull().default(1),
     ...timestamps(),
@@ -84,6 +86,11 @@ export const bookings = pgTable(
     index('bookings_hold_expiry_idx')
       .on(t.holdExpiresAt)
       .where(sql`${t.status} IN ('HELD', 'PENDING_PAYMENT')`),
+    // One unpaid hold per customer at a time, so nobody can lock up many dates for free.
+    uniqueIndex('bookings_one_active_hold_per_customer')
+      .on(t.customerId)
+      .where(sql`${t.status} IN ('HELD', 'PENDING_PAYMENT')`),
+    index('bookings_status_event_date_idx').on(t.status, t.eventDate),
     check('bookings_guest_count', sql`${t.guestCount} > 0`),
     check(
       'bookings_amounts_non_negative',

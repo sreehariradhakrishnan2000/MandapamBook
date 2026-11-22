@@ -93,7 +93,7 @@ describe.skipIf(!hasTestDb)('double booking is prevented by the database', () =>
     await book({ date, slot: 'MORNING' });
     expect(
       await sqlState(() =>
-        db.update(bookings).set({ status: 'PENDING_PAYMENT' }).where(eq(bookings.id, stale!.id)),
+        db.update(bookings).set({ status: 'CONFIRMED' }).where(eq(bookings.id, stale!.id)),
       ),
     ).toBe(PG_ERROR.EXCLUSION_VIOLATION);
   });
@@ -170,5 +170,43 @@ describe.skipIf(!hasTestDb)('double booking is prevented by the database', () =>
     }
     const active = await db.select().from(hallOccupancy).where(eq(hallOccupancy.eventDate, date));
     expect(active.filter((o) => o.active && o.hallId === f.hallId)).toHaveLength(1);
+  });
+});
+
+describe.skipIf(!hasTestDb)('one unpaid hold per customer', () => {
+  let pool: pg.Pool;
+  let db: Db;
+  let f: VenueFixture;
+
+  beforeAll(async () => {
+    pool = createTestPool(5);
+    db = testDb(pool);
+    f = await createVenueFixture(db);
+  });
+  afterAll(async () => {
+    await pool?.end();
+  });
+
+  it('rejects a second HELD or PENDING_PAYMENT booking for the same customer', async () => {
+    const [first] = await db
+      .insert(bookings)
+      .values(bookingValues(f, { date: uniqueDate(), slot: 'MORNING', status: 'HELD' }))
+      .returning();
+    expect(
+      await sqlState(() =>
+        db
+          .insert(bookings)
+          .values(
+            bookingValues(f, { date: uniqueDate(), slot: 'EVENING', status: 'PENDING_PAYMENT' }),
+          ),
+      ),
+    ).toBe(PG_ERROR.UNIQUE_VIOLATION);
+    // Once the first hold is no longer active, a new one is allowed.
+    await db.update(bookings).set({ status: 'EXPIRED' }).where(eq(bookings.id, first!.id));
+    await expect(
+      db
+        .insert(bookings)
+        .values(bookingValues(f, { date: uniqueDate(), slot: 'EVENING', status: 'HELD' })),
+    ).resolves.toBeDefined();
   });
 });
