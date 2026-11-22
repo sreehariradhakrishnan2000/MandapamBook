@@ -144,6 +144,26 @@ jobs:
           push: false
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      # Start the web image and check it really serves: the app, the SPA fallback, the
+      # security headers, and nginx not running as root. The API upstream only needs to
+      # resolve at startup, so it points at a closed local port.
+      - name: Smoke test (web image)
+        if: matrix.image == 'web'
+        run: |
+          docker run -d --name web-smoke -p 127.0.0.1:8080:8080 \
+            -e API_UPSTREAM=http://127.0.0.1:9 mandapambook-web:ci
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
+          curl -fsS -D headers.txt -o index.html http://127.0.0.1:8080/
+          grep -qi '<app-root' index.html || { echo "::error::/ did not serve the app"; exit 1; }
+          curl -fsS -o deep.html http://127.0.0.1:8080/search/some/deep/link
+          cmp -s index.html deep.html || { echo "::error::SPA fallback did not serve index.html"; exit 1; }
+          grep -qi '^x-content-type-options: nosniff' headers.txt || { echo "::error::security headers missing"; cat headers.txt; exit 1; }
+          uid=$(docker exec web-smoke id -u)
+          [ "$uid" != "0" ] || { echo "::error::nginx runs as root"; exit 1; }
+          echo "web image serves correctly as uid $uid"
+      - name: Web container logs
+        if: always() && matrix.image == 'web'
+        run: docker logs web-smoke 2>&1 | tail -50 || true
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: mandapambook-${{ matrix.image }}:ci
