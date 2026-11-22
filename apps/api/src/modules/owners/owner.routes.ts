@@ -5,6 +5,7 @@ import type { ObjectStorage } from '../../infra/storage.js';
 import type { AuditService } from '../audit/audit.service.js';
 import type { AuthService } from '../auth/auth.service.js';
 import type { PaymentService } from '../payments/payment.service.js';
+import type { InvoiceService } from '../invoices/invoice.service.js';
 import { bookingsInboxRouter } from './bookings-inbox.routes.js';
 import { calendarRouter } from './calendar.routes.js';
 import { listingsRouter } from './listings.routes.js';
@@ -21,6 +22,7 @@ export interface OwnerRouterDeps {
   crypto: FieldCrypto;
   storage: ObjectStorage;
   payments: PaymentService;
+  invoices: InvoiceService;
 }
 
 /**
@@ -37,6 +39,8 @@ export function ownerRouter(deps: OwnerRouterDeps): Router {
   r.use(calendarRouter({ db, scoped, audit }));
   r.use(mediaRouter({ db, scoped, storage, audit }));
   r.use(staffRouter({ db, scoped, auth, audit }));
-  r.use(bookingsInboxRouter({ db, scoped, audit, payments: deps.payments }));
+  r.use(
+    bookingsInboxRouter({ db, scoped, audit, payments: deps.payments, invoices: deps.invoices }),
+  );
   return r;
 }

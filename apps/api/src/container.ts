@@ -33,6 +33,7 @@ import {
   providerRoutes,
 } from './modules/payments/factory.js';
 import { PaymentService } from './modules/payments/payment.service.js';
+import { InvoiceService } from './modules/invoices/invoice.service.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
@@ -74,6 +75,7 @@ export interface Container {
   api: Router;
   bookings: BookingService;
   payments: PaymentService;
+  invoices: InvoiceService;
   auth: AuthService;
   audit: AuditService;
   accessTokens: AccessTokenService;
@@ -120,6 +122,7 @@ export function buildContainer(deps: ContainerDeps): Container {
   const bookingService = new BookingService(db, quotes, settings, audit);
   const provider = deps.paymentProvider ?? createPaymentProvider(env);
   const paymentService = new PaymentService(db, provider, settings, audit, deps.logger);
+  const invoices = new InvoiceService(db);
   api.use(catalogRouter({ db, storage: deps.storage }));
   api.use(
     bookingsRouter({
@@ -127,6 +130,7 @@ export function buildContainer(deps: ContainerDeps): Container {
       quotes,
       bookings: bookingService,
       payments: paymentService,
+      invoices,
       limiters,
       authenticate,
     }),
@@ -153,6 +157,7 @@ export function buildContainer(deps: ContainerDeps): Container {
       crypto,
       storage: deps.storage,
       payments: paymentService,
+      invoices,
     }),
   );
   api.use(
@@ -175,6 +180,7 @@ export function buildContainer(deps: ContainerDeps): Container {
     api,
     bookings: bookingService,
     payments: paymentService,
+    invoices,
     auth,
     audit,
     accessTokens,
