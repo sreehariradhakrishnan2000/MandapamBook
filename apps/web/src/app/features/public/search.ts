@@ -1,0 +1,315 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import type { SearchQuery, SearchResult, Slot } from '@mandapambook/shared';
+import { errorMessage } from '../../core/auth/auth.service';
+import { BookingApi } from '../../core/booking-api.service';
+import { InrPipe } from '../../shared/inr.pipe';
+import { SearchForm } from './search-form';
+
+@Component({
+  selector: 'app-search',
+  imports: [FormsModule, RouterLink, InrPipe, SearchForm],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <section class="flex flex-col gap-5 py-4">
+      <app-search-form [initial]="formInitial()" />
+
+      <div class="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <aside
+          aria-label="Filters"
+          class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm"
+        >
+          <h2 class="font-semibold">Filters</h2>
+          <label class="flex items-center gap-2"
+            ><input
+              type="checkbox"
+              class="size-4"
+              [(ngModel)]="filters.ac"
+              (ngModelChange)="apply()"
+            />
+            Air-conditioned</label
+          >
+          <label class="flex flex-col gap-1"
+            >Catering
+            <select
+              class="rounded-md border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="filters.catering"
+              (ngModelChange)="apply()"
+            >
+              <option value="">Any</option>
+              <option value="OUTSIDE_ALLOWED">Outside caterers allowed</option>
+              <option value="IN_HOUSE_ONLY">In-house only</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1"
+            >Decoration
+            <select
+              class="rounded-md border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="filters.decoration"
+              (ngModelChange)="apply()"
+            >
+              <option value="">Any</option>
+              <option value="OUTSIDE_ALLOWED">Outside decorators allowed</option>
+              <option value="IN_HOUSE_ONLY">In-house only</option>
+            </select>
+          </label>
+          <label class="flex flex-col gap-1"
+            >Car parking at least
+            <input
+              type="number"
+              min="0"
+              class="rounded-md border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="filters.minParking"
+              (change)="apply()"
+            />
+          </label>
+          <label class="flex flex-col gap-1"
+            >Guest rooms at least
+            <input
+              type="number"
+              min="0"
+              class="rounded-md border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="filters.minRooms"
+              (change)="apply()"
+            />
+          </label>
+          <label class="flex flex-col gap-1"
+            >Rating at least
+            <select
+              class="rounded-md border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="filters.minRating"
+              (ngModelChange)="apply()"
+            >
+              <option [ngValue]="null">Any</option>
+              <option [ngValue]="3">3+</option>
+              <option [ngValue]="4">4+</option>
+              <option [ngValue]="4.5">4.5+</option>
+            </select>
+          </label>
+          <fieldset class="flex flex-col gap-1">
+            <legend class="mb-1 font-medium">Amenities</legend>
+            @for (a of allAmenities(); track a.code) {
+              <label class="flex items-center gap-2"
+                ><input
+                  type="checkbox"
+                  class="size-4"
+                  [checked]="filters.amenities.includes(a.code)"
+                  (change)="toggleAmenity(a.code)"
+                />
+                {{ a.name }}</label
+              >
+            }
+          </fieldset>
+        </aside>
+
+        <div class="flex min-w-0 flex-col gap-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm text-slate-600" aria-live="polite">
+              {{ loading() ? 'Searching…' : total() + ' hall(s) found' }}
+            </p>
+            <label class="text-sm"
+              >Sort
+              <select
+                class="ml-1 rounded-md border border-slate-300 px-2 py-1.5"
+                [(ngModel)]="filters.sort"
+                (ngModelChange)="apply()"
+              >
+                <option value="recommended">Recommended</option>
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+                <option value="rating">Rating</option>
+                <option value="capacity">Capacity</option>
+              </select>
+            </label>
+          </div>
+          @if (error()) {
+            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              {{ error() }}
+            </p>
+          }
+          <ul class="grid gap-4 sm:grid-cols-2">
+            @for (v of results(); track v.id) {
+              <li class="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                <a [routerLink]="['/venues', v.slug]" [queryParams]="venueParams()" class="block">
+                  @if (v.photoUrl) {
+                    <img
+                      [src]="v.photoUrl"
+                      [alt]="'Photo of ' + v.name"
+                      class="aspect-[16/9] w-full object-cover"
+                      loading="lazy"
+                    />
+                  } @else {
+                    <div
+                      class="flex aspect-[16/9] items-center justify-center bg-slate-100 text-sm text-slate-500"
+                    >
+                      No photo yet
+                    </div>
+                  }
+                  <div class="flex flex-col gap-1 p-4">
+                    <h3 class="font-semibold">{{ v.name }}</h3>
+                    <p class="text-sm text-slate-600">
+                      {{ v.locality ? v.locality + ', ' : '' }}{{ v.city }}
+                    </p>
+                    <p class="text-sm text-slate-600">
+                      Up to {{ v.maxCapacity }} guests · {{ v.hasAc ? 'AC' : 'Non-AC' }} ·
+                      {{ v.parkingCars }} car parking
+                    </p>
+                    <p class="mt-1 flex items-baseline justify-between">
+                      @if (v.fromPricePaise !== null) {
+                        <span
+                          ><span class="text-xs text-slate-500">from </span
+                          ><span class="font-semibold tabular-nums">{{
+                            v.fromPricePaise | inr
+                          }}</span></span
+                        >
+                      }
+                      @if (v.ratingAvg) {
+                        <span class="text-sm"
+                          >★ {{ v.ratingAvg.toFixed(1) }} ({{ v.ratingCount }})</span
+                        >
+                      }
+                    </p>
+                  </div>
+                </a>
+              </li>
+            } @empty {
+              @if (!loading()) {
+                <li
+                  class="rounded-lg border border-dashed border-slate-300 p-6 text-slate-600 sm:col-span-2"
+                >
+                  No halls match. Try another date or fewer filters.
+                </li>
+              }
+            }
+          </ul>
+          @if (total() > results().length + (page() - 1) * pageSize) {
+            <button
+              type="button"
+              class="w-fit self-center rounded-md border border-slate-300 px-4 py-2 text-sm"
+              (click)="more()"
+            >
+              Show more
+            </button>
+          }
+        </div>
+      </div>
+    </section>
+  `,
+})
+export class Search {
+  private readonly api = inject(BookingApi);
+
+  // Bound from the URL by the router (withComponentInputBinding).
+  readonly city = input<string>();
+  readonly date = input<string>();
+  readonly slot = input<Slot>();
+  readonly guests = input<string>();
+  readonly budget = input<string>();
+
+  protected readonly pageSize = 12;
+  protected readonly results = signal<SearchResult[]>([]);
+  protected readonly total = signal(0);
+  protected readonly page = signal(1);
+  protected readonly loading = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly allAmenities = signal<{ code: string; name: string }[]>([]);
+  protected filters = {
+    ac: false,
+    catering: '' as '' | 'OUTSIDE_ALLOWED' | 'IN_HOUSE_ONLY',
+    decoration: '' as '' | 'OUTSIDE_ALLOWED' | 'IN_HOUSE_ONLY',
+    minParking: null as number | null,
+    minRooms: null as number | null,
+    minRating: null as number | null,
+    amenities: [] as string[],
+    sort: 'recommended' as NonNullable<SearchQuery['sort']>,
+  };
+
+  protected readonly formInitial = computed(() => ({
+    city: this.city() ?? '',
+    date: this.date() ?? '',
+    slot: (this.slot() ?? '') as Slot | '',
+    guests: this.guests() ? Number(this.guests()) : null,
+    budgetRupees: this.budget() ? Number(this.budget()) : null,
+  }));
+  /** Carries date/slot/guests to the venue page so the booking form is pre-filled. */
+  protected readonly venueParams = computed(() => ({
+    date: this.date() ?? null,
+    slot: this.slot() ?? null,
+    guests: this.guests() ?? null,
+  }));
+
+  constructor() {
+    void this.api.amenities().then(
+      (a) => this.allAmenities.set(a.items),
+      () => undefined,
+    );
+    effect(() => {
+      this.formInitial(); // re-run whenever the URL query changes
+      this.page.set(1);
+      void this.load(false);
+    });
+  }
+
+  private query(): SearchQuery {
+    const f = this.filters;
+    const budget = this.budget() ? Number(this.budget()) : undefined;
+    return {
+      city: this.city() || undefined,
+      date: this.date() || undefined,
+      slot: this.slot() || undefined,
+      guests: this.guests() ? Number(this.guests()) : undefined,
+      maxPricePaise: budget ? Math.round(budget) * 100 : undefined,
+      ac: f.ac || undefined,
+      catering: f.catering || undefined,
+      decoration: f.decoration || undefined,
+      minParking: f.minParking ?? undefined,
+      minRooms: f.minRooms ?? undefined,
+      minRating: f.minRating ?? undefined,
+      amenities: f.amenities.length ? f.amenities : undefined,
+      sort: f.sort,
+      page: this.page(),
+      pageSize: this.pageSize,
+    } as SearchQuery;
+  }
+
+  private async load(append: boolean): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      const res = await this.api.search(this.query());
+      this.results.set(append ? [...this.results(), ...res.items] : res.items);
+      this.total.set(res.total);
+    } catch (err) {
+      this.error.set(errorMessage(err, 'Search failed. Try again.'));
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  protected apply(): void {
+    this.page.set(1);
+    void this.load(false);
+  }
+
+  protected more(): void {
+    this.page.update((p) => p + 1);
+    void this.load(true);
+  }
+
+  protected toggleAmenity(code: string): void {
+    const set = new Set(this.filters.amenities);
+    if (set.has(code)) set.delete(code);
+    else set.add(code);
+    this.filters.amenities = [...set];
+    this.apply();
+  }
+}
