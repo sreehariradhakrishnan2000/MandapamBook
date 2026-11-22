@@ -15,6 +15,9 @@ import type { ObjectStorage } from './infra/storage.js';
 import { FieldCrypto } from './lib/field-crypto.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
 import { AuditService } from './modules/audit/audit.service.js';
+import { BookingService } from './modules/bookings/booking.service.js';
+import { bookingsRouter } from './modules/bookings/bookings.routes.js';
+import { QuoteService } from './modules/bookings/quote.service.js';
 import { catalogRouter } from './modules/catalog/catalog.routes.js';
 import { AccessTokenService } from './modules/auth/access-tokens.js';
 import { authRouter } from './modules/auth/auth.routes.js';
@@ -58,6 +61,7 @@ export interface ContainerDeps {
 
 export interface Container {
   api: Router;
+  bookings: BookingService;
   auth: AuthService;
   audit: AuditService;
   accessTokens: AccessTokenService;
@@ -99,14 +103,17 @@ export function buildContainer(deps: ContainerDeps): Container {
 
   const api = Router();
   api.use(limiters.middleware('apiPerIp', byIp));
-  api.use(catalogRouter({ db }));
+  const settings = new SettingsService(db);
+  const quotes = new QuoteService(db, settings);
+  const bookingService = new BookingService(db, quotes, settings, audit);
+  api.use(catalogRouter({ db, storage: deps.storage }));
+  api.use(bookingsRouter({ db, quotes, bookings: bookingService, limiters, authenticate }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
   api.use(
     '/owner',
     limiters.middleware('apiPerUser', byIp),
     ownerRouter({ db, authenticate, audit, auth, crypto, storage: deps.storage }),
   );
-  const settings = new SettingsService(db);
   api.use(
     '/admin',
     adminRouter({
@@ -122,5 +129,14 @@ export function buildContainer(deps: ContainerDeps): Container {
     }),
   );
 
-  return { api, auth, audit, accessTokens, refreshTokens, limiters, authenticate };
+  return {
+    api,
+    bookings: bookingService,
+    auth,
+    audit,
+    accessTokens,
+    refreshTokens,
+    limiters,
+    authenticate,
+  };
 }

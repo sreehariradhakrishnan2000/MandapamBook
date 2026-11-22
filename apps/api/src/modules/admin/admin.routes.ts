@@ -1,9 +1,22 @@
 import { type RequestHandler, Router } from 'express';
 import { and, count, desc, eq, ilike, lt, or, type SQL } from 'drizzle-orm';
-import { adminUserQuerySchema, roleChangeSchema } from '@mandapambook/shared';
+import {
+  adminUserQuerySchema,
+  ownerBookingQuerySchema,
+  roleChangeSchema,
+} from '@mandapambook/shared';
 import { z } from 'zod';
 import type { Db } from '../../db/client.js';
-import { auditLogs, ownerProfiles, users } from '../../db/schema/index.js';
+import {
+  auditLogs,
+  auditoriums,
+  bookings,
+  cities,
+  halls,
+  ownerProfiles,
+  users,
+} from '../../db/schema/index.js';
+import { bookingSummary } from '../bookings/bookings.routes.js';
 import { errors } from '../../http/errors.js';
 import type { ObjectStorage } from '../../infra/storage.js';
 import type { FieldCrypto } from '../../lib/field-crypto.js';
@@ -81,6 +94,22 @@ export function adminRouter(deps: AdminRouterDeps): Router {
     }),
   );
   r.use(masterDataRouter({ db, audit, settings: deps.settings }));
+
+  r.get('/bookings', requirePermission('booking:view_all'), async (req, res) => {
+    const q = ownerBookingQuerySchema.parse(req.query);
+    const items = await db
+      .select({ ...bookingSummary, customerEmail: users.email })
+      .from(bookings)
+      .innerJoin(auditoriums, eq(auditoriums.id, bookings.auditoriumId))
+      .innerJoin(halls, eq(halls.id, bookings.hallId))
+      .innerJoin(cities, eq(cities.id, auditoriums.cityId))
+      .innerJoin(users, eq(users.id, bookings.customerId))
+      .where(q.status ? eq(bookings.status, q.status) : undefined)
+      .orderBy(desc(bookings.createdAt))
+      .limit(q.limit)
+      .offset(q.offset);
+    res.set('Cache-Control', 'no-store').json({ items });
+  });
 
   r.get('/users', requirePermission('user:manage'), async (req, res) => {
     const q = adminUserQuerySchema.parse(req.query);
