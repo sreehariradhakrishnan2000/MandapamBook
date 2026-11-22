@@ -17,6 +17,8 @@ export const PERMISSIONS = [
   'audit:view',
   'masterdata:update',
   'booking:view_all',
+  /** View full KYC numbers (every reveal is audited) and verify or reject KYC. */
+  'kyc:review',
   // owner side (scoped to the owner's own venues)
   'auditorium:create',
   'auditorium:update',
@@ -42,6 +44,7 @@ const PLATFORM_ADMIN: Permission[] = [
   'audit:view',
   'masterdata:update',
   'booking:view_all',
+  'kyc:review',
 ];
 
 const OWNER: Permission[] = [
