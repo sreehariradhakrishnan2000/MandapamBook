@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { DEFAULT_RULE_PRIORITY, blockSchema, pricingRuleSchema } from '@mandapambook/shared';
 import { z } from 'zod';
-import { type Db, PG_ERROR, pgErrorCode } from '../../db/client.js';
+import { type Db, PG_ERROR, lockHallDate, pgErrorCode } from '../../db/client.js';
 import { availabilityBlocks, hallOccupancy, pricingRules } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
 import { todayInIst } from '../../lib/time.js';
@@ -156,16 +156,22 @@ export function calendarRouter(deps: {
       throw errors.badRequest('DATE_IN_PAST', 'You can only block today or future dates');
     }
     try {
-      const [block] = await db
-        .insert(availabilityBlocks)
-        .values({
-          hallId: hall.id,
-          eventDate: input.eventDate,
-          slot: input.slot,
-          reason: input.reason ?? null,
-          createdBy: me.userId,
-        })
-        .returning();
+      // Same hall/date lock as holds, so a block racing a booking can't deadlock on the
+      // occupancy exclusion constraint; one of them gets a clean 409 instead.
+      const block = await db.transaction(async (tx) => {
+        await lockHallDate(tx, hall.id, input.eventDate);
+        const [row] = await tx
+          .insert(availabilityBlocks)
+          .values({
+            hallId: hall.id,
+            eventDate: input.eventDate,
+            slot: input.slot,
+            reason: input.reason ?? null,
+            createdBy: me.userId,
+          })
+          .returning();
+        return row;
+      });
       await audit.record(
         {
           action: 'calendar.blocked',
