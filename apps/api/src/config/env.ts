@@ -177,7 +177,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       problems.push('CORS_ORIGINS: production origins must use https');
     }
     if (env.APP_BASE_URL.startsWith('http://')) problems.push('APP_BASE_URL: must use https');
-    if (!env.REDIS_URL.startsWith('rediss://'))
+    // Staging may use a host's private-network Redis (e.g. Render Key Value's internal
+    // redis:// URL), which never leaves that network. Real production requires TLS.
+    if (!staging && !env.REDIS_URL.startsWith('rediss://'))
       problems.push('REDIS_URL: production requires TLS (rediss://)');
     if (env.EMAIL_PROVIDER !== 'smtp')
       problems.push(`EMAIL_PROVIDER: ${env.EMAIL_PROVIDER} is not allowed in production`);
