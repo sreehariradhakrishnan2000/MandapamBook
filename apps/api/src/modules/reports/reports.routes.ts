@@ -12,6 +12,7 @@ import type { Db } from '../../db/client.js';
 import { auditoriums, bookings, cities, payouts } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
 import { todayInIst } from '../../lib/time.js';
+import type { RateLimiters } from '../../http/middleware/rate-limit.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 import { type ScopedResources, parseId, requireOwner } from '../owners/scoped.js';
@@ -46,8 +47,9 @@ export function reportsRouter(deps: {
   authenticate: RequestHandler;
   scoped: ScopedResources;
   audit: AuditService;
+  limiters: RateLimiters;
 }): Router {
-  const { db, authenticate, scoped, audit } = deps;
+  const { db, authenticate, scoped, audit, limiters } = deps;
   const r = Router();
 
   /** Owner earnings for their venues in a window, from payouts and bookings. */
@@ -191,6 +193,7 @@ export function reportsRouter(deps: {
     requirePermission('report:view'),
     async (req, res) => {
       const me = currentUser(req);
+      await limiters.consume('reportExportPerUser', me.userId);
       const { from, to } = reportWindow(reportQuerySchema.parse(req.query));
       const rows = await db
         .select({

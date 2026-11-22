@@ -21,7 +21,9 @@ RUN pnpm --filter @mandapambook/shared build \
  && pnpm --filter @mandapambook/api deploy --prod --legacy /out
 
 FROM ${NODE_IMAGE} AS runtime
-ENV NODE_ENV=production
+# Commit the image was built from; /health reports it so deploys can confirm the rollout.
+ARG APP_VERSION=dev
+ENV NODE_ENV=production APP_VERSION=${APP_VERSION}
 RUN apk add --no-cache tini
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./

@@ -6,7 +6,7 @@ describe('app shell', () => {
   it('GET /health returns ok with security headers and a request id', async () => {
     const res = await request(buildTestApp()).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.body).toEqual({ status: 'ok', version: 'dev' });
     expect(res.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
     expect(res.headers['x-powered-by']).toBeUndefined();
     expect(res.headers['content-security-policy']).toContain("default-src 'none'");

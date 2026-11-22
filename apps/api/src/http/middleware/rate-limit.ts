@@ -30,6 +30,12 @@ export const LIMITS = {
   // Holds lock a date for everyone else; cap how often one customer can do that.
   holdPerUser: { points: 6, windowSeconds: 60 * 60 },
   quotePerIp: { points: 120, windowSeconds: 60 },
+  /** Reviews and owner replies (spam). */
+  reviewWritePerUser: { points: 10, windowSeconds: 60 * 60 },
+  /** CSV exports read up to 50,000 rows. */
+  reportExportPerUser: { points: 20, windowSeconds: 60 * 60 },
+  /** Invoice PDFs are rendered on request. */
+  invoicePerUser: { points: 60, windowSeconds: 60 * 60 },
 } satisfies Record<string, LimitSpec>;
 
 export type LimitName = keyof typeof LIMITS;

@@ -150,8 +150,8 @@ export function buildContainer(deps: ContainerDeps): Container {
   api.use(paymentsRouter({ payments: paymentService, authenticate, limiters }));
   // Reviews span public, customer, owner and admin paths, each with its own permission.
   const scoped = new ScopedResources(db);
-  api.use(reviewsRouter({ db, authenticate, scoped, audit }));
-  api.use(reportsRouter({ db, authenticate, scoped, audit }));
+  api.use(reviewsRouter({ db, authenticate, scoped, audit, limiters }));
+  api.use(reportsRouter({ db, authenticate, scoped, audit, limiters }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
   api.use(
     '/owner',

@@ -227,6 +227,19 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
     expect(logs.map((l) => l.action)).toEqual(['review.moderated', 'review.moderated']);
   });
 
+  it('rate-limits review writes per user', async () => {
+    const cust = await login('CUSTOMER');
+    const id = await booking(cust.id, 'CONFIRMED');
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      statuses.push(
+        (await cust.c.send('post', `/api/v1/bookings/${id}/review`, { rating: 5 })).status,
+      );
+    }
+    expect(statuses.slice(0, 10).every((s) => s === 409)).toBe(true);
+    expect(statuses[10]).toBe(429);
+  });
+
   it('returns 404 for reviews of unknown or unapproved venues', async () => {
     const c = new Client(h.app);
     expect(

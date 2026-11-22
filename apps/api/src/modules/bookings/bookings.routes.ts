@@ -109,7 +109,9 @@ export function bookingsRouter(deps: {
 
   /** Invoice PDF for the customer's own paid booking. */
   r.get('/bookings/:id/invoice.pdf', requirePermission('booking:create'), async (req, res) => {
-    const b = await loadOwn(currentUser(req).userId, req.params['id']);
+    const me = currentUser(req);
+    await limiters.consume('invoicePerUser', me.userId);
+    const b = await loadOwn(me.userId, req.params['id']);
     const { data, buffer } = await invoices.pdf(b.id);
     res
       .set({
