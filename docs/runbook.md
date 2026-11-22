@@ -6,14 +6,14 @@ anything that can run two containers (API, worker) plus the static web image wor
 
 ## Components
 
-| Component      | Image / command                                   | Scale | Notes                                                                                                                                              |
-| -------------- | ------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API            | `ghcr.io/<repo>-api:<sha>`, `node dist/server.js` | 2+    | Stateless; behind a TLS-terminating proxy (`TRUST_PROXY_HOPS=1`)                                                                                   |
-| Worker         | same image, `node dist/worker.js`                 | 1+    | Sweep (holds, completion, refunds, payouts, uploads) and email delivery. An advisory lock keeps sweeps from overlapping, so extra workers are safe |
-| Web            | `ghcr.io/<repo>-web:<sha>`                        | 1+    | nginx, non-root, strict CSP                                                                                                                        |
-| Postgres       | managed (Neon)                                    |       | Pooled URL for the app, **direct** URL for migrations                                                                                              |
-| Redis          | managed (Upstash, `rediss://`)                    |       | Rate limits and token revocation. Rebuildable: losing it only resets counters                                                                      |
-| Object storage | S3-compatible, private bucket                     |       | Presigned uploads/downloads only                                                                                                                   |
+| Component      | Image / command                                                             | Scale | Notes                                                                                                                                              |
+| -------------- | --------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API            | `ghcr.io/<owner>/mandapambook-api:<sha>` (lowercase), `node dist/server.js` | 2+    | Stateless; behind a TLS-terminating proxy (`TRUST_PROXY_HOPS=1`)                                                                                   |
+| Worker         | same image, `node dist/worker.js`                                           | 1+    | Sweep (holds, completion, refunds, payouts, uploads) and email delivery. An advisory lock keeps sweeps from overlapping, so extra workers are safe |
+| Web            | `ghcr.io/<owner>/mandapambook-web:<sha>`                                    | 1+    | nginx, non-root, strict CSP                                                                                                                        |
+| Postgres       | managed (Neon)                                                              |       | Pooled URL for the app, **direct** URL for migrations                                                                                              |
+| Redis          | managed (Upstash, `rediss://`)                                              |       | Rate limits and token revocation. Rebuildable: losing it only resets counters                                                                      |
+| Object storage | S3-compatible, private bucket                                               |       | Presigned uploads/downloads only                                                                                                                   |
 
 ## Environments and the pipeline
 

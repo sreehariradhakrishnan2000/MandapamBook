@@ -35,10 +35,16 @@ jobs:
     environment:
       name: ${{ inputs.environment }}
       url: ${{ vars.API_BASE_URL }}
-    env:
-      API_IMAGE: ghcr.io/${{ github.repository }}-api:${{ inputs.image_tag }}
-      WEB_IMAGE: ghcr.io/${{ github.repository }}-web:${{ inputs.image_tag }}
     steps:
+      # GHCR image names must be lowercase; github.repository keeps the repo's capitals.
+      # image_tag is a validated commit SHA (deploy.yml), so it is safe in the shell.
+      - name: Image references
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "API_IMAGE=$prefix-api:$IMAGE_TAG" >> "$GITHUB_ENV"
+          echo "WEB_IMAGE=$prefix-web:$IMAGE_TAG" >> "$GITHUB_ENV"
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
