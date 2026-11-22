@@ -142,6 +142,57 @@ jobs:
           comment-summary-in-pr: on-failure
           deny-licenses: GPL-3.0, AGPL-3.0
 
+  e2e:
+    name: End-to-end journeys (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mandapambook_e2e
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: test-only-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d mandapambook_e2e"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8.2-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      E2E_DATABASE_URL: postgres://ci:test-only-ci-password@localhost:5432/mandapambook_e2e
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mandapambook/shared build
+      - name: Throwaway secrets for this run (masked)
+        run: |
+          node scripts/generate-secrets.mjs | while IFS='=' read -r key value; do
+            echo "::add-mask::$value"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done
+      - name: Install Chromium
+        run: pnpm --filter @mandapambook/e2e exec playwright install --with-deps chromium
+      - name: Journeys (owner listing and approval; customer search, hold, pay, confirm)
+        run: pnpm e2e
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: |
+            apps/e2e/playwright-report
+            apps/e2e/test-results
+          retention-days: 7
+
   docker:
     name: Docker build and Trivy scan
     runs-on: ubuntu-latest

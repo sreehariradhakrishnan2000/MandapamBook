@@ -21,12 +21,15 @@ RUN pnpm --filter @mandapambook/shared build \
  && pnpm --filter @mandapambook/api deploy --prod --legacy /out
 
 FROM ${NODE_IMAGE} AS runtime
-ENV NODE_ENV=production
 # Patch OS packages, and drop npm, npx and corepack: the runtime only runs node, and their
 # bundled dependencies (undici, brace-expansion, ...) would otherwise be shipped and scanned.
 RUN apk upgrade --no-cache && apk add --no-cache tini \
  && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
            /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+# Commit the image was built from; /health reports it so deploys can confirm the rollout.
+# Declared after the package layer so a new commit does not invalidate that cache.
+ARG APP_VERSION=dev
+ENV NODE_ENV=production APP_VERSION=${APP_VERSION}
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 USER node

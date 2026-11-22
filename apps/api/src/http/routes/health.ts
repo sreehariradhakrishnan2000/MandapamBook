@@ -10,8 +10,10 @@ export type ReadinessCheck = () => Promise<void>;
 export function healthRouter(checks: Record<string, ReadinessCheck>, timeoutMs = 2000): Router {
   const router = Router();
 
+  // The build's commit (short), so a deploy can confirm the new version is serving.
+  const version = (process.env['APP_VERSION'] ?? 'dev').slice(0, 12);
   router.get('/health', (_req, res) => {
-    res.json({ status: 'ok' });
+    res.json({ status: 'ok', version });
   });
 
   router.get('/ready', async (req, res) => {

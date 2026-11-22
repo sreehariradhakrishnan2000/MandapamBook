@@ -62,6 +62,12 @@ export const envSchema = z.object({
   APP_BASE_URL: z.url().default('http://localhost:4200'),
   DATABASE_URL: z.url().refine((u) => u.startsWith('postgres'), 'must be a postgres:// URL'),
   REDIS_URL: z.url().refine((u) => /^rediss?:\/\//.test(u), 'must be a redis:// or rediss:// URL'),
+  /** Namespace for every Redis key (rate limits, revocations), e.g. "e2e:run1:". Default: none. */
+  REDIS_KEY_PREFIX: z
+    .string()
+    .max(40)
+    .regex(/^[a-z0-9:_-]*$/, 'lowercase letters, digits, : _ - only')
+    .default(''),
   /** JSON request body limit, e.g. "100kb". */
   BODY_LIMIT: z
     .string()
@@ -85,7 +91,9 @@ export const envSchema = z.object({
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   /** Check new passwords against Have I Been Pwned (k-anonymity; only a hash prefix is sent). */
   HIBP_ENABLED: booleanString.default(false),
-  EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
+  /** console: log (dev). file: one JSON file per message in EMAIL_FILE_DIR (e2e tests). smtp: real delivery. */
+  EMAIL_PROVIDER: z.enum(['console', 'file', 'smtp']).default('console'),
+  EMAIL_FILE_DIR: z.string().min(1).optional(),
   OTP_PROVIDER: z.enum(['console']).default('console'),
   /** e.g. smtp://localhost:1025 (Mailpit) or smtps://user:pass@relay:465. Required for EMAIL_PROVIDER=smtp. */
   SMTP_URL: z
@@ -152,8 +160,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     if (env.APP_BASE_URL.startsWith('http://')) problems.push('APP_BASE_URL: must use https');
     if (!env.REDIS_URL.startsWith('rediss://'))
       problems.push('REDIS_URL: production requires TLS (rediss://)');
-    if (env.EMAIL_PROVIDER === 'console')
-      problems.push('EMAIL_PROVIDER: console is not allowed in production');
+    if (env.EMAIL_PROVIDER !== 'smtp')
+      problems.push(`EMAIL_PROVIDER: ${env.EMAIL_PROVIDER} is not allowed in production`);
     if (env.STORAGE_PROVIDER === 'memory')
       problems.push('STORAGE_PROVIDER: memory is not allowed in production');
     if (env.PAYMENT_PROVIDER === 'mock')
@@ -176,6 +184,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     problems.push(
       'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET / RAZORPAY_WEBHOOK_SECRET: required when PAYMENT_PROVIDER=razorpay',
     );
+  }
+  if (env.EMAIL_PROVIDER === 'file' && !env.EMAIL_FILE_DIR) {
+    problems.push('EMAIL_FILE_DIR: required when EMAIL_PROVIDER=file');
   }
   if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_URL) {
     problems.push('SMTP_URL: required when EMAIL_PROVIDER=smtp');

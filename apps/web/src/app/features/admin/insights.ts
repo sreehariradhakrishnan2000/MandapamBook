@@ -311,7 +311,7 @@ export class AdminPayouts implements OnInit {
                 class="rounded-md border px-3 py-1 font-semibold disabled:opacity-50"
                 [class.border-red-300]="r.status === 'PUBLISHED'"
                 [class.text-red-700]="r.status === 'PUBLISHED'"
-                [disabled]="(reasons[r.id]?.trim()?.length ?? 0) < 3"
+                [disabled]="(reasons[r.id] ?? '').trim().length < 3"
               >
                 {{ r.status === 'PUBLISHED' ? 'Hide' : 'Restore' }}
               </button>

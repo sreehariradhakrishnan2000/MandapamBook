@@ -39,14 +39,15 @@ Or run everything in containers: `docker compose up --build`, then open http://l
 
 ## Common scripts
 
-| Command             | Does                            |
-| ------------------- | ------------------------------- |
-| `pnpm lint`         | ESLint across the monorepo      |
-| `pnpm typecheck`    | `tsc --noEmit` in every package |
-| `pnpm test`         | All unit and integration tests  |
-| `pnpm build`        | Build shared, API and web       |
-| `pnpm format`       | Prettier                        |
-| `pnpm secrets:scan` | gitleaks over the git history   |
+| Command             | Does                              |
+| ------------------- | --------------------------------- |
+| `pnpm lint`         | ESLint across the monorepo        |
+| `pnpm typecheck`    | `tsc --noEmit` in every package   |
+| `pnpm test`         | All unit and integration tests    |
+| `pnpm e2e`          | Playwright journeys (see runbook) |
+| `pnpm build`        | Build shared, API and web         |
+| `pnpm format`       | Prettier                          |
+| `pnpm secrets:scan` | gitleaks over the git history     |
 
 Database workflow and integrity rules: [docs/database.md](docs/database.md). Auth, tokens and permissions: [docs/auth.md](docs/auth.md). Owner onboarding, KYC, uploads and pricing: [docs/owners.md](docs/owners.md). Admin review, KYC verification and settings: [docs/admin.md](docs/admin.md). Search, pricing, holds and the booking state machine: [docs/bookings.md](docs/bookings.md). Notifications, invoices, reviews, payouts and reports: [docs/notifications-and-reports.md](docs/notifications-and-reports.md).
 

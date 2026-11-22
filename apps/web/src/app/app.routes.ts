@@ -6,13 +6,16 @@ import { signedIn, withPermission } from './core/auth/guards';
  * owner/admin code. Guards only shape navigation; the API enforces access.
  */
 export const routes: Routes = [
-  {
-    path: '',
-    loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),
-  },
+  // Public first: an empty-path parent counts as matched when no URL is left, even if no
+  // child matches, so the auth group listed first swallowed "/" and the home page never
+  // rendered. With segments left over ("/login"), the router backtracks to the auth group.
   {
     path: '',
     loadChildren: () => import('./features/public/public.routes').then((m) => m.PUBLIC_ROUTES),
+  },
+  {
+    path: '',
+    loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),
   },
   {
     path: 'account',

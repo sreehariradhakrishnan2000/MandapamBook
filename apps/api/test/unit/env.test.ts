@@ -67,6 +67,27 @@ describe('loadEnv', () => {
     ).not.toThrow();
   });
 
+  it('allows the file email provider only outside production, with a directory', () => {
+    expect(() => loadEnv({ ...valid, EMAIL_PROVIDER: 'file' })).toThrow(/EMAIL_FILE_DIR/);
+    expect(
+      loadEnv({ ...valid, EMAIL_PROVIDER: 'file', EMAIL_FILE_DIR: '/tmp/mail' }).EMAIL_PROVIDER,
+    ).toBe('file');
+    let caught: unknown;
+    try {
+      loadEnv({
+        ...valid,
+        NODE_ENV: 'production',
+        EMAIL_PROVIDER: 'file',
+        EMAIL_FILE_DIR: '/tmp/mail',
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(String((caught as Error).message)).toContain(
+      'EMAIL_PROVIDER: file is not allowed in production',
+    );
+  });
+
   it('requires S3 credentials for the s3 provider and 32-byte encryption keys', () => {
     expect(() => loadEnv({ ...valid, STORAGE_PROVIDER: 's3' })).toThrow(/S3_ACCESS_KEY_ID/);
     expect(() =>

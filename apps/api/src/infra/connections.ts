@@ -62,8 +62,11 @@ export function createPgPool(env: Pick<Env, 'DATABASE_URL'>, logger?: Logger): p
   return withReadRetry(pool, logger);
 }
 
-export function createRedis(env: Pick<Env, 'REDIS_URL'>): Redis {
+export function createRedis(
+  env: Pick<Env, 'REDIS_URL'> & Partial<Pick<Env, 'REDIS_KEY_PREFIX'>>,
+): Redis {
   return new Redis(env.REDIS_URL, {
+    ...(env.REDIS_KEY_PREFIX ? { keyPrefix: env.REDIS_KEY_PREFIX } : {}),
     lazyConnect: true,
     maxRetriesPerRequest: 2,
     enableOfflineQueue: false,

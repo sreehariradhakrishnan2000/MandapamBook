@@ -1,0 +1,95 @@
+name: Deploy to one environment
+
+# Reusable: migrate (separate step, direct DB connection), trigger the host's deploy hook
+# with the image tags, then wait until /ready reports healthy on the new version.
+#
+# Per-environment configuration (Settings → Environments → staging / production):
+#   secrets:   MIGRATION_DATABASE_URL  direct (non-pooled) Postgres URL for migrations
+#              DEPLOY_HOOK_URL         host deploy hook; receives api/web image references
+#              DEPLOY_HOOK_TOKEN       bearer token for the hook (optional)
+#   variables: API_BASE_URL            e.g. https://api.staging.mandapambook.in
+#   production: add required reviewers — that is the approval gate.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      image_tag:
+        type: string
+        required: true
+      run_migrations:
+        type: boolean
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.API_BASE_URL }}
+    env:
+      API_IMAGE: ghcr.io/${{ github.repository }}-api:${{ inputs.image_tag }}
+      WEB_IMAGE: ghcr.io/${{ github.repository }}-web:${{ inputs.image_tag }}
+    steps:
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check configuration
+        env:
+          HAS_DB: ${{ secrets.MIGRATION_DATABASE_URL != '' }}
+          HAS_HOOK: ${{ secrets.DEPLOY_HOOK_URL != '' }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          missing=""
+          [ "$HAS_HOOK" = "true" ] || missing="$missing DEPLOY_HOOK_URL"
+          [ -n "$API_BASE_URL" ] || missing="$missing API_BASE_URL"
+          if [ "${{ inputs.run_migrations }}" = "true" ] && [ "$HAS_DB" != "true" ]; then missing="$missing MIGRATION_DATABASE_URL"; fi
+          if [ -n "$missing" ]; then echo "::error::Environment ${{ inputs.environment }} is missing:$missing"; exit 1; fi
+
+      - name: Migrate database (expand-only migrations; see docs/runbook.md)
+        if: inputs.run_migrations
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
+        run: |
+          docker pull "$API_IMAGE"
+          docker run --rm -e NODE_ENV=production -e MIGRATION_DATABASE_URL -e DATABASE_URL="$MIGRATION_DATABASE_URL" \
+            "$API_IMAGE" node dist/db/migrate.js
+
+      - name: Trigger deploy
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
+          DEPLOY_HOOK_TOKEN: ${{ secrets.DEPLOY_HOOK_TOKEN }}
+        run: |
+          body=$(printf '{"environment":"%s","api_image":"%s","web_image":"%s","version":"%s"}' \
+            "${{ inputs.environment }}" "$API_IMAGE" "$WEB_IMAGE" "${{ inputs.image_tag }}")
+          auth=()
+          [ -n "$DEPLOY_HOOK_TOKEN" ] && auth=(-H "Authorization: Bearer $DEPLOY_HOOK_TOKEN")
+          curl --fail-with-body -sS -X POST "${auth[@]}" -H 'Content-Type: application/json' \
+            --data "$body" "$DEPLOY_HOOK_URL"
+
+      - name: Smoke test (/health and /ready on the new deployment)
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          want=$(echo "${{ inputs.image_tag }}" | cut -c1-12)
+          for i in $(seq 1 40); do
+            got=$(curl -fsS "$API_BASE_URL/health" | jq -r '.version // empty' || true)
+            if [ "$got" = "$want" ] && curl -fsS "$API_BASE_URL/ready"; then
+              echo; echo "version $got is live and ready"; exit 0
+            fi
+            echo "waiting: serving '${got:-none}', want '$want'"
+            sleep 15
+          done
+          echo "::error::$API_BASE_URL did not serve version $want healthily within 10 minutes; roll back (docs/runbook.md)"
+          exit 1

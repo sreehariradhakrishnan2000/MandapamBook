@@ -13,6 +13,7 @@ import type { Db } from '../../db/client.js';
 import { PG_ERROR, pgErrorCode } from '../../db/client.js';
 import { auditoriums, bookings, reviews, users } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
+import type { RateLimiters } from '../../http/middleware/rate-limit.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 import { auditoriumScopeCondition } from '../rbac/owner-scope.js';
@@ -49,8 +50,9 @@ export function reviewsRouter(deps: {
   authenticate: RequestHandler;
   scoped: ScopedResources;
   audit: AuditService;
+  limiters: RateLimiters;
 }): Router {
-  const { db, authenticate, scoped, audit } = deps;
+  const { db, authenticate, scoped, audit, limiters } = deps;
   const r = Router();
 
   r.get('/auditoriums/:id/reviews', async (req, res) => {
@@ -92,6 +94,7 @@ export function reviewsRouter(deps: {
     requirePermission('review:create'),
     async (req, res) => {
       const me = currentUser(req);
+      await limiters.consume('reviewWritePerUser', me.userId);
       const id = parseId(req.params['id']);
       const input = createReviewSchema.parse(req.body);
       try {
@@ -165,6 +168,7 @@ export function reviewsRouter(deps: {
     requirePermission('review:reply'),
     async (req, res) => {
       const me = currentUser(req);
+      await limiters.consume('reviewWritePerUser', me.userId);
       const scope = await scoped.scope(req);
       requireOwner(scope);
       const id = parseId(req.params['id']);
