@@ -106,7 +106,7 @@ export function authRouter({ auth, limiters, authenticate, csrf }: AuthRouterDep
     res.status(204).end();
   });
 
-  r.post('/verify-email', async (req, res) => {
+  r.post('/verify-email', limiters.middleware('verifyEmailPerIp', byIp), async (req, res) => {
     const { token } = verifyEmailSchema.parse(req.body);
     await auth.verifyEmail(token, clientContext(req));
     res.json({ message: 'Your email is verified.' });

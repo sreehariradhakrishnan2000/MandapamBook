@@ -63,4 +63,19 @@ describe.skipIf(!hasTestDb)('rate limiting', () => {
       await fresh.close();
     }
   });
+
+  it('limits email verification attempts per IP', async () => {
+    const fresh = await createHarness({
+      limitOverrides: { verifyEmailPerIp: { points: 2, windowSeconds: 60 } },
+    });
+    try {
+      const c = new Client(fresh.app);
+      const attempt = () => c.send('post', '/api/v1/auth/verify-email', { token: 'x'.repeat(43) });
+      expect((await attempt()).status).toBe(400);
+      expect((await attempt()).status).toBe(400);
+      expect((await attempt()).status).toBe(429);
+    } finally {
+      await fresh.close();
+    }
+  });
 });
