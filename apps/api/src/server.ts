@@ -7,7 +7,7 @@ import { createApp } from './http/app.js';
 import { createPgPool, createRedis } from './infra/connections.js';
 import { RedisRevocationStore } from './infra/revocation-store.js';
 import { MemoryObjectStorage, type ObjectStorage, S3ObjectStorage } from './infra/storage.js';
-import { ConsoleEmailSender, ConsoleSmsSender } from './modules/notifications/senders.js';
+import { createEmailSender, ConsoleSmsSender } from './modules/notifications/senders.js';
 
 async function main(): Promise<void> {
   const env = loadEnv(); // fail fast on bad config
@@ -31,15 +31,14 @@ async function main(): Promise<void> {
         })
       : new MemoryObjectStorage();
 
-  // Phase 7 replaces the console senders with SMTP / SMS gateway implementations.
-  // loadEnv already refuses EMAIL_PROVIDER=console in production.
+  // loadEnv refuses EMAIL_PROVIDER=console in production.
   const container = buildContainer({
     env,
     logger,
     db: createDb(pool),
     redis,
     revocations: new RedisRevocationStore(redis),
-    email: new ConsoleEmailSender(logger),
+    email: createEmailSender(env, logger),
     sms: new ConsoleSmsSender(logger),
     storage,
   });

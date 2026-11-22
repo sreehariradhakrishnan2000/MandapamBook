@@ -1,8 +1,11 @@
+import nodemailer, { type Transporter } from 'nodemailer';
 import type { Logger } from 'pino';
+import type { BookingTemplate } from './templates.js';
 
 /**
- * Delivery abstractions. Auth depends only on these interfaces; Phase 7 adds SMTP
- * and SMS gateway implementations selected by EMAIL_PROVIDER / OTP_PROVIDER.
+ * Delivery abstractions. Business code depends only on these interfaces; EMAIL_PROVIDER
+ * selects console (development) or SMTP (Mailpit locally, any SMTP relay in production).
+ * SMS stays behind SmsSender; a gateway implementation is added when one is chosen.
  */
 export interface EmailMessage {
   to: string;
@@ -12,9 +15,11 @@ export interface EmailMessage {
     | 'account_exists'
     | 'security_alert'
     | 'listing_decision'
-    | 'kyc_decision';
+    | 'kyc_decision'
+    | BookingTemplate;
   subject: string;
   text: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
 export interface EmailSender {
@@ -30,12 +35,46 @@ export interface SmsSender {
   send(message: SmsMessage): Promise<void>;
 }
 
+/** Sends through SMTP. Works with Mailpit (smtp://localhost:1025) and production relays. */
+export class SmtpEmailSender implements EmailSender {
+  private readonly transport: Transporter;
+
+  constructor(
+    smtpUrl: string,
+    private readonly from: string,
+  ) {
+    this.transport = nodemailer.createTransport(smtpUrl);
+  }
+
+  async send(message: EmailMessage): Promise<void> {
+    await this.transport.sendMail({
+      from: this.from,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      headers: { 'X-MandapamBook-Template': message.template },
+      attachments: message.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
+    });
+  }
+}
+
 /** Development only: writes messages to the log so links and codes can be copied. */
 export class ConsoleEmailSender implements EmailSender {
   constructor(private readonly logger: Logger) {}
   async send(message: EmailMessage): Promise<void> {
     this.logger.info(
-      { mail: { template: message.template, subject: message.subject, body: message.text } },
+      {
+        mail: {
+          template: message.template,
+          subject: message.subject,
+          body: message.text,
+          attachments: message.attachments?.map((a) => a.filename),
+        },
+      },
       'email (console provider)',
     );
   }
@@ -67,4 +106,14 @@ export class MemorySmsSender implements SmsSender {
   lastTo(to: string): SmsMessage | undefined {
     return [...this.sent].reverse().find((m) => m.to === to);
   }
+}
+
+/** Picks the email transport from EMAIL_PROVIDER. Production refuses 'console' at startup. */
+export function createEmailSender(
+  env: { EMAIL_PROVIDER: 'console' | 'smtp'; SMTP_URL?: string | undefined; EMAIL_FROM: string },
+  logger: Logger,
+): EmailSender {
+  return env.EMAIL_PROVIDER === 'smtp' && env.SMTP_URL
+    ? new SmtpEmailSender(env.SMTP_URL, env.EMAIL_FROM)
+    : new ConsoleEmailSender(logger);
 }

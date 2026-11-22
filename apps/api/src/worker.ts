@@ -14,6 +14,9 @@ import { QuoteService } from './modules/bookings/quote.service.js';
 import { createPaymentProvider } from './modules/payments/factory.js';
 import { PaymentService } from './modules/payments/payment.service.js';
 import { SettingsService } from './modules/settings/settings.service.js';
+import { InvoiceService } from './modules/invoices/invoice.service.js';
+import { NotificationService } from './modules/notifications/notification.service.js';
+import { createEmailSender } from './modules/notifications/senders.js';
 import { runSweep } from './jobs/sweeper.js';
 
 async function main(): Promise<void> {
@@ -47,13 +50,21 @@ async function main(): Promise<void> {
         })
       : new MemoryObjectStorage();
 
+  const notifications = new NotificationService(
+    db,
+    createEmailSender(env, logger),
+    new InvoiceService(db),
+    env.APP_BASE_URL,
+    logger,
+  );
+
   const intervalMs = Number(process.env['SWEEP_INTERVAL_SECONDS'] ?? 30) * 1000;
   let running = false;
   const tick = async () => {
     if (running) return;
     running = true;
     try {
-      await runSweep({ pool, db, bookingService, storage, payments, logger });
+      await runSweep({ pool, db, bookingService, storage, payments, notifications, logger });
     } catch (err) {
       logger.error({ err }, 'sweep failed');
     } finally {

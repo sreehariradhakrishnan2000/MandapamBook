@@ -87,6 +87,15 @@ export const envSchema = z.object({
   HIBP_ENABLED: booleanString.default(false),
   EMAIL_PROVIDER: z.enum(['console', 'smtp']).default('console'),
   OTP_PROVIDER: z.enum(['console']).default('console'),
+  /** e.g. smtp://localhost:1025 (Mailpit) or smtps://user:pass@relay:465. Required for EMAIL_PROVIDER=smtp. */
+  SMTP_URL: z
+    .url()
+    .refine(
+      (u) => u.startsWith('smtp://') || u.startsWith('smtps://'),
+      'must be smtp:// or smtps://',
+    )
+    .optional(),
+  EMAIL_FROM: z.string().min(3).default('MandapamBook <no-reply@mandapambook.example>'),
 
   // --- Data protection ---
   /** AES-256-GCM keys for PAN and bank details ("kid:base64url", exactly 32 bytes each). */
@@ -167,6 +176,9 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     problems.push(
       'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET / RAZORPAY_WEBHOOK_SECRET: required when PAYMENT_PROVIDER=razorpay',
     );
+  }
+  if (env.EMAIL_PROVIDER === 'smtp' && !env.SMTP_URL) {
+    problems.push('SMTP_URL: required when EMAIL_PROVIDER=smtp');
   }
   if (env.STORAGE_PROVIDER === 's3' && (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY)) {
     problems.push('S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY: required when STORAGE_PROVIDER=s3');
