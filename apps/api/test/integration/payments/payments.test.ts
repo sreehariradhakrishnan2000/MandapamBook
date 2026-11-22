@@ -492,4 +492,107 @@ describe.skipIf(!hasTestDb)('payments', { timeout: 120_000 }, () => {
       ).toBe(403);
     });
   });
+  describe('edge cases', () => {
+    it('returns 404 or 400 for bad checkout requests', async () => {
+      expect((await request(h.app).get('/api/v1/payments/mock/checkout/not-an-order')).status).toBe(
+        404,
+      );
+      expect(
+        (await request(h.app).get('/api/v1/payments/mock/checkout/mock_order_missing')).status,
+      ).toBe(404);
+      expect(
+        (
+          await request(h.app)
+            .post('/api/v1/payments/mock/checkout/mock_order_missing/complete')
+            .type('form')
+            .send({ outcome: 'success' })
+        ).status,
+      ).toBe(404);
+      expect(
+        (
+          await request(h.app)
+            .post('/api/v1/payments/mock/checkout/mock_order_x/complete')
+            .type('form')
+            .send({ outcome: 'steal' })
+        ).status,
+      ).toBe(400);
+    });
+
+    it('shows a payment only to the customer who made it', async () => {
+      const { cust, bookingId } = await heldBooking();
+      const o = (await order(cust.c, bookingId)).body;
+      const mine = await cust.c.send('get', `/api/v1/payments/${o.paymentId}`);
+      expect(mine.body).toMatchObject({
+        id: o.paymentId,
+        status: 'CREATED',
+        bookingStatus: 'PENDING_PAYMENT',
+      });
+      expect(
+        (await (await customer()).c.send('get', `/api/v1/payments/${o.paymentId}`)).status,
+      ).toBe(404);
+      expect(
+        (
+          await cust.c.send('post', '/api/v1/payments/verify', {
+            providerOrderId: 'mock_order_unknown',
+            providerPaymentId: 'mock_pay_x',
+            signature: 'x',
+          })
+        ).status,
+      ).toBe(404);
+    });
+
+    it('acknowledges webhook events it does not act on', async () => {
+      expect((await webhook({ id: `evt_${randomUUID()}`, event: 'order.paid' })).body.outcome).toBe(
+        'ignored',
+      );
+      expect(
+        (await webhook({ id: `evt_${randomUUID()}`, event: 'payment.captured' })).body.outcome,
+      ).toBe('ignored');
+      expect(
+        (await webhook({ id: `evt_${randomUUID()}`, event: 'payment.failed' })).body.outcome,
+      ).toBe('ignored');
+      expect(
+        (
+          await webhook({
+            id: `evt_${randomUUID()}`,
+            event: 'refund.processed',
+            refundId: 'mock_rfnd_none',
+          })
+        ).body.outcome,
+      ).toBe('processed');
+      // A capture for an order we never created changes nothing.
+      expect(
+        (
+          await webhook({
+            id: `evt_${randomUUID()}`,
+            event: 'payment.captured',
+            orderId: 'mock_order_ghost',
+            paymentId: 'mock_pay_ghost',
+            amount: 100,
+          })
+        ).body.outcome,
+      ).toBe('processed');
+    });
+
+    it('will not take payment for a confirmed or cancelled booking, and refunds nothing when nothing was paid', async () => {
+      const { cust, bookingId } = await paidBooking(instantHall);
+      expect((await order(cust.c, bookingId)).body.error.code).toBe('NOT_PAYABLE');
+      const unpaid = await heldBooking();
+      const none = await h.container.payments.refundBooking({
+        bookingId: unpaid.bookingId,
+        amountPaise: 100,
+        purpose: 'test',
+        reason: 'nothing paid',
+      });
+      expect(none).toEqual({ refundId: null, status: 'NONE', amountPaise: 0 });
+      await expect(
+        h.container.payments.refundBooking({
+          bookingId: unpaid.bookingId,
+          amountPaise: 1.5,
+          purpose: 'x',
+          reason: 'bad',
+        }),
+      ).rejects.toThrow();
+    });
+  });
 });
