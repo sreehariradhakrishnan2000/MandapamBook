@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "secrets:scan": "gitleaks git --no-banner --redact",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "e2e": "pnpm --filter @mandapambook/e2e test"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",

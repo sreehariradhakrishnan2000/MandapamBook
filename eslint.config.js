@@ -20,7 +20,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts'],
+    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts', 'apps/e2e/**/*.ts'],
     languageOptions: { globals: globals.node },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
@@ -34,7 +34,12 @@ export default tseslint.config(
   },
   {
     // Tests assert on rows they just inserted; `row!` is clearer there than repeated guards.
-    files: ['apps/api/test/**/*.ts', 'packages/shared/test/**/*.ts', 'apps/web/src/**/*.spec.ts'],
+    files: [
+      'apps/api/test/**/*.ts',
+      'packages/shared/test/**/*.ts',
+      'apps/web/src/**/*.spec.ts',
+      'apps/e2e/**/*.ts',
+    ],
     rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
   },
   {
