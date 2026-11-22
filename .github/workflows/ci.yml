@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  HUSKY: '0'
+
+jobs:
+  quality:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mandapambook/shared build
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - name: Unit tests with coverage gates
+        run: |
+          pnpm --filter @mandapambook/shared test:coverage
+          pnpm --filter @mandapambook/api test:unit
+          pnpm --filter @mandapambook/web test
+      - run: pnpm build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: coverage
+          path: '**/coverage/lcov.info'
+          if-no-files-found: ignore
+          retention-days: 7
+
+  integration:
+    name: Integration tests (Postgres + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mandapambook_test
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: test-only-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d mandapambook_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8.2-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://ci:test-only-ci-password@localhost:5432/mandapambook_test
+      REDIS_URL: redis://localhost:6379
+      CORS_ORIGINS: http://localhost:4200
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mandapambook/shared build
+      - name: API unit + integration tests with module coverage gates (auth, bookings, payments >= 80%)
+        run: pnpm --filter @mandapambook/api test:coverage
+
+  security:
+    name: Secret scan and dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: gitleaks (full history)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner --exit-code 1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: pnpm audit (high and critical fail the build)
+        run: pnpm audit --audit-level high
+      - name: Install (for the license check)
+        run: pnpm install --frozen-lockfile
+      - name: License check (production dependencies; GPL-3.0 and AGPL-3.0 are denied)
+        run: pnpm licenses list --prod --json | node scripts/check-licenses.mjs
+
+  # Needs the dependency graph, which private repositories only get with GitHub Code
+  # Security. While the repo is private, pnpm audit and the license check above cover it.
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request' && !github.event.repository.private
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+  docker:
+    name: Docker build and Trivy scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [api, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/${{ matrix.image }}.Dockerfile
+          tags: mandapambook-${{ matrix.image }}:ci
+          load: true
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      # Start the web image and check it really serves: the app, the SPA fallback, the
+      # security headers, and nginx not running as root. The API upstream only needs to
+      # resolve at startup, so it points at a closed local port.
+      - name: Smoke test (web image)
+        if: matrix.image == 'web'
+        run: |
+          docker run -d --name web-smoke -p 127.0.0.1:8080:8080 \
+            -e API_UPSTREAM=http://127.0.0.1:9 mandapambook-web:ci
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8080/ && break; sleep 1; done
+          curl -fsS -D headers.txt -o index.html http://127.0.0.1:8080/
+          grep -qi '<app-root' index.html || { echo "::error::/ did not serve the app"; exit 1; }
+          curl -fsS -o deep.html http://127.0.0.1:8080/search/some/deep/link
+          cmp -s index.html deep.html || { echo "::error::SPA fallback did not serve index.html"; exit 1; }
+          grep -qi '^x-content-type-options: nosniff' headers.txt || { echo "::error::security headers missing"; cat headers.txt; exit 1; }
+          uid=$(docker exec web-smoke id -u)
+          case "$uid" in ''|*[!0-9]*|0) echo "::error::nginx must run as a non-root uid (got '$uid')"; exit 1 ;; esac
+          echo "web image serves correctly as uid $uid"
+      - name: Web container logs
+        if: always() && matrix.image == 'web'
+        run: docker logs web-smoke 2>&1 | tail -50 || true
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: mandapambook-${{ matrix.image }}:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'

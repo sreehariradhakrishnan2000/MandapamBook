@@ -1,0 +1,9 @@
+title = "MandapamBook gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholder values in the example env file and test fixtures"
+paths = ['''\.env\.example$''']
+regexes = ['''change-me[a-z0-9-]*''', '''test-only-[a-z0-9-]+''']
