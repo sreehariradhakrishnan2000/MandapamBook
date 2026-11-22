@@ -32,7 +32,6 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
 
 jobs:
   images:
@@ -48,6 +47,11 @@ jobs:
         image: [api, web]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # GHCR image names must be lowercase; github.repository keeps the repo's capitals
+      # ("MandapamBook") and workflow expressions have no lowercase function.
+      - name: Image name
+        id: img
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
@@ -60,7 +64,7 @@ jobs:
           file: docker/${{ matrix.image }}.Dockerfile
           push: true
           build-args: APP_VERSION=${{ github.sha }}
-          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ github.sha }}
+          tags: ${{ steps.img.outputs.prefix }}-${{ matrix.image }}:${{ github.sha }}
           provenance: true
           sbom: true
           cache-from: type=gha,scope=${{ matrix.image }}
