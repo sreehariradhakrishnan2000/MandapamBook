@@ -23,6 +23,7 @@ export const LIMITS = {
   registerPerIp: { points: 10, windowSeconds: 60 * 60 },
   passwordResetPerIp: { points: 10, windowSeconds: 60 * 60 },
   passwordResetPerEmail: { points: 3, windowSeconds: 60 * 60 },
+  verifyEmailPerIp: { points: 30, windowSeconds: 60 * 60 },
   otpSendPerUser: { points: 5, windowSeconds: 60 * 60 },
   otpSendPerPhone: { points: 5, windowSeconds: 60 * 60 },
   otpVerifyPerUser: { points: 10, windowSeconds: 15 * 60 },
