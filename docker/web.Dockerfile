@@ -23,7 +23,7 @@ RUN pnpm --filter @mandapambook/shared build \
 # web-entrypoint.sh (template rendering) and the unprivileged user.
 FROM alpine:3.24 AS runtime
 RUN apk upgrade --no-cache \
- && apk add --no-cache nginx gettext-envsubst \
+ && apk add --no-cache nginx gettext-envsubst ca-certificates \
  && rm -f /etc/nginx/http.d/default.conf \
  && mkdir -p /etc/nginx/templates /etc/nginx/conf.d /usr/share/nginx/html \
  && chown nginx:nginx /etc/nginx/conf.d
