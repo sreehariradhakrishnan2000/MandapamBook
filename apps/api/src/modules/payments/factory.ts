@@ -2,8 +2,13 @@
  * The one place that knows concrete payment providers. Everything else receives a
  * PaymentProvider. Switching gateways is an environment change: PAYMENT_PROVIDER=mock|razorpay.
  */
+import type { Router } from 'express';
+import type { Logger } from 'pino';
 import type { Env } from '../../config/env.js';
+import type { Db } from '../../db/client.js';
+import { mockCheckoutRouter } from './mock/checkout.routes.js';
 import { MockPaymentProvider } from './mock/mock-provider.js';
+import type { PaymentService } from './payment.service.js';
 import type { PaymentProvider } from './provider.js';
 import { RazorpayProvider } from './razorpay/razorpay-provider.js';
 
@@ -36,7 +41,13 @@ export function createPaymentProvider(env: PaymentEnv): PaymentProvider {
   }
 }
 
-/** Narrow type guard used only by the mock checkout routes. */
-export function asMockProvider(provider: PaymentProvider): MockPaymentProvider | null {
-  return provider instanceof MockPaymentProvider ? provider : null;
+/**
+ * Routes the active provider needs besides our own payments API: for the mock gateway,
+ * its hosted test checkout page. Real gateways host checkout themselves, so this is null.
+ */
+export function providerRoutes(
+  provider: PaymentProvider,
+  deps: { db: Db; payments: PaymentService; appBaseUrl: string; logger: Logger },
+): Router | null {
+  return provider instanceof MockPaymentProvider ? mockCheckoutRouter({ ...deps, provider }) : null;
 }
