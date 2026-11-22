@@ -318,11 +318,7 @@ export class AuthService {
   /** Ends every session of the user, including outstanding access tokens. */
   async revokeAllSessions(userId: string, reason: string): Promise<void> {
     await this.refreshTokens.revokeAllForUser(this.db, userId, reason);
-    await this.revocations.setUserCutoff(
-      userId,
-      Math.floor(Date.now() / 1000),
-      this.accessTokens.ttlSeconds,
-    );
+    await this.revocations.setUserCutoff(userId, Date.now(), this.accessTokens.ttlSeconds);
   }
 
   async logoutAll(userId: string, ctx: ClientContext): Promise<void> {

@@ -11,15 +11,21 @@ export interface RevocationStore {
   /** Deny every access token issued for a refresh-token family (one device session). */
   revokeFamily(familyId: string, ttlSeconds: number): Promise<void>;
   isFamilyRevoked(familyId: string): Promise<boolean>;
-  /** Deny every access token for a user issued before `epochSeconds` (logout-all, role change). */
-  setUserCutoff(userId: string, epochSeconds: number, ttlSeconds: number): Promise<void>;
+  /**
+   * Deny every access token for a user issued at or before `epochMs` (logout-all, password
+   * reset, role change). Milliseconds, so a sign-in just after the cutoff is not caught by it.
+   */
+  setUserCutoff(userId: string, epochMs: number, ttlSeconds: number): Promise<void>;
+  /** The cutoff in epoch milliseconds, or null. */
   getUserCutoff(userId: string): Promise<number | null>;
 }
 
 const k = {
   jti: (jti: string) => `auth:revoked:jti:${jti}`,
   family: (id: string) => `auth:revoked:family:${id}`,
-  cutoff: (id: string) => `auth:cutoff:user:${id}`,
+  // "-ms": the value is epoch milliseconds. A distinct key means a seconds value written by an
+  // older release can never be read as milliseconds, which would silently disable the cutoff.
+  cutoff: (id: string) => `auth:cutoff-ms:user:${id}`,
 };
 
 export class RedisRevocationStore implements RevocationStore {
@@ -37,8 +43,8 @@ export class RedisRevocationStore implements RevocationStore {
   async isFamilyRevoked(id: string): Promise<boolean> {
     return (await this.redis.exists(k.family(id))) === 1;
   }
-  async setUserCutoff(userId: string, epochSeconds: number, ttl: number): Promise<void> {
-    await this.redis.set(k.cutoff(userId), String(epochSeconds), 'EX', Math.max(1, ttl));
+  async setUserCutoff(userId: string, epochMs: number, ttl: number): Promise<void> {
+    await this.redis.set(k.cutoff(userId), String(epochMs), 'EX', Math.max(1, ttl));
   }
   async getUserCutoff(userId: string): Promise<number | null> {
     const v = await this.redis.get(k.cutoff(userId));
@@ -75,8 +81,8 @@ export class MemoryRevocationStore implements RevocationStore {
   async isFamilyRevoked(id: string): Promise<boolean> {
     return this.get(k.family(id)) !== null;
   }
-  async setUserCutoff(userId: string, epochSeconds: number, ttl: number): Promise<void> {
-    this.set(k.cutoff(userId), String(epochSeconds), ttl);
+  async setUserCutoff(userId: string, epochMs: number, ttl: number): Promise<void> {
+    this.set(k.cutoff(userId), String(epochMs), ttl);
   }
   async getUserCutoff(userId: string): Promise<number | null> {
     const v = this.get(k.cutoff(userId));
