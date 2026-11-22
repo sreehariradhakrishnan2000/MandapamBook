@@ -13,7 +13,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter "@mandapambook/web..."
 COPY packages/shared packages/shared
 COPY apps/web apps/web
-RUN pnpm --filter @mandapambook/web build
+# The web app imports @mandapambook/shared, which resolves to its compiled dist/.
+RUN pnpm --filter @mandapambook/shared build \
+ && pnpm --filter @mandapambook/web build
 
 FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
 ENV API_UPSTREAM=http://api:4000
