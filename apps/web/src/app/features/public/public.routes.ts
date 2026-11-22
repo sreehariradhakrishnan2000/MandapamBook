@@ -22,4 +22,9 @@ export const PUBLIC_ROUTES: Routes = [
     title: 'Book a hall · MandapamBook',
     loadComponent: () => import('../booking/book').then((m) => m.Book),
   },
+  {
+    path: 'payments/return',
+    title: 'Payment · MandapamBook',
+    loadComponent: () => import('../payments/payment-return').then((m) => m.PaymentReturn),
+  },
 ];
