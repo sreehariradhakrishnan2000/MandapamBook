@@ -227,6 +227,7 @@ jobs:
           curl -fsS -o deep.html http://127.0.0.1:8080/search/some/deep/link
           cmp -s index.html deep.html || { echo "::error::SPA fallback did not serve index.html"; exit 1; }
           grep -qi '^x-content-type-options: nosniff' headers.txt || { echo "::error::security headers missing"; cat headers.txt; exit 1; }
+          grep -qi '^strict-transport-security: max-age=63072000' headers.txt || { echo "::error::HSTS header missing"; cat headers.txt; exit 1; }
           uid=$(docker exec web-smoke id -u)
           case "$uid" in ''|*[!0-9]*|0) echo "::error::nginx must run as a non-root uid (got '$uid')"; exit 1 ;; esac
           echo "web image serves correctly as uid $uid"
