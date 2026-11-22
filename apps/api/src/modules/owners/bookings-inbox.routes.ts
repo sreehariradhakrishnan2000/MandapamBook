@@ -6,6 +6,7 @@ import { auditoriums, bookings, cities, halls, users } from '../../db/schema/ind
 import { errors } from '../../http/errors.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
 import type { PaymentService } from '../payments/payment.service.js';
+import type { InvoiceService } from '../invoices/invoice.service.js';
 import { bookingSummary } from '../bookings/bookings.routes.js';
 import { StaleBookingError, transition } from '../bookings/state-machine.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
@@ -21,8 +22,9 @@ export function bookingsInboxRouter(deps: {
   scoped: ScopedResources;
   audit: AuditService;
   payments: PaymentService;
+  invoices: InvoiceService;
 }): Router {
-  const { db, scoped, audit, payments } = deps;
+  const { db, scoped, audit, payments, invoices } = deps;
   const r = Router();
   const PAID = ['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED'] as const;
 
@@ -72,6 +74,19 @@ export function bookingsInboxRouter(deps: {
     if (!row) throw errors.notFound('Booking not found');
     return { scope, booking: row.b };
   };
+
+  /** Invoice PDF for a paid booking at one of the owner's (or staff member's) venues. */
+  r.get('/bookings/:id/invoice.pdf', requirePermission('booking:view_venue'), async (req, res) => {
+    const { booking } = await loadScoped(req);
+    const { data, buffer } = await invoices.pdf(booking.id);
+    res
+      .set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${data.number.replaceAll('/', '-')}.pdf"`,
+        'Cache-Control': 'private, no-store',
+      })
+      .send(buffer);
+  });
 
   /** Request-mode venues: the owner confirms a paid booking. */
   r.post('/bookings/:id/accept', requirePermission('booking:approve'), async (req, res) => {

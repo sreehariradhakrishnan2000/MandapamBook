@@ -6,6 +6,7 @@ import {
   auditoriums,
   bookingAddons,
   bookingStatusHistory,
+  reviews,
   bookings,
   cities,
   halls,
@@ -17,6 +18,7 @@ import { auditContext } from '../audit/audit.service.js';
 import { parseId } from '../owners/scoped.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 import type { PaymentService } from '../payments/payment.service.js';
+import type { InvoiceService } from '../invoices/invoice.service.js';
 import type { BookingService } from './booking.service.js';
 import type { QuoteService } from './quote.service.js';
 
@@ -43,10 +45,11 @@ export function bookingsRouter(deps: {
   quotes: QuoteService;
   bookings: BookingService;
   payments: PaymentService;
+  invoices: InvoiceService;
   limiters: RateLimiters;
   authenticate: RequestHandler;
 }): Router {
-  const { db, quotes, limiters, authenticate } = deps;
+  const { db, quotes, limiters, authenticate, invoices } = deps;
   const service = deps.bookings;
   const r = Router();
 
@@ -104,6 +107,19 @@ export function bookingsRouter(deps: {
     return b;
   };
 
+  /** Invoice PDF for the customer's own paid booking. */
+  r.get('/bookings/:id/invoice.pdf', requirePermission('booking:create'), async (req, res) => {
+    const b = await loadOwn(currentUser(req).userId, req.params['id']);
+    const { data, buffer } = await invoices.pdf(b.id);
+    res
+      .set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${data.number.replaceAll('/', '-')}.pdf"`,
+        'Cache-Control': 'private, no-store',
+      })
+      .send(buffer);
+  });
+
   r.get('/bookings/:id', requirePermission('booking:create'), async (req, res) => {
     const me = currentUser(req);
     const b = await loadOwn(me.userId, req.params['id']);
@@ -126,8 +142,13 @@ export function bookingsRouter(deps: {
         .where(eq(bookingStatusHistory.bookingId, b.id))
         .orderBy(asc(bookingStatusHistory.createdAt)),
     ]);
+    const [review] = await db
+      .select({ id: reviews.id, rating: reviews.rating })
+      .from(reviews)
+      .where(eq(reviews.bookingId, b.id));
     res.set('Cache-Control', 'no-store').json({
       ...summary,
+      review: review ?? null,
       subtotalPaise: b.subtotalPaise,
       addonsPaise: b.addonsPaise,
       gstPaise: b.gstPaise,

@@ -55,6 +55,7 @@ describe('loadEnv', () => {
         APP_BASE_URL: 'https://mandapambook.in',
         REDIS_URL: 'rediss://default:x@cache.example:6379',
         EMAIL_PROVIDER: 'smtp',
+        SMTP_URL: 'smtps://relay.example:465',
         STORAGE_PROVIDER: 's3',
         S3_ACCESS_KEY_ID: 'test-only-key-id',
         S3_SECRET_ACCESS_KEY: 'test-only-secret',

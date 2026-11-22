@@ -19,6 +19,10 @@ export const PERMISSIONS = [
   'booking:view_all',
   /** View full KYC numbers (every reveal is audited) and verify or reject KYC. */
   'kyc:review',
+  /** Hide or restore customer reviews (every change is audited). */
+  'review:moderate',
+  /** Mark owner payouts as paid (audited). */
+  'payout:manage',
   // owner side (scoped to the owner's own venues)
   'auditorium:create',
   'auditorium:update',
@@ -29,6 +33,8 @@ export const PERMISSIONS = [
   'calendar:manage',
   'booking:view_venue',
   'booking:approve',
+  /** Publicly reply to reviews of the owner's venues. */
+  'review:reply',
   // customer side (scoped to the customer's own bookings)
   'booking:create',
   'booking:cancel_own',
@@ -45,6 +51,8 @@ const PLATFORM_ADMIN: Permission[] = [
   'masterdata:update',
   'booking:view_all',
   'kyc:review',
+  'review:moderate',
+  'payout:manage',
 ];
 
 const OWNER: Permission[] = [
@@ -57,6 +65,7 @@ const OWNER: Permission[] = [
   'calendar:manage',
   'booking:view_venue',
   'booking:approve',
+  'review:reply',
 ];
 
 const OWNER_STAFF: Permission[] = ['calendar:manage', 'booking:view_venue'];

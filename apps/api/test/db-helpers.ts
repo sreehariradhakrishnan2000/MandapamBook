@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { createDb, pgErrorCode, type Db } from '../src/db/client.js';
+import { withReadRetry } from '../src/infra/connections.js';
 import type { bookings } from '../src/db/schema/index.js';
 import { auditoriums, cities, halls, ownerProfiles, users } from '../src/db/schema/index.js';
 
@@ -9,10 +10,17 @@ export const hasTestDb = Boolean(TEST_DATABASE_URL);
 
 export function createTestPool(max = 5): pg.Pool {
   if (!TEST_DATABASE_URL) throw new Error('TEST_DATABASE_URL is not set');
-  const pool = new pg.Pool({ connectionString: TEST_DATABASE_URL, max, keepAlive: true });
+  // Same connection policy as production (see createPgPool).
+  const pool = new pg.Pool({
+    connectionString: TEST_DATABASE_URL,
+    max,
+    idleTimeoutMillis: 10_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+  });
   // The remote test database occasionally drops idle connections; the pool recovers.
   pool.on('error', () => undefined);
-  return pool;
+  return withReadRetry(pool);
 }
 
 export function testDb(pool: pg.Pool): Db {

@@ -25,6 +25,17 @@ export const OWNER_ROUTES: Routes = [
     loadComponent: () => import('./bookings-inbox').then((m) => m.OwnerBookingsInbox),
   },
   {
+    path: 'earnings',
+    title: 'Earnings · MandapamBook',
+    canMatch: [withPermission('payout:view')],
+    loadComponent: () => import('./insights').then((m) => m.OwnerEarningsPage),
+  },
+  {
+    path: 'reviews',
+    title: 'Reviews · MandapamBook',
+    loadComponent: () => import('./insights').then((m) => m.OwnerReviewsPage),
+  },
+  {
     path: 'venues/new',
     title: 'Add a venue · MandapamBook',
     canMatch: [withPermission('auditorium:create')],

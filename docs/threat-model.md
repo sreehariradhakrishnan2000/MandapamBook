@@ -35,6 +35,20 @@ Method: STRIDE per trust boundary. This document grows each phase; the Phase 8 r
 | E      | Owner staff escalating to pricing or payouts       | Permission-based RBAC, explicit staff permission set, tests              | 2, 3  |
 | E      | Compromised dependency or action                   | Lockfile, 7-day package age, SHA-pinned actions, audit, CodeQL, Trivy    | 0     |
 
+## Phase 7 controls in place
+
+- Notifications come from a transactional outbox (booking history written in the booking
+  transaction); unique dedupe keys stop duplicate emails, and retries are bounded.
+- Emails are plain text, built from booking facts; no contact details stored in queued data.
+- Invoices are served only to the booking's customer or the venue's owner/staff (404
+  otherwise); numbers are gap-free per financial year under a row lock.
+- Reviews only from the customer of a completed booking, once; bodies stripped of control
+  characters and rendered as text; public names reduced to first name + initial.
+- New permissions `review:reply` (owner, not staff), `review:moderate` and
+  `payout:manage` (admin); moderation, payouts and CSV exports are audited.
+- CSV exports neutralise formula injection and omit customer contact details.
+- Download file names from the server are accepted by the web app only if they are plain names.
+
 ## Phase 5 controls in place
 
 - Price tampering: quote and hold requests cannot carry prices; the server prices from its own rules and freezes a snapshot

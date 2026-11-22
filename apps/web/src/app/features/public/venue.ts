@@ -16,6 +16,7 @@ import {
   SLOT_LABELS,
   type VenuePage,
 } from '../../core/booking-api.service';
+import { InsightsApi, type VenueReviews } from '../../core/insights-api.service';
 import { InrPipe } from '../../shared/inr.pipe';
 
 const POLICY_LABELS: Record<string, string> = {
@@ -222,6 +223,51 @@ const POLICY_LABELS: Record<string, string> = {
             </ul>
           </section>
         }
+
+        <section aria-labelledby="reviews-h" class="flex flex-col gap-3">
+          <h2 id="reviews-h" class="font-display text-xl font-semibold">
+            Reviews
+            @if (reviews()?.ratingAvg; as avg) {
+              <span class="text-base font-normal text-slate-600"
+                >· ★ {{ avg.toFixed(1) }} from {{ reviews()?.ratingCount }}</span
+              >
+            }
+          </h2>
+          <ul class="flex flex-col gap-3">
+            @for (r of reviews()?.items ?? []; track r.id) {
+              <li class="rounded-md bg-white p-3 text-sm ring-1 ring-slate-200">
+                <p class="flex flex-wrap justify-between gap-2">
+                  <span class="font-semibold"
+                    ><span class="text-amber-500" [attr.aria-label]="r.rating + ' out of 5'">{{
+                      '★★★★★'.slice(0, r.rating)
+                    }}</span>
+                    {{ r.author }}</span
+                  >
+                  <span class="text-slate-500">Event in {{ r.eventMonth }}</span>
+                </p>
+                @if (r.body) {
+                  <p class="mt-1 whitespace-pre-line">{{ r.body }}</p>
+                }
+                @if (r.ownerReply) {
+                  <p class="mt-2 border-l-2 border-brand-500 pl-2 text-slate-700">
+                    <span class="font-semibold">Reply from the venue:</span> {{ r.ownerReply }}
+                  </p>
+                }
+              </li>
+            } @empty {
+              <li class="text-sm text-slate-600">No reviews yet.</li>
+            }
+          </ul>
+          @if ((reviews()?.items?.length ?? 0) < (reviews()?.ratingCount ?? 0)) {
+            <button
+              type="button"
+              class="w-fit rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              (click)="moreReviews()"
+            >
+              More reviews
+            </button>
+          }
+        </section>
       </article>
     } @else if (notFound()) {
       <section class="py-16 text-center">
@@ -235,6 +281,8 @@ const POLICY_LABELS: Record<string, string> = {
 })
 export class Venue {
   private readonly api = inject(BookingApi);
+  private readonly insights = inject(InsightsApi);
+  protected readonly reviews = signal<VenueReviews | null>(null);
   readonly slug = input.required<string>();
   readonly date = input<string>();
   readonly slot = input<Slot>();
@@ -283,12 +331,25 @@ export class Venue {
 
   private async load(slug: string): Promise<void> {
     try {
-      this.venue.set(await this.api.venue(slug));
+      const v = await this.api.venue(slug);
+      this.venue.set(v);
+      void this.insights.venueReviews(v.id).then(
+        (r) => this.reviews.set(r),
+        () => undefined,
+      );
       const date = this.date();
       if (date) this.month.set(date.slice(0, 7));
     } catch (err) {
       if (err instanceof HttpErrorResponse && err.status === 404) this.notFound.set(true);
     }
+  }
+
+  protected async moreReviews(): Promise<void> {
+    const v = this.venue();
+    const current = this.reviews();
+    if (!v || !current) return;
+    const next = await this.insights.venueReviews(v.id, current.items.length);
+    this.reviews.set({ ...next, items: [...current.items, ...next.items] });
   }
 
   protected shift(by: number): void {

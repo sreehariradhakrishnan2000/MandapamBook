@@ -187,10 +187,25 @@ export const notifications = pgTable(
     providerMessageId: text('provider_message_id'),
     lastError: text('last_error'),
     sentAt: timestamp('sent_at', { withTimezone: true }),
+    /** Prevents sending the same message twice (e.g. booking_confirmed:<bookingId>:<userId>). */
+    dedupeKey: text('dedupe_key').notNull(),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
-  (t) => [index('notifications_status_idx').on(t.status, t.createdAt)],
+  (t) => [
+    index('notifications_status_idx').on(t.status, t.createdAt),
+    uniqueIndex('notifications_dedupe_key').on(t.dedupeKey),
+    index('notifications_due_idx')
+      .on(t.nextAttemptAt)
+      .where(sql`${t.status} = 'QUEUED'`),
+  ],
 );
+
+/** Gap-free invoice numbering per Indian financial year (April-March), e.g. 2026-27. */
+export const invoiceCounters = pgTable('invoice_counters', {
+  financialYear: text('financial_year').primaryKey(),
+  lastNumber: integer('last_number').notNull().default(0),
+});
 
 /** Key/value platform configuration (commission, platform fee, GST rate). */
 export const platformSettings = pgTable('platform_settings', {

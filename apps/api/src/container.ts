@@ -33,6 +33,10 @@ import {
   providerRoutes,
 } from './modules/payments/factory.js';
 import { PaymentService } from './modules/payments/payment.service.js';
+import { InvoiceService } from './modules/invoices/invoice.service.js';
+import { reviewsRouter } from './modules/reviews/reviews.routes.js';
+import { reportsRouter } from './modules/reports/reports.routes.js';
+import { ScopedResources } from './modules/owners/scoped.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
@@ -74,6 +78,7 @@ export interface Container {
   api: Router;
   bookings: BookingService;
   payments: PaymentService;
+  invoices: InvoiceService;
   auth: AuthService;
   audit: AuditService;
   accessTokens: AccessTokenService;
@@ -120,6 +125,7 @@ export function buildContainer(deps: ContainerDeps): Container {
   const bookingService = new BookingService(db, quotes, settings, audit);
   const provider = deps.paymentProvider ?? createPaymentProvider(env);
   const paymentService = new PaymentService(db, provider, settings, audit, deps.logger);
+  const invoices = new InvoiceService(db);
   api.use(catalogRouter({ db, storage: deps.storage }));
   api.use(
     bookingsRouter({
@@ -127,6 +133,7 @@ export function buildContainer(deps: ContainerDeps): Container {
       quotes,
       bookings: bookingService,
       payments: paymentService,
+      invoices,
       limiters,
       authenticate,
     }),
@@ -141,6 +148,10 @@ export function buildContainer(deps: ContainerDeps): Container {
   });
   if (extra) api.use(extra);
   api.use(paymentsRouter({ payments: paymentService, authenticate, limiters }));
+  // Reviews span public, customer, owner and admin paths, each with its own permission.
+  const scoped = new ScopedResources(db);
+  api.use(reviewsRouter({ db, authenticate, scoped, audit }));
+  api.use(reportsRouter({ db, authenticate, scoped, audit }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
   api.use(
     '/owner',
@@ -153,6 +164,7 @@ export function buildContainer(deps: ContainerDeps): Container {
       crypto,
       storage: deps.storage,
       payments: paymentService,
+      invoices,
     }),
   );
   api.use(
@@ -175,6 +187,7 @@ export function buildContainer(deps: ContainerDeps): Container {
     api,
     bookings: bookingService,
     payments: paymentService,
+    invoices,
     auth,
     audit,
     accessTokens,
