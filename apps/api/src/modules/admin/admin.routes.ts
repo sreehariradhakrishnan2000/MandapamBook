@@ -24,6 +24,7 @@ import { type AuditService, auditContext } from '../audit/audit.service.js';
 import type { AuthService } from '../auth/auth.service.js';
 import type { EmailSender } from '../notifications/senders.js';
 import { parseId } from '../owners/scoped.js';
+import type { PaymentService } from '../payments/payment.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import { kycReviewRouter } from './kyc-review.routes.js';
 import { escapeLike, listingsReviewRouter } from './listings-review.routes.js';
@@ -53,6 +54,7 @@ export interface AdminRouterDeps {
   crypto: FieldCrypto;
   email: EmailSender;
   settings: SettingsService;
+  payments: PaymentService;
   appBaseUrl: string;
 }
 
@@ -109,6 +111,30 @@ export function adminRouter(deps: AdminRouterDeps): Router {
       .limit(q.limit)
       .offset(q.offset);
     res.set('Cache-Control', 'no-store').json({ items });
+  });
+
+  /** Goodwill or dispute refund, bounded by what is still refundable. Audited. */
+  r.post('/bookings/:id/refund', requirePermission('refund:issue'), async (req, res) => {
+    const me = currentUser(req);
+    const id = parseId(req.params['id']);
+    const input = z
+      .strictObject({
+        amountPaise: z.number().int().min(1),
+        reason: z.string().trim().min(10).max(500),
+        idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/),
+      })
+      .parse(req.body);
+    const [b] = await db.select({ id: bookings.id }).from(bookings).where(eq(bookings.id, id));
+    if (!b) throw errors.notFound('Booking not found');
+    const result = await deps.payments.refundBooking({
+      bookingId: id,
+      amountPaise: input.amountPaise,
+      purpose: `admin:${input.idempotencyKey}`,
+      reason: input.reason,
+      actorId: me.userId,
+      ctx: auditContext(req),
+    });
+    res.json(result);
   });
 
   r.get('/users', requirePermission('user:manage'), async (req, res) => {

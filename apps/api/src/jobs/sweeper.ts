@@ -6,6 +6,7 @@ import { bookings, media } from '../db/schema/index.js';
 import type { ObjectStorage } from '../infra/storage.js';
 import { todayInIst } from '../lib/time.js';
 import type { BookingService } from '../modules/bookings/booking.service.js';
+import type { PaymentService } from '../modules/payments/payment.service.js';
 import { transition } from '../modules/bookings/state-machine.js';
 
 /** Arbitrary constant: only one process at a time may run the sweep. */
@@ -17,6 +18,8 @@ export interface SweepResult {
   expiredHolds: number;
   completed: number;
   removedUploads: number;
+  declinedRequests: number;
+  refundsProcessed: number;
 }
 
 /**
@@ -27,12 +30,15 @@ export interface SweepResult {
  * - Unpaid holds past their expiry → EXPIRED (frees the slot)
  * - Confirmed bookings whose date has passed (IST) → COMPLETED
  * - Photo uploads never confirmed within 24 hours → deleted from storage and the DB
+ * - Paid requests the owner did not answer in time → cancelled with a full refund
+ * - Queued or failed refunds → sent to the payment provider again
  */
 export async function runSweep(deps: {
   pool: pg.Pool;
   db: Db;
   bookingService: BookingService;
   storage: ObjectStorage;
+  payments?: PaymentService;
   logger: Logger;
 }): Promise<SweepResult> {
   const { pool, db, bookingService, storage, logger } = deps;
@@ -42,7 +48,15 @@ export async function runSweep(deps: {
       'SELECT pg_try_advisory_lock($1) AS locked',
       [SWEEP_LOCK_KEY],
     );
-    if (!rows[0]?.locked) return { ran: false, expiredHolds: 0, completed: 0, removedUploads: 0 };
+    if (!rows[0]?.locked)
+      return {
+        ran: false,
+        expiredHolds: 0,
+        completed: 0,
+        removedUploads: 0,
+        declinedRequests: 0,
+        refundsProcessed: 0,
+      };
     try {
       const expiredHolds = await db.transaction((tx) => bookingService.expireStale(tx));
 
@@ -84,8 +98,19 @@ export async function runSweep(deps: {
           ),
         );
 
-      const result = { ran: true, expiredHolds, completed, removedUploads: stale.length };
-      if (expiredHolds || completed || stale.length) logger.info(result, 'sweep finished');
+      const declinedRequests = deps.payments ? await deps.payments.declineOverdueRequests() : 0;
+      const refundsProcessed = deps.payments ? await deps.payments.retryRefunds() : 0;
+
+      const result = {
+        ran: true,
+        expiredHolds,
+        completed,
+        removedUploads: stale.length,
+        declinedRequests,
+        refundsProcessed,
+      };
+      if (expiredHolds || completed || stale.length || declinedRequests || refundsProcessed)
+        logger.info(result, 'sweep finished');
       return result;
     } finally {
       await client.query('SELECT pg_advisory_unlock($1)', [SWEEP_LOCK_KEY]);
