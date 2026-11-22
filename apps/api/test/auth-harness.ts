@@ -105,6 +105,7 @@ export async function createHarness(
       loginPerIp: generous,
       registerPerIp: generous,
       passwordResetPerIp: generous,
+      verifyEmailPerIp: generous,
       refreshPerIp: generous,
       ...opts.limitOverrides,
     },

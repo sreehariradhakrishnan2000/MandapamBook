@@ -19,6 +19,11 @@ export interface AccessClaims {
   familyId: string;
   jti: string;
   issuedAt: number;
+  /**
+   * Issue time in milliseconds (private `iat_ms` claim). Revocation cutoffs compare against
+   * this, because whole seconds can't order a revocation and a sign-in in the same second.
+   */
+  issuedAtMs: number;
   expiresAt: number;
 }
 
@@ -52,8 +57,9 @@ export class AccessTokenService {
     claims: AccessClaims;
   }> {
     const jti = randomUUID();
-    const now = Math.floor(Date.now() / 1000);
-    const token = await new SignJWT({ role: input.role, sid: input.familyId })
+    const nowMs = Date.now();
+    const now = Math.floor(nowMs / 1000);
+    const token = await new SignJWT({ role: input.role, sid: input.familyId, iat_ms: nowMs })
       .setProtectedHeader({ alg: 'HS256', kid: this.signer.kid, typ: 'at+jwt' })
       .setSubject(input.userId)
       .setIssuer(ISSUER)
@@ -64,7 +70,13 @@ export class AccessTokenService {
       .sign(this.signer.secret);
     return {
       token,
-      claims: { ...input, jti, issuedAt: now, expiresAt: now + this.ttlSeconds },
+      claims: {
+        ...input,
+        jti,
+        issuedAt: now,
+        issuedAtMs: nowMs,
+        expiresAt: now + this.ttlSeconds,
+      },
     };
   }
 
@@ -103,12 +115,22 @@ export class AccessTokenService {
     ) {
       throw new AccessTokenError('invalid');
     }
+    const issuedAt = payload.iat ?? 0;
+    // The signed iat_ms must fall inside its iat second. A token without it (signed before
+    // the claim existed) counts as issued at the end of its second: the conservative side
+    // for revocation checks.
+    const iatMs = payload['iat_ms'];
+    const issuedAtMs =
+      typeof iatMs === 'number' && Math.floor(iatMs / 1000) === issuedAt
+        ? iatMs
+        : issuedAt * 1000 + 999;
     return {
       userId: payload.sub,
       role: role as Role,
       familyId: sid,
       jti: payload.jti,
-      issuedAt: payload.iat ?? 0,
+      issuedAt,
+      issuedAtMs,
       expiresAt: payload.exp ?? 0,
     };
   }
