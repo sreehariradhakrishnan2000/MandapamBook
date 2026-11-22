@@ -43,6 +43,11 @@ in the host's secret store, never in the repository. The API refuses to start in
 with unsafe settings: http origins, console or file email, memory storage, mock payments,
 `rzp_test_` keys, non-TLS Redis.
 
+Staging runs with `NODE_ENV=production` and `APP_ENV=staging`. It keeps all of those rules
+except the payment ones: the mock gateway (with the TEST MODE banner) and `rzp_test_` keys
+are allowed, and `rzp_live_` keys are refused. If `APP_ENV` is unset, the strict production
+rules apply, so a missing variable can never loosen production.
+
 ## Health checks
 
 | Endpoint      | Meaning                                                                | Use for                       |

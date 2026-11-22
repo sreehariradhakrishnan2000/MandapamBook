@@ -94,4 +94,54 @@ describe('loadEnv', () => {
       loadEnv({ ...valid, FIELD_ENCRYPTION_KEYS: `f1:${randomBytes(48).toString('base64url')}` }),
     ).toThrow(/exactly 32 bytes/);
   });
+
+  describe('APP_ENV (staging vs production)', () => {
+    // Everything production requires, except the payment gateway.
+    const prodLike = {
+      ...valid,
+      NODE_ENV: 'production',
+      CORS_ORIGINS: 'https://staging.example.in',
+      APP_BASE_URL: 'https://staging.example.in',
+      REDIS_URL: 'rediss://default:pw@redis.example:6379',
+      EMAIL_PROVIDER: 'smtp',
+      SMTP_URL: 'smtps://user:pass@smtp.example:465',
+      STORAGE_PROVIDER: 's3',
+      S3_ACCESS_KEY_ID: 'key',
+      S3_SECRET_ACCESS_KEY: 'secret',
+    };
+
+    it('lets staging use the mock gateway, but not real production', () => {
+      expect(loadEnv({ ...prodLike, APP_ENV: 'staging' }).PAYMENT_PROVIDER).toBe('mock');
+      expect(() => loadEnv(prodLike)).toThrow(/mock gateway is not allowed in production/);
+      expect(() => loadEnv({ ...prodLike, APP_ENV: 'production' })).toThrow(/mock gateway/);
+    });
+
+    it('keeps every other production safeguard in staging', () => {
+      const staging = { ...prodLike, APP_ENV: 'staging' };
+      expect(() => loadEnv({ ...staging, REDIS_URL: 'redis://r:6379' })).toThrow(/TLS/);
+      expect(() => loadEnv({ ...staging, EMAIL_PROVIDER: 'console' })).toThrow(/console/);
+      expect(() => loadEnv({ ...staging, STORAGE_PROVIDER: 'memory' })).toThrow(/memory/);
+      expect(() => loadEnv({ ...staging, CORS_ORIGINS: 'http://x.example' })).toThrow(/https/);
+    });
+
+    it('allows Razorpay test keys only in staging, and live keys only in production', () => {
+      const razorpay = (key: string) => ({
+        ...prodLike,
+        PAYMENT_PROVIDER: 'razorpay',
+        RAZORPAY_KEY_ID: key,
+        RAZORPAY_KEY_SECRET: 'k'.repeat(24),
+        RAZORPAY_WEBHOOK_SECRET: 'w'.repeat(24),
+      });
+      expect(loadEnv({ ...razorpay('rzp_test_abc'), APP_ENV: 'staging' }).APP_ENV).toBe('staging');
+      expect(() => loadEnv(razorpay('rzp_test_abc'))).toThrow(/test keys/);
+      expect(() => loadEnv({ ...razorpay('rzp_live_abc'), APP_ENV: 'staging' })).toThrow(
+        /live keys are not allowed in staging/,
+      );
+      expect(loadEnv(razorpay('rzp_live_abc')).PAYMENT_PROVIDER).toBe('razorpay');
+    });
+
+    it('rejects APP_ENV outside NODE_ENV=production', () => {
+      expect(() => loadEnv({ ...valid, APP_ENV: 'staging' })).toThrow(/NODE_ENV=production/);
+    });
+  });
 });
