@@ -1,19 +1,19 @@
 # Runbook
 
-How MandapamBook is deployed, checked, rolled back and kept healthy. The hosting provider is
-not fixed: the deploy workflow calls the provider's deploy hook with immutable image tags, so
-anything that can run two containers (API, worker) plus the static web image works.
+How MandapamBook is deployed, checked, rolled back and kept healthy. It is hosted on
+[Render](https://render.com) from immutable GHCR images (see [Hosting on Render](#hosting-on-render));
+the deploy workflow points each Render service at the new image through its deploy hook.
 
 ## Components
 
-| Component      | Image / command                                                             | Scale | Notes                                                                                                                                              |
-| -------------- | --------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API            | `ghcr.io/<owner>/mandapambook-api:<sha>` (lowercase), `node dist/server.js` | 2+    | Stateless; behind a TLS-terminating proxy (`TRUST_PROXY_HOPS=1`)                                                                                   |
-| Worker         | same image, `node dist/worker.js`                                           | 1+    | Sweep (holds, completion, refunds, payouts, uploads) and email delivery. An advisory lock keeps sweeps from overlapping, so extra workers are safe |
-| Web            | `ghcr.io/<owner>/mandapambook-web:<sha>`                                    | 1+    | nginx, non-root, strict CSP                                                                                                                        |
-| Postgres       | managed (Neon)                                                              |       | Pooled URL for the app, **direct** URL for migrations                                                                                              |
-| Redis          | managed (Upstash, `rediss://`)                                              |       | Rate limits and token revocation. Rebuildable: losing it only resets counters                                                                      |
-| Object storage | S3-compatible, private bucket                                               |       | Presigned uploads/downloads only                                                                                                                   |
+| Component      | Image / command                                                                   | Scale | Notes                                                                                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API            | `ghcr.io/<owner>/mandapambook-api:<sha>` (lowercase), `node dist/server.js`       | 2+    | Stateless; behind a TLS-terminating proxy (`TRUST_PROXY_HOPS=1`)                                                                                                                                                            |
+| Worker         | same image, `node dist/worker.js`                                                 | 1+    | Sweep (holds, completion, refunds, payouts, uploads) and email delivery. An advisory lock keeps sweeps from overlapping, so extra workers are safe. Without a worker (free tier), set `RUN_JOBS_IN_PROCESS=true` on the API |
+| Web            | `ghcr.io/<owner>/mandapambook-web:<sha>`                                          | 1+    | nginx, non-root, strict CSP                                                                                                                                                                                                 |
+| Postgres       | managed (Neon)                                                                    |       | Pooled URL for the app, **direct** URL for migrations                                                                                                                                                                       |
+| Redis          | Render Key Value (staging: internal `redis://`, `noeviction`), or TLS `rediss://` |       | Rate limits and token revocation. Rebuildable: losing it only resets counters                                                                                                                                               |
+| Object storage | S3-compatible, private bucket                                                     |       | Presigned uploads/downloads only                                                                                                                                                                                            |
 
 ## Environments and the pipeline
 
@@ -22,26 +22,61 @@ anything that can run two containers (API, worker) plus the static web image wor
 1. **Build once.** API and web images are pushed to GHCR tagged with the commit SHA (with
    provenance and SBOM). The API image carries `APP_VERSION=<sha>`, reported by `/health`.
 2. **Staging.** Migrations run as a separate step (`node dist/db/migrate.js` with
-   `MIGRATION_DATABASE_URL`), the deploy hook is called, then the job waits until `/health`
+   `MIGRATION_DATABASE_URL`), each Render service's deploy hook is called with the new image, then the job waits until `/health`
    reports the new version **and** `/ready` passes (up to 10 minutes).
 3. **Production.** The same images and steps, after approval by a required reviewer of the
    `production` environment.
 
 Configure once per environment (Settings → Environments):
 
-| Kind            | Name                     | Value                                                                     |
-| --------------- | ------------------------ | ------------------------------------------------------------------------- |
-| secret          | `MIGRATION_DATABASE_URL` | Direct (non-pooled) Postgres URL                                          |
-| secret          | `DEPLOY_HOOK_URL`        | Host deploy hook; receives `{environment, api_image, web_image, version}` |
-| secret          | `DEPLOY_HOOK_TOKEN`      | Optional bearer token for the hook                                        |
-| variable        | `API_BASE_URL`           | e.g. `https://api.mandapambook.in`                                        |
-| production only | Required reviewers       | The approval gate                                                         |
+| Kind            | Name                        | Value                                                                      |
+| --------------- | --------------------------- | -------------------------------------------------------------------------- |
+| secret          | `MIGRATION_DATABASE_URL`    | Direct (non-pooled) Postgres URL                                           |
+| secret          | `RENDER_DEPLOY_HOOK_API`    | The API service's deploy hook URL (Render → service → Settings)            |
+| secret          | `RENDER_DEPLOY_HOOK_WEB`    | The web service's deploy hook URL                                          |
+| secret          | `RENDER_DEPLOY_HOOK_WORKER` | Optional; only with a separate worker service                              |
+| variable        | `API_BASE_URL`              | The API's public URL, e.g. `https://mandapambook-api-staging.onrender.com` |
+| production only | Required reviewers          | The approval gate                                                          |
 
 Runtime secrets (`ACCESS_TOKEN_KEYS`, `REFRESH_TOKEN_KEYS`, `CSRF_SECRET`, `OTP_SECRET`,
 `FIELD_ENCRYPTION_KEYS`, `RAZORPAY_*`, `SMTP_URL`, `S3_*`, `DATABASE_URL`, `REDIS_URL`) live
 in the host's secret store, never in the repository. The API refuses to start in production
 with unsafe settings: http origins, console or file email, memory storage, mock payments,
 `rzp_test_` keys, non-TLS Redis.
+
+Staging runs with `NODE_ENV=production` and `APP_ENV=staging`. It keeps all of those rules
+with two exceptions. The mock gateway (with the TEST MODE banner) and `rzp_test_` keys are
+allowed, and `rzp_live_` keys are refused. Plain `redis://` is also allowed, for a host's
+private-network Redis such as Render Key Value's internal URL, which never leaves that
+network. If `APP_ENV` is unset, the strict production rules apply, so a missing variable can
+never loosen production.
+
+## Hosting on Render
+
+Each environment is two **image-backed web services** (Render's free plan), both pulling from
+GHCR with a registry credential (a GitHub token with `read:packages`, until the packages are
+made public). Put them in the same region as the environment's database (staging: Virginia,
+next to Neon us-east-1).
+
+| Service                  | Image                                    | Port | Health check | Key settings                                                                                                                      |
+| ------------------------ | ---------------------------------------- | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `mandapambook-api-<env>` | `ghcr.io/<owner>/mandapambook-api:<sha>` | 4000 | `/health`    | `NODE_ENV=production`, `APP_ENV=staging` (staging only), `RUN_JOBS_IN_PROCESS=true`, `PORT=4000`, plus every runtime secret above |
+| `mandapambook-web-<env>` | `ghcr.io/<owner>/mandapambook-web:<sha>` | 8080 | `/`          | `API_UPSTREAM=https://mandapambook-api-<env>.onrender.com`, `STORAGE_ORIGIN`                                                      |
+
+- **No worker service on the free plan.** Render has no free background workers, so the API
+  runs the sweeps itself (`RUN_JOBS_IN_PROCESS=true`). On a paid plan, add a worker
+  (same image, command `node dist/worker.js`) and set `RENDER_DEPLOY_HOOK_WORKER`; the
+  sweep's advisory lock keeps them from overlapping.
+- **The web service proxies `/api` over the API's public URL.** Free services can't receive
+  private-network traffic. nginx sends the upstream's own `Host` (so Render routes to the
+  API), SNI, and verifies the certificate. `CORS_ORIGINS` and `APP_BASE_URL` are the web
+  service's `https://…onrender.com` URL.
+- **Client IPs:** requests reach the API through Render's edge, nginx and Render's edge
+  again, so `TRUST_PROXY_HOPS` must match that chain. Check after the first deploy that the
+  API logs real client IPs (otherwise everyone shares one rate-limit bucket).
+- **Free services sleep** after 15 minutes idle and take about a minute to wake; sweeps pause
+  while asleep. Expired holds still free their slot on the next request, and queued email is
+  sent after waking. Fine for staging; production needs paid instances.
 
 ## Health checks
 
@@ -100,7 +135,7 @@ shows who did what.
 | Symptom                                      | Check                                         | Action                                                                                                        |
 | -------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `/ready` failing on `database`               | Neon status, connection limits                | Wait out a cold start; otherwise scale or fail over                                                           |
-| `/ready` failing on `redis`                  | Upstash status                                | Logins, holds and refresh fail closed. Restore Redis; nothing to recover                                      |
+| `/ready` failing on `redis`                  | Render Key Value / Redis provider status      | Logins, holds and refresh fail closed. Restore Redis; nothing to recover                                      |
 | Payments captured but bookings not confirmed | `webhook_events` rows with `processing_error` | Fix the cause; the gateway retries. The browser verify path also confirms                                     |
 | Refunds stuck in `PENDING`                   | Worker logs, `refunds` table                  | The worker retries every sweep; check gateway credentials                                                     |
 | Emails not arriving                          | `notifications` rows `FAILED` / `last_error`  | Fix SMTP; re-queue with `UPDATE notifications SET status='QUEUED', attempts=0, next_attempt_at=now() WHERE …` |

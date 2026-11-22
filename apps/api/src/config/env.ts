@@ -52,6 +52,13 @@ const secret32 = z
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /**
+   * Which deployment this is, when NODE_ENV=production. "staging" keeps every production
+   * safeguard but allows the mock payment gateway (shown with the TEST MODE banner) and
+   * Razorpay test keys. Unset means "production", the strict default, so forgetting it can
+   * never loosen production.
+   */
+  APP_ENV: z.enum(['staging', 'production']).optional(),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Number of trusted reverse-proxy hops in front of the API (affects req.ip). */
@@ -74,6 +81,14 @@ export const envSchema = z.object({
     .regex(/^\d+(kb|mb)$/)
     .default('100kb'),
   ENABLE_API_DOCS: booleanString.default(false),
+  /** Seconds between maintenance sweeps (worker, or the API with RUN_JOBS_IN_PROCESS). */
+  SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(3600).default(30),
+  /**
+   * Run the maintenance sweeps inside the API process instead of a separate worker. For
+   * hosts without a free worker tier. Safe alongside workers: the sweep takes an advisory
+   * lock, so only one process sweeps at a time.
+   */
+  RUN_JOBS_IN_PROCESS: booleanString.default(false),
 
   // --- Auth ---
   /** HS256 signing keys for access tokens. Separate from the refresh-token keys. */
@@ -153,21 +168,30 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   }
   const env = result.data;
   const problems: string[] = [];
+  if (env.APP_ENV && env.NODE_ENV !== 'production') {
+    problems.push('APP_ENV: only meaningful with NODE_ENV=production');
+  }
+  const staging = env.APP_ENV === 'staging';
   if (env.NODE_ENV === 'production') {
     if (env.CORS_ORIGINS.some((o) => o.startsWith('http://'))) {
       problems.push('CORS_ORIGINS: production origins must use https');
     }
     if (env.APP_BASE_URL.startsWith('http://')) problems.push('APP_BASE_URL: must use https');
-    if (!env.REDIS_URL.startsWith('rediss://'))
+    // Staging may use a host's private-network Redis (e.g. Render Key Value's internal
+    // redis:// URL), which never leaves that network. Real production requires TLS.
+    if (!staging && !env.REDIS_URL.startsWith('rediss://'))
       problems.push('REDIS_URL: production requires TLS (rediss://)');
     if (env.EMAIL_PROVIDER !== 'smtp')
       problems.push(`EMAIL_PROVIDER: ${env.EMAIL_PROVIDER} is not allowed in production`);
     if (env.STORAGE_PROVIDER === 'memory')
       problems.push('STORAGE_PROVIDER: memory is not allowed in production');
-    if (env.PAYMENT_PROVIDER === 'mock')
+    // Staging may take test payments; real production may not.
+    if (!staging && env.PAYMENT_PROVIDER === 'mock')
       problems.push('PAYMENT_PROVIDER: the mock gateway is not allowed in production');
-    if (env.RAZORPAY_KEY_ID?.startsWith('rzp_test_'))
+    if (!staging && env.RAZORPAY_KEY_ID?.startsWith('rzp_test_'))
       problems.push('RAZORPAY_KEY_ID: test keys are not allowed in production');
+    if (staging && env.RAZORPAY_KEY_ID?.startsWith('rzp_live_'))
+      problems.push('RAZORPAY_KEY_ID: live keys are not allowed in staging');
   }
   if (
     env.PAYMENT_PROVIDER === 'mock' &&
