@@ -45,6 +45,8 @@ export type AuditAction =
   | 'settings.changed'
   | 'booking.held'
   | 'booking.cancelled'
+  | 'review.replied'
+  | 'review.moderated'
   | 'booking.accepted'
   | 'booking.balance_received'
   | 'booking.declined'

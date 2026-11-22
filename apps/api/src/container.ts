@@ -34,6 +34,8 @@ import {
 } from './modules/payments/factory.js';
 import { PaymentService } from './modules/payments/payment.service.js';
 import { InvoiceService } from './modules/invoices/invoice.service.js';
+import { reviewsRouter } from './modules/reviews/reviews.routes.js';
+import { ScopedResources } from './modules/owners/scoped.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
@@ -145,6 +147,8 @@ export function buildContainer(deps: ContainerDeps): Container {
   });
   if (extra) api.use(extra);
   api.use(paymentsRouter({ payments: paymentService, authenticate, limiters }));
+  // Reviews span public, customer, owner and admin paths, each with its own permission.
+  api.use(reviewsRouter({ db, authenticate, scoped: new ScopedResources(db), audit }));
   api.use('/auth', authRouter({ auth, limiters, authenticate, csrf }));
   api.use(
     '/owner',
