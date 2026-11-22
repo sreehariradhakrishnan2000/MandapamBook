@@ -8,6 +8,12 @@
   {
     "rule": "js/missing-rate-limiting",
     "path": "apps/api/src/modules/auth/auth.routes.ts",
+    "line": "r.post('/verify-email', limiters.middleware('verifyEmailPerIp', byIp), async (req, res) => {",
+    "reason": "Rate-limited by verifyEmailPerIp (30 per hour) through our rate-limiter-flexible wrapper, which CodeQL does not model, plus the app-wide apiPerIp. Covered by rate-limit.test.ts (429)."
+  },
+  {
+    "rule": "js/missing-rate-limiting",
+    "path": "apps/api/src/modules/auth/auth.routes.ts",
     "line": "r.post('/otp/verify', authenticate, async (req, res) => {",
     "reason": "AuthService.verifyPhoneOtp consumes otpVerifyPerUser (10 per 15 min) before checking the code, plus the app-wide apiPerIp limit."
   },
