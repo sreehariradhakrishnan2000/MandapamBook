@@ -1,0 +1,94 @@
+# Local development stack. Not for production.
+# Usage: cp .env.example .env && docker compose up --build
+name: mandapambook
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mandapambook}
+      POSTGRES_USER: ${POSTGRES_USER:-mandapambook}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports: ['127.0.0.1:5433:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8.2-alpine
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}']
+    ports: ['127.0.0.1:6380:6379']
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$${REDIS_PASSWORD}" --no-auth-warning ping | grep PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  mailpit:
+    image: axllent/mailpit:v1.34
+    ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
+
+  # S3-compatible object storage for uploads (MinIO no longer ships Docker images).
+  # Local only: no S3 auth configured, so it is bound to 127.0.0.1. Phase 3 adds credentials.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.54
+    command: ['server', '-s3', '-s3.port=8333', '-dir=/data']
+    ports: ['127.0.0.1:8333:8333']
+    volumes: [s3data:/data]
+
+  api:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      TRUST_PROXY_HOPS: 1
+      DATABASE_URL: postgres://${POSTGRES_USER:-mandapambook}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandapambook}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      mailpit: { condition: service_started }
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+
+  # Same image as the API; runs the maintenance sweep (hold expiry, completion, upload
+  # cleanup, refunds, payouts) and delivers queued notifications.
+  worker:
+    build: { context: ., dockerfile: docker/api.Dockerfile }
+    command: ['node', 'dist/worker.js']
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://${POSTGRES_USER:-mandapambook}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mandapambook}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Booking emails (with invoice PDFs) go to Mailpit: http://localhost:8025
+      EMAIL_PROVIDER: smtp
+      SMTP_URL: smtp://mailpit:1025
+    depends_on:
+      postgres: { condition: service_healthy }
+      mailpit: { condition: service_started }
+    healthcheck:
+      disable: true
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    ports: ['127.0.0.1:8080:8080']
+    depends_on: [api]
+    security_opt: ['no-new-privileges:true']
+    cap_drop: [ALL]
+
+volumes:
+  pgdata:
+  s3data:

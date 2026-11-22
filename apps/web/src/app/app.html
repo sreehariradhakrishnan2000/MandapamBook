@@ -1,0 +1,58 @@
+<a
+  href="#main"
+  class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-4 focus:py-2"
+  >Skip to content</a
+>
+
+@if (payments.config()?.testMode) {
+  <div
+    class="bg-red-700 px-4 py-1.5 text-center text-sm font-bold tracking-wide text-white"
+    role="status"
+  >
+    TEST MODE: payments are simulated and no real money moves
+  </div>
+}
+
+<header class="border-b border-slate-200 bg-white">
+  <div
+    class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
+  >
+    <a routerLink="/" class="font-display text-lg font-extrabold tracking-tight text-brand-700">
+      MandapamBook
+    </a>
+    <nav aria-label="Main" class="flex flex-wrap items-center gap-4 text-sm font-medium">
+      <a routerLink="/" class="hover:text-brand-700">Find a hall</a>
+      @if (auth.user(); as user) {
+        @if (auth.hasPermission('booking:view_venue')) {
+          <a routerLink="/owner" class="hover:text-brand-700">My venues</a>
+        }
+        @if (auth.hasPermission('audit:view')) {
+          <a routerLink="/admin" class="hover:text-brand-700">Admin</a>
+        }
+        @if (auth.hasPermission('booking:create')) {
+          <a routerLink="/account/bookings" class="hover:text-brand-700">My bookings</a>
+        }
+        <a routerLink="/account" class="hover:text-brand-700">{{ user.fullName.split(' ')[0] }}</a>
+        <button type="button" (click)="signOut()" class="text-slate-600 hover:text-brand-700">
+          Sign out
+        </button>
+      } @else {
+        <a routerLink="/register" class="hover:text-brand-700">List your venue</a>
+        <a
+          routerLink="/login"
+          class="rounded-md bg-brand-600 px-3 py-1.5 text-white hover:bg-brand-700"
+        >
+          Sign in
+        </a>
+      }
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="mx-auto max-w-6xl px-4 py-8">
+  <router-outlet />
+</main>
+
+<footer class="border-t border-slate-200 py-6 text-center text-sm text-slate-500">
+  © {{ year }} MandapamBook
+</footer>

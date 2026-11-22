@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/coverage
+**/.angular
+.git
+.github
+.husky
+.env
+.env.*
+!.env.example
+docs
+**/*.log
+playwright-report
+test-results

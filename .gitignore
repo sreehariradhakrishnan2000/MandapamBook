@@ -1,0 +1,36 @@
+# deps & build
+node_modules/
+dist/
+build/
+coverage/
+.angular/
+out-tsc/
+*.tsbuildinfo
+
+# env & secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
+# data
+uploads/
+*.dump
+*.sql.gz
+*.backup
+
+# test artifacts
+playwright-report/
+test-results/
+blob-report/
+
+# editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.log

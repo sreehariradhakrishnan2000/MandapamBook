@@ -1,0 +1,7 @@
+# Security-sensitive paths require review from the repository owner.
+*                                   @sreehariradhakrishnan2000
+/.github/                           @sreehariradhakrishnan2000
+/apps/api/src/modules/auth/         @sreehariradhakrishnan2000
+/apps/api/src/modules/payments/     @sreehariradhakrishnan2000
+/apps/api/src/db/migrations/        @sreehariradhakrishnan2000
+/SECURITY.md                        @sreehariradhakrishnan2000

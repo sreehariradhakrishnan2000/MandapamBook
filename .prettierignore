@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+dist
+coverage
+.angular
+**/migrations/**
+docker/*.inc
+docker/*.template
