@@ -20,6 +20,11 @@ ENV API_UPSTREAM=http://api:4000
 # Origin of the S3-compatible store that browsers upload photos to (added to CSP connect-src),
 # e.g. https://br-xxxx.storage.c-16.us-east-1.aws.neon.tech
 ENV STORAGE_ORIGIN=""
+# The base image lags Alpine security fixes: patch OS packages, then drop back to the
+# image's unprivileged nginx user (uid 101).
+USER root
+RUN apk upgrade --no-cache
+USER 101
 # The nginx image renders /etc/nginx/templates/*.template into /etc/nginx/conf.d/ at start.
 COPY docker/default.conf.template /etc/nginx/templates/default.conf.template
 COPY docker/security-headers.inc.template /etc/nginx/templates/security-headers.inc.template
