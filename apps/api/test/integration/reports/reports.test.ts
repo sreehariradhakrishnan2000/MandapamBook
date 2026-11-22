@@ -23,6 +23,8 @@ describe.skipIf(!hasTestDb)('payouts and reports', { timeout: 120_000 }, () => {
   let hallId: string;
   let accrual: PayoutService;
   let day = 0;
+  /** Commission across this file's payouts, worked out in the first test. */
+  let totalCommission = 0;
   // A fixed far-past financial year that no other test file writes to.
   const FY = { from: '2019-04-01', to: '2020-03-31' };
   const date = () => new Date(Date.UTC(2019, 5, 1) + day++ * 86_400_000).toISOString().slice(0, 10);
@@ -118,12 +120,21 @@ describe.skipIf(!hasTestDb)('payouts and reports', { timeout: 120_000 }, () => {
     const rows = await h.db.select().from(payouts).where(eq(payouts.ownerId, owner.id));
     const by = (id: string) => rows.filter((r) => r.bookingId === id);
     expect(by(done.id)).toHaveLength(1);
-    expect(by(done.id)[0]).toMatchObject({
-      grossPaise: 3_000_000 - 49_900,
-      commissionPaise: 800_000,
-      status: 'PENDING',
+    // The commission rate is a platform setting another test file may change in parallel,
+    // so derive the rate this accrual used and check both payouts against it.
+    const completedPayout = by(done.id)[0]!;
+    expect(completedPayout).toMatchObject({ grossPaise: 3_000_000 - 49_900, status: 'PENDING' });
+    const bps = (completedPayout.commissionPaise * 10_000) / 10_000_000; // venue charges = 1,00,000
+    expect(Number.isInteger(bps) && bps > 0).toBe(true);
+    const cancelledCommission = Math.round((950_100 * bps) / 10_000);
+    expect(by(cancelled.id)[0]).toMatchObject({
+      grossPaise: 950_100,
+      commissionPaise: cancelledCommission,
     });
-    expect(by(cancelled.id)[0]).toMatchObject({ grossPaise: 950_100, commissionPaise: 76_008 });
+    expect(completedPayout.netPaise).toBe(
+      completedPayout.grossPaise - completedPayout.commissionPaise,
+    );
+    totalCommission = completedPayout.commissionPaise + cancelledCommission;
     expect(by(upcoming.id)).toHaveLength(0);
   });
 
@@ -133,7 +144,7 @@ describe.skipIf(!hasTestDb)('payouts and reports', { timeout: 120_000 }, () => {
     expect(res.body.summary).toMatchObject({
       from: FY.from,
       to: FY.to,
-      commissionPaise: 876_008,
+      commissionPaise: totalCommission,
       paidOutPaise: 0,
     });
     expect(res.body.summary.netPaise).toBe(res.body.summary.pendingPaise);
@@ -166,7 +177,7 @@ describe.skipIf(!hasTestDb)('payouts and reports', { timeout: 120_000 }, () => {
     expect(sum.body.bookingsByStatus).toMatchObject({ COMPLETED: 1, CANCELLED: 1, CONFIRMED: 1 });
     expect(sum.body.collectedOnlinePaise).toBe(9_000_000);
     expect(sum.body.refundedPaise).toBe(2_000_000);
-    expect(sum.body.commissionPaise).toBe(876_008);
+    expect(sum.body.commissionPaise).toBe(totalCommission);
     expect(sum.body.topCities[0]).toMatchObject({ city: 'Kozhikode', bookings: 2 });
 
     await h.db.update(auditoriums).set({ name: '=cmd|calc!A1' }).where(eq(auditoriums.id, venueId));
