@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { Express } from 'express';
 import { Redis } from 'ioredis';
 import type pg from 'pg';
@@ -26,6 +26,14 @@ export const PASSWORD = 'correct horse battery staple';
 
 const key = () => randomBytes(32).toString('base64url');
 
+/**
+ * A fixed field-encryption key shared by every harness and test file (Vitest re-evaluates
+ * this module per file, so a random one would differ per file). Test files share one
+ * database and admin lists decrypt rows other files wrote, so per-file keys made those rows
+ * undecryptable: a 500 that depended on test ordering. Test data only, never a real key.
+ */
+const FIELD_KEY = createHash('sha256').update('mandapambook test field encryption key').digest();
+
 export function testAuthEnv(overrides: Partial<AuthEnv> = {}): AuthEnv {
   return {
     CORS_ORIGINS: [ORIGIN],
@@ -40,7 +48,7 @@ export function testAuthEnv(overrides: Partial<AuthEnv> = {}): AuthEnv {
     LOGIN_MAX_FAILURES: 5,
     LOGIN_LOCKOUT_MINUTES: 15,
     HIBP_ENABLED: false,
-    FIELD_ENCRYPTION_KEYS: [{ kid: 'f1', secret: randomBytes(32) }],
+    FIELD_ENCRYPTION_KEYS: [{ kid: 'f1', secret: FIELD_KEY }],
     ...overrides,
   };
 }
