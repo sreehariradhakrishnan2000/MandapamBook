@@ -85,6 +85,7 @@ export async function createHarness(
   const redisUrl = process.env.TEST_REDIS_URL;
   const redis = redisUrl
     ? new Redis(redisUrl, {
+        protocol: 2, // same wire protocol as createRedis()
         maxRetriesPerRequest: 2,
         keyPrefix: `test:${randomUUID().slice(0, 8)}:`,
       })

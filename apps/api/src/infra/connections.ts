@@ -67,6 +67,10 @@ export function createRedis(
 ): Redis {
   return new Redis(env.REDIS_URL, {
     ...(env.REDIS_KEY_PREFIX ? { keyPrefix: env.REDIS_KEY_PREFIX } : {}),
+    // ioredis 6 defaults to RESP3, which changes some reply shapes. The rate limiter and
+    // revocation store were built and tested against RESP2, so keep it until a deliberate
+    // switch (with tests against Upstash).
+    protocol: 2,
     lazyConnect: true,
     maxRetriesPerRequest: 2,
     enableOfflineQueue: false,
