@@ -159,7 +159,7 @@ jobs:
           cmp -s index.html deep.html || { echo "::error::SPA fallback did not serve index.html"; exit 1; }
           grep -qi '^x-content-type-options: nosniff' headers.txt || { echo "::error::security headers missing"; cat headers.txt; exit 1; }
           uid=$(docker exec web-smoke id -u)
-          [ "$uid" != "0" ] || { echo "::error::nginx runs as root"; exit 1; }
+          case "$uid" in ''|*[!0-9]*|0) echo "::error::nginx must run as a non-root uid (got '$uid')"; exit 1 ;; esac
           echo "web image serves correctly as uid $uid"
       - name: Web container logs
         if: always() && matrix.image == 'web'
