@@ -24,4 +24,27 @@ jobs:
         with:
           languages: javascript-typescript, actions
           queries: security-extended
+      # Public repositories upload results to code scanning. Private repositories without
+      # GitHub Code Security can't, so there the results are kept as a file and the job
+      # fails on any error- or warning-level finding instead.
       - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4.39.4
+        with:
+          upload: ${{ github.event.repository.private && 'never' || 'always' }}
+          output: codeql-results
+      - name: Fail on findings (private repository)
+        if: github.event.repository.private
+        run: |
+          jq -r '.runs[] | .tool.driver.name as $t | .results[]?
+                 | select((.level // "warning") == "error" or (.level // "warning") == "warning")
+                 | "\(.ruleId)  \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)  \(.message.text | split("\n")[0])"' \
+            codeql-results/*.sarif > findings.txt
+          if [ -s findings.txt ]; then
+            echo "::error::CodeQL reported $(wc -l < findings.txt) finding(s):"; cat findings.txt; exit 1
+          fi
+          echo "CodeQL: no findings"
+      - if: always() && github.event.repository.private
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-sarif
+          path: codeql-results
+          retention-days: 14
