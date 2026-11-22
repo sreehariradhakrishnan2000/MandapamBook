@@ -22,7 +22,11 @@ RUN pnpm --filter @mandapambook/shared build \
 
 FROM ${NODE_IMAGE} AS runtime
 ENV NODE_ENV=production
-RUN apk add --no-cache tini
+# Patch OS packages, and drop npm, npx and corepack: the runtime only runs node, and their
+# bundled dependencies (undici, brace-expansion, ...) would otherwise be shipped and scanned.
+RUN apk upgrade --no-cache && apk add --no-cache tini \
+ && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+           /usr/local/bin/corepack /opt/yarn* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 USER node
