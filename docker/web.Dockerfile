@@ -17,15 +17,24 @@ COPY apps/web apps/web
 RUN pnpm --filter @mandapambook/shared build \
  && pnpm --filter @mandapambook/web build
 
-FROM nginxinc/nginx-unprivileged:1.30-alpine AS runtime
+# Alpine's own nginx package, not the nginx.org-built nginx-unprivileged image: Alpine ships
+# nginx security fixes sooner (1.30.7 was in Alpine while that image was still on 1.30.6).
+# The pieces that image provided are ours instead: nginx.conf (non-root paths, port 8080),
+# web-entrypoint.sh (template rendering) and the unprivileged user.
+FROM alpine:3.24 AS runtime
+RUN apk upgrade --no-cache \
+ && apk add --no-cache nginx gettext-envsubst \
+ && rm -f /etc/nginx/http.d/default.conf \
+ && mkdir -p /etc/nginx/templates /etc/nginx/conf.d /usr/share/nginx/html \
+ && chown nginx:nginx /etc/nginx/conf.d
 ENV API_UPSTREAM=http://api:4000
-# The base image lags Alpine security fixes: patch OS packages, then drop back to the
-# image's unprivileged nginx user (uid 101).
-USER root
-RUN apk upgrade --no-cache
-USER 101
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY --chmod=0755 docker/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
 COPY docker/default.conf.template /etc/nginx/templates/default.conf.template
 COPY docker/security-headers.inc /etc/nginx/conf.d/security-headers.inc
 COPY --from=build /repo/apps/web/dist/web/browser /usr/share/nginx/html
+USER nginx
 EXPOSE 8080
+STOPSIGNAL SIGQUIT
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1
+ENTRYPOINT ["/usr/local/bin/web-entrypoint.sh"]
