@@ -366,9 +366,48 @@ describe.skipIf(!hasTestDb)('search, quotes, holds and bookings', { timeout: 120
           }),
         ),
       );
-      const statuses = results.map((r) => r.status).sort();
-      expect(statuses.filter((s) => s === 201)).toHaveLength(1);
-      expect(statuses.filter((s) => s === 409)).toHaveLength(7);
+      // Losers must get a clean 409, not a 500 from a deadlock on the exclusion constraint
+      // (which CI's fast Postgres used to hit). The message shows every response.
+      const seen = JSON.stringify(results.map((r) => [r.status, r.body?.error?.code]));
+      expect(
+        results.filter((r) => r.status === 201),
+        seen,
+      ).toHaveLength(1);
+      expect(
+        results.filter((r) => r.status === 409 && r.body.error.code === 'SLOT_UNAVAILABLE'),
+        seen,
+      ).toHaveLength(7);
+    });
+
+    it('lets exactly one of an owner block and customer holds take a date at once', async () => {
+      const date = nextDate();
+      const ownerClient = new Client(h.app);
+      await ownerClient.login(owner.email);
+      const customers = await Promise.all(Array.from({ length: 4 }, () => customer()));
+      const results = await Promise.all([
+        ownerClient.send('post', `/api/v1/owner/halls/${hallId}/blocks`, {
+          eventDate: date,
+          slot: 'FULL_DAY',
+          reason: 'Maintenance',
+        }),
+        ...customers.map((c) =>
+          c.c.send('post', '/api/v1/bookings', {
+            hallId,
+            eventDate: date,
+            slot: 'FULL_DAY',
+            guestCount: 400,
+          }),
+        ),
+      ]);
+      const seen = JSON.stringify(results.map((r) => [r.status, r.body?.error?.code]));
+      expect(
+        results.filter((r) => r.status === 201),
+        seen,
+      ).toHaveLength(1);
+      expect(
+        results.filter((r) => r.status === 409),
+        seen,
+      ).toHaveLength(4);
     });
 
     it('frees an expired hold the moment someone else asks for the slot', async () => {

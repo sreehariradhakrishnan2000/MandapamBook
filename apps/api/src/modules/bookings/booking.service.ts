@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { BOOKING_REF_ALPHABET } from '@mandapambook/shared';
-import { type Db, PG_ERROR, pgConstraint, pgErrorCode } from '../../db/client.js';
+import { type Db, PG_ERROR, lockHallDate, pgConstraint, pgErrorCode } from '../../db/client.js';
 import { bookingAddons, bookingStatusHistory, bookings, payments } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
 import { todayInIst } from '../../lib/time.js';
@@ -51,6 +51,9 @@ export class BookingService {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await this.db.transaction(async (tx) => {
+          // Concurrent holds for this hall and date queue here, so the later ones see the
+          // slot as taken (409) instead of deadlocking on the exclusion constraint.
+          await lockHallDate(tx, req.hallId, req.eventDate);
           await this.expireStale(tx, { hallId: req.hallId, eventDate: req.eventDate });
           await this.expireStale(tx, { customerId });
           const priced = await this.quotes.quote(req, tx);
@@ -138,10 +141,13 @@ export class BookingService {
         // Reference code collision (1 in ~10^9): try again with a new code.
         if (code === PG_ERROR.UNIQUE_VIOLATION && pgConstraint(err) === 'bookings_ref_code_key')
           continue;
+        // Defence in depth: lockHallDate prevents the known deadlock, but if one still
+        // happens Postgres has rolled this transaction back, so retrying is safe.
+        if (code === PG_ERROR.DEADLOCK_DETECTED) continue;
         throw err;
       }
     }
-    throw new Error('could not allocate a booking reference');
+    throw new Error('could not place the hold after retries');
   }
 
   /** Marks unpaid holds past their expiry as EXPIRED. Returns how many were expired. */
