@@ -35,6 +35,18 @@ Method: STRIDE per trust boundary. This document grows each phase; the Phase 8 r
 | E      | Owner staff escalating to pricing or payouts       | Permission-based RBAC, explicit staff permission set, tests              | 2, 3  |
 | E      | Compromised dependency or action                   | Lockfile, 7-day package age, SHA-pinned actions, audit, CodeQL, Trivy    | 0     |
 
+## Phase 8 controls in place
+
+- End-to-end journeys run in a real browser on every PR. They cover the payment, booking and
+  approval paths, fail on serious WCAG 2.1 AA violations, and fail on any browser error.
+- Per-user limits on review writes, CSV exports and invoice PDFs (cost and spam).
+- Production refuses `EMAIL_PROVIDER=file` (test-only, like `console`).
+- Deploys use immutable SHA-tagged images with provenance and an SBOM, run migrations as a
+  separate step, require approval for production, and are confirmed by the served version.
+  Rollback means redeploying a previous SHA.
+- Rollback-safe schema changes: migrations are expand-only within a release.
+- `REDIS_KEY_PREFIX` isolates test traffic from shared Redis instances.
+
 ## Phase 7 controls in place
 
 - Notifications come from a transactional outbox (booking history written in the booking
