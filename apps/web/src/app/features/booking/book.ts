@@ -36,12 +36,12 @@ import { PaymentAdapter } from '../payments/payment-adapter';
         <a [routerLink]="['/venues', v.slug]" class="text-sm text-brand-700 underline"
           >← {{ v.name }}</a
         >
-        <h1 class="font-display text-2xl font-bold">Book {{ hall()?.name }} at {{ v.name }}</h1>
+        <h1 class="font-display text-3xl font-medium">Book {{ hall()?.name }} at {{ v.name }}</h1>
       }
 
       @if (held(); as hold) {
         <div
-          class="flex flex-col gap-3 rounded-lg border border-brand-500 bg-brand-50 p-4"
+          class="flex flex-col gap-3 rounded-2xl border border-brand-500 bg-brand-50 p-4"
           role="status"
         >
           <p class="font-semibold">Your date is on hold · reference {{ hold.refCode }}</p>
@@ -58,13 +58,13 @@ import { PaymentAdapter } from '../payments/payment-adapter';
           <div class="flex flex-wrap gap-3">
             <a
               routerLink="/account/bookings"
-              class="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+              class="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm"
               >My bookings</a
             >
             @if (secondsLeft() > 0) {
               <button
                 type="button"
-                class="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm text-red-700"
+                class="rounded-full border border-red-300 bg-white px-3 py-1.5 text-sm text-red-700"
                 (click)="releaseHold()"
               >
                 Cancel hold
@@ -74,7 +74,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
         </div>
       } @else {
         <form
-          class="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4"
+          class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4"
           (ngSubmit)="refresh()"
         >
           <div class="grid gap-3 sm:grid-cols-3">
@@ -85,7 +85,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
                 type="date"
                 required
                 [min]="today"
-                class="rounded-md border border-slate-300 px-2 py-2"
+                class="rounded-xl border border-slate-300 px-2 py-2"
                 [(ngModel)]="form.date"
                 (change)="refresh()"
               />
@@ -94,7 +94,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
               >Slot
               <select
                 name="slot"
-                class="rounded-md border border-slate-300 px-2 py-2"
+                class="rounded-xl border border-slate-300 px-2 py-2"
                 [(ngModel)]="form.slot"
                 (ngModelChange)="refresh()"
               >
@@ -110,7 +110,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
                 type="number"
                 min="1"
                 [max]="hall()?.seatingCapacity ?? 20000"
-                class="rounded-md border border-slate-300 px-2 py-2"
+                class="rounded-xl border border-slate-300 px-2 py-2"
                 [(ngModel)]="form.guests"
                 (change)="refresh()"
               />
@@ -129,7 +129,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
                     type="number"
                     min="0"
                     [max]="a.maxQuantity"
-                    class="w-20 rounded-md border border-slate-300 px-2 py-1"
+                    class="w-20 rounded-xl border border-slate-300 px-2 py-1"
                     [name]="'addon-' + a.id"
                     [attr.aria-label]="'Quantity of ' + a.name"
                     [(ngModel)]="addonQty[a.id]"
@@ -142,14 +142,14 @@ import { PaymentAdapter } from '../payments/payment-adapter';
         </form>
 
         @if (error()) {
-          <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
             {{ error() }}
           </p>
         }
 
         @if (quote(); as q) {
           <section
-            class="rounded-lg border border-slate-200 bg-white p-4"
+            class="rounded-2xl border border-slate-200 bg-white p-4"
             aria-labelledby="price-h"
           >
             <h2 id="price-h" class="font-semibold">Price breakdown</h2>
@@ -178,13 +178,13 @@ import { PaymentAdapter } from '../payments/payment-adapter';
               <dd class="text-right text-slate-600">{{ q.payLaterPaise | inr }}</dd>
             </dl>
             @if (!q.available) {
-              <p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+              <p class="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
                 This slot is already booked. Choose another date or slot.
               </p>
             } @else {
               <button
                 type="button"
-                class="mt-4 w-full rounded-md bg-brand-600 px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+                class="mt-4 w-full rounded-full bg-brand-600 px-4 py-2.5 font-semibold text-white disabled:opacity-60"
                 [disabled]="busy()"
                 (click)="hold()"
               >

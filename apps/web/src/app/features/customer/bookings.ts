@@ -32,13 +32,13 @@ const INVOICEABLE = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCEL
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <h1 class="font-display text-2xl font-bold">My bookings</h1>
+      <h1 class="font-display text-3xl font-medium">My bookings</h1>
       <ul class="flex flex-col gap-3">
         @for (b of items(); track b.id) {
           <li>
             <a
               [routerLink]="b.id"
-              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-500"
+              class="flex flex-wrap items-center justify-between gap-2 rounded-full border border-slate-200 bg-white p-4 hover:border-brand-500"
             >
               <span class="min-w-0">
                 <span class="block font-semibold">{{ b.venueName }} · {{ b.hallName }}</span>
@@ -57,7 +57,7 @@ const INVOICEABLE = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCEL
           </li>
         } @empty {
           @if (!loading()) {
-            <li class="rounded-lg border border-dashed border-slate-300 p-6 text-slate-600">
+            <li class="rounded-2xl border border-dashed border-slate-300 p-6 text-slate-600">
               No bookings yet.
               <a routerLink="/" class="font-semibold text-brand-700 underline">Find a hall</a>
             </li>
@@ -92,7 +92,7 @@ export class MyBookings implements OnInit {
       <a routerLink="/account/bookings" class="text-sm text-brand-700 underline">← My bookings</a>
       @if (b(); as b) {
         <header>
-          <h1 class="font-display text-2xl font-bold">{{ b.venueName }} · {{ b.hallName }}</h1>
+          <h1 class="font-display text-3xl font-medium">{{ b.venueName }} · {{ b.hallName }}</h1>
           <p class="text-slate-600">
             {{ b.eventDate | date: 'EEEE, d MMMM y' }} · {{ slotLabels[b.slot] }} ·
             {{ b.guestCount }} guests
@@ -105,7 +105,7 @@ export class MyBookings implements OnInit {
         </header>
 
         <dl
-          class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-white p-4 text-sm tabular-nums"
+          class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 rounded-2xl border border-slate-200 bg-white p-4 text-sm tabular-nums"
         >
           <dt>Hall</dt>
           <dd class="text-right">{{ b.subtotalPaise | inr }}</dd>
@@ -130,7 +130,7 @@ export class MyBookings implements OnInit {
         @if (invoiceable()) {
           <button
             type="button"
-            class="w-fit rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium"
+            class="w-fit rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium"
             [disabled]="downloading()"
             (click)="downloadInvoice()"
           >
@@ -140,7 +140,7 @@ export class MyBookings implements OnInit {
 
         @if (b.status === 'COMPLETED') {
           <section
-            class="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm"
+            class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
             aria-labelledby="review-h"
           >
             <h2 id="review-h" class="font-semibold">Your review</h2>
@@ -172,7 +172,7 @@ export class MyBookings implements OnInit {
               <label class="flex flex-col gap-1"
                 >What should other families know? (optional)
                 <textarea
-                  class="rounded-md border border-slate-300 px-2 py-1.5"
+                  class="rounded-xl border border-slate-300 px-2 py-1.5"
                   rows="3"
                   maxlength="2000"
                   [(ngModel)]="reviewBody"
@@ -180,7 +180,7 @@ export class MyBookings implements OnInit {
               </label>
               <button
                 type="button"
-                class="w-fit rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+                class="w-fit rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
                 [disabled]="rating() === 0 || submitting()"
                 (click)="submitReview()"
               >
@@ -192,7 +192,7 @@ export class MyBookings implements OnInit {
 
         @if (cancellable()) {
           <section
-            class="flex flex-col gap-2 rounded-lg border border-red-200 bg-white p-4 text-sm"
+            class="flex flex-col gap-2 rounded-2xl border border-red-200 bg-white p-4 text-sm"
             aria-labelledby="cancel-h"
           >
             <h2 id="cancel-h" class="font-semibold">Cancel this booking</h2>
@@ -205,20 +205,20 @@ export class MyBookings implements OnInit {
             @if (confirming()) {
               <label class="flex flex-col gap-1"
                 >Reason (optional)<input
-                  class="rounded-md border border-slate-300 px-2 py-1.5"
+                  class="rounded-xl border border-slate-300 px-2 py-1.5"
                   [(ngModel)]="reason"
               /></label>
               <div class="flex gap-2">
                 <button
                   type="button"
-                  class="rounded-md bg-red-700 px-3 py-1.5 font-semibold text-white"
+                  class="rounded-full bg-red-700 px-3 py-1.5 font-semibold text-white"
                   (click)="cancel()"
                 >
                   Yes, cancel
                 </button>
                 <button
                   type="button"
-                  class="rounded-md border border-slate-300 px-3 py-1.5"
+                  class="rounded-full border border-slate-300 px-3 py-1.5"
                   (click)="confirming.set(false)"
                 >
                   Keep booking
@@ -227,7 +227,7 @@ export class MyBookings implements OnInit {
             } @else {
               <button
                 type="button"
-                class="w-fit rounded-md border border-red-300 px-3 py-1.5 text-red-700"
+                class="w-fit rounded-full border border-red-300 px-3 py-1.5 text-red-700"
                 (click)="startCancel()"
               >
                 Cancel booking
@@ -236,7 +236,7 @@ export class MyBookings implements OnInit {
           </section>
         }
         @if (error()) {
-          <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
             {{ error() }}
           </p>
         }

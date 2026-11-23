@@ -13,13 +13,13 @@ import { OwnerApi, type Photo } from '../../../core/owner-api.service';
         to submit.
       </p>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
       <ul class="grid grid-cols-2 gap-3 sm:grid-cols-4">
         @for (p of photos(); track p.id) {
-          <li class="relative overflow-hidden rounded-md border border-slate-200 bg-slate-100">
+          <li class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
             @if (p.url) {
               <img
                 [src]="p.url"
@@ -35,7 +35,7 @@ import { OwnerApi, type Photo } from '../../../core/owner-api.service';
             <button
               type="button"
               (click)="remove(p.id)"
-              class="absolute right-1 top-1 rounded bg-white/90 px-2 py-0.5 text-xs text-red-700"
+              class="absolute right-1 top-1 rounded-full bg-white/90 px-2 py-0.5 text-xs text-red-700"
             >
               Remove<span class="sr-only"> photo {{ p.altText }}</span>
             </button>
@@ -43,7 +43,7 @@ import { OwnerApi, type Photo } from '../../../core/owner-api.service';
         }
       </ul>
       <label
-        class="inline-flex w-fit cursor-pointer items-center gap-2 rounded-md border border-brand-600 px-3 py-2 font-semibold text-brand-700"
+        class="inline-flex w-fit cursor-pointer items-center gap-2 rounded-xl border border-brand-600 px-3 py-2 font-semibold text-brand-700"
       >
         <input
           type="file"

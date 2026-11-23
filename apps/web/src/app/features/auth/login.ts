@@ -10,12 +10,12 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
-      <h1 class="font-display text-2xl font-bold">Sign in</h1>
+      <h1 class="font-display text-3xl font-medium">Sign in</h1>
       <p class="mt-1 text-slate-600">Manage your bookings and venues.</p>
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="mt-6 flex flex-col gap-4" novalidate>
         @if (error()) {
-          <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
             {{ error() }}
           </p>
         }

@@ -18,17 +18,17 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
   template: `
     <section class="mx-auto flex max-w-lg flex-col gap-4 py-4">
       <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
-      <h1 class="font-display text-2xl font-bold">Platform settings</h1>
+      <h1 class="font-display text-3xl font-medium">Platform settings</h1>
       <p class="text-sm text-slate-600">
         Changes apply to new quotes. Existing bookings keep the price they were quoted.
       </p>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
       @if (saved()) {
-        <p class="rounded-md bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
+        <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
           Saved.
         </p>
       }
@@ -42,7 +42,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
               step="0.01"
               min="0"
               max="30"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="f.commissionPercent"
               [disabled]="!canEdit"
             />
@@ -53,7 +53,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
               name="fee"
               type="number"
               min="0"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="f.feeRupees"
               [disabled]="!canEdit"
             />
@@ -66,7 +66,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
               step="0.01"
               min="0"
               max="28"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="f.gstPercent"
               [disabled]="!canEdit"
             />
@@ -78,7 +78,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
               type="number"
               min="5"
               max="30"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="f.holdMinutes"
               [disabled]="!canEdit"
             />
@@ -90,7 +90,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
               type="number"
               min="1"
               max="72"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="f.responseHours"
               [disabled]="!canEdit"
             />
@@ -98,7 +98,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
           @if (canEdit) {
             <button
               type="submit"
-              class="w-fit rounded-md bg-brand-600 px-4 py-2 font-semibold text-white"
+              class="w-fit rounded-full bg-brand-600 px-4 py-2 font-semibold text-white"
             >
               Save settings
             </button>
@@ -166,9 +166,9 @@ export class AdminSettings implements OnInit {
   template: `
     <section class="flex flex-col gap-6 py-4">
       <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
-      <h1 class="font-display text-2xl font-bold">Reference data</h1>
+      <h1 class="font-display text-3xl font-medium">Reference data</h1>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
@@ -192,22 +192,25 @@ export class AdminSettings implements OnInit {
           <label class="flex flex-col gap-1"
             >Name<input
               name="cname"
-              class="rounded-md border border-slate-300 px-2 py-1"
+              class="rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="city.name"
           /></label>
           <label class="flex flex-col gap-1"
             >District<input
               name="cdistrict"
-              class="rounded-md border border-slate-300 px-2 py-1"
+              class="rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="city.district"
           /></label>
           <label class="flex flex-col gap-1"
             >State<input
               name="cstate"
-              class="rounded-md border border-slate-300 px-2 py-1"
+              class="rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="city.state"
           /></label>
-          <button type="submit" class="rounded-md bg-brand-600 px-3 py-1 font-semibold text-white">
+          <button
+            type="submit"
+            class="rounded-full bg-brand-600 px-3 py-1 font-semibold text-white"
+          >
             Add city
           </button>
         </form>
@@ -232,10 +235,13 @@ export class AdminSettings implements OnInit {
           <label class="flex flex-col gap-1"
             >Name<input
               name="aname"
-              class="rounded-md border border-slate-300 px-2 py-1"
+              class="rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="amenityName"
           /></label>
-          <button type="submit" class="rounded-md bg-brand-600 px-3 py-1 font-semibold text-white">
+          <button
+            type="submit"
+            class="rounded-full bg-brand-600 px-3 py-1 font-semibold text-white"
+          >
             Add amenity
           </button>
         </form>
@@ -260,16 +266,19 @@ export class AdminSettings implements OnInit {
             >Date<input
               name="mdate"
               type="date"
-              class="rounded-md border border-slate-300 px-2 py-1"
+              class="rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="mDate"
           /></label>
           <label class="flex flex-col gap-1"
             >Label<input
               name="mlabel"
-              class="rounded-md border border-slate-300 px-2 py-1"
+              class="rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="mLabel"
           /></label>
-          <button type="submit" class="rounded-md bg-brand-600 px-3 py-1 font-semibold text-white">
+          <button
+            type="submit"
+            class="rounded-full bg-brand-600 px-3 py-1 font-semibold text-white"
+          >
             Add date
           </button>
         </form>
@@ -345,29 +354,32 @@ export class AdminMasterData implements OnInit {
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
-      <h1 class="font-display text-2xl font-bold">Audit log</h1>
+      <h1 class="font-display text-3xl font-medium">Audit log</h1>
       <form class="flex flex-wrap items-end gap-2 text-sm" (ngSubmit)="load(true)">
         <label class="flex flex-col gap-1"
           >Action<input
             name="action"
             placeholder="e.g. listing.approved"
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="action"
         /></label>
         <label class="flex flex-col gap-1"
           >Entity id<input
             name="entityId"
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="entityId"
         /></label>
-        <button type="submit" class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white">
+        <button
+          type="submit"
+          class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
+        >
           Filter
         </button>
       </form>
       <ol class="flex flex-col gap-2 text-sm">
         @for (e of items(); track e.id) {
           <li
-            class="rounded-md border border-slate-200 bg-white px-3 py-2"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2"
             [class.border-red-300]="!e.success"
           >
             <div class="flex flex-wrap justify-between gap-2">
@@ -396,7 +408,7 @@ export class AdminMasterData implements OnInit {
       @if (next()) {
         <button
           type="button"
-          class="w-fit rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          class="w-fit rounded-full border border-slate-300 px-3 py-1.5 text-sm"
           (click)="load(false)"
         >
           Older entries

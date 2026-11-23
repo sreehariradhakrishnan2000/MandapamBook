@@ -22,13 +22,13 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
           <p>Verifying your email…</p>
         }
         @case ('done') {
-          <h1 class="font-display text-2xl font-bold">Email verified</h1>
+          <h1 class="font-display text-3xl font-medium">Email verified</h1>
           <a routerLink="/login" class="mt-4 inline-block font-semibold text-brand-700 underline"
             >Sign in</a
           >
         }
         @default {
-          <h1 class="font-display text-2xl font-bold">Link not valid</h1>
+          <h1 class="font-display text-3xl font-medium">Link not valid</h1>
           <p class="mt-2 text-slate-600">{{ error() }}</p>
         }
       }
@@ -63,7 +63,7 @@ export class VerifyEmail implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
-      <h1 class="font-display text-2xl font-bold">Reset your password</h1>
+      <h1 class="font-display text-3xl font-medium">Reset your password</h1>
       @if (sent()) {
         <p class="mt-2 text-slate-600" role="status">
           If an account exists for that email, we have sent a reset link. It expires in 30 minutes.
@@ -74,7 +74,7 @@ export class VerifyEmail implements OnInit {
       } @else {
         <form [formGroup]="form" (ngSubmit)="submit()" class="mt-6 flex flex-col gap-4" novalidate>
           @if (error()) {
-            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               {{ error() }}
             </p>
           }
@@ -127,7 +127,7 @@ export class ForgotPassword {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
-      <h1 class="font-display text-2xl font-bold">Choose a new password</h1>
+      <h1 class="font-display text-3xl font-medium">Choose a new password</h1>
       @if (done()) {
         <p class="mt-2 text-slate-600" role="status">
           Your password is changed and other devices are signed out.
@@ -138,7 +138,7 @@ export class ForgotPassword {
       } @else {
         <form [formGroup]="form" (ngSubmit)="submit()" class="mt-6 flex flex-col gap-4" novalidate>
           @if (error()) {
-            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               {{ error() }}
             </p>
           }
