@@ -4,6 +4,13 @@ map $http_x_forwarded_proto $forwarded_proto {
   ''      $scheme;
 }
 
+# The browser's IP: from the edge (Render/Cloudflare sets CF-Connecting-IP and rejects client
+# values), or the direct peer when there is no edge (local compose).
+map $http_cf_connecting_ip $mb_client_ip {
+  default $http_cf_connecting_ip;
+  ''      $remote_addr;
+}
+
 server {
   listen 8080;
   server_name _;
@@ -25,6 +32,10 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $forwarded_proto;
     proxy_set_header X-Request-Id $request_id;
+    # The API trusts X-MB-Client-IP only when this secret matches its PROXY_SHARED_SECRET, so
+    # nobody calling the API directly can forge it. Set it only behind an edge like Render's.
+    proxy_set_header X-MB-Client-IP $mb_client_ip;
+    proxy_set_header X-MB-Proxy-Secret "${PROXY_SHARED_SECRET}";
     proxy_ssl_server_name on;
     proxy_ssl_verify on;
     proxy_ssl_verify_depth 3;

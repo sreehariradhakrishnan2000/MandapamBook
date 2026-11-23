@@ -24,4 +24,6 @@ if (process.argv.includes('--rotate')) {
   console.log(`FIELD_ENCRYPTION_KEYS=${kid('f')}:${secret()}`);
   console.log(`MOCK_PAYMENT_KEY_SECRET=${secret()}`);
   console.log(`MOCK_PAYMENT_WEBHOOK_SECRET=${secret()}`);
+  // Set the same value on the web service (nginx) when it proxies /api from behind an edge.
+  console.log(`PROXY_SHARED_SECRET=${secret()}`);
 }

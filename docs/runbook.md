@@ -71,9 +71,15 @@ next to Neon us-east-1).
   private-network traffic. nginx sends the upstream's own `Host` (so Render routes to the
   API), SNI, and verifies the certificate. `CORS_ORIGINS` and `APP_BASE_URL` are the web
   service's `https://…onrender.com` URL.
-- **Client IPs:** requests reach the API through Render's edge, nginx and Render's edge
-  again, so `TRUST_PROXY_HOPS` must match that chain. Check after the first deploy that the
-  API logs real client IPs (otherwise everyone shares one rate-limit bucket).
+- **Client IPs** (rate limits and audit logs) don't come from counting `X-Forwarded-For` hops.
+  Measured on staging, the browser's IP is 7 hops back through the web app, but only 2 when
+  the API is called directly. Any count that fits one path lets direct callers forge their IP.
+  Instead:
+  - API: `CLIENT_IP_HEADER=cf-connecting-ip`. Render's Cloudflare edge overwrites it and
+    rejects client-sent values (forged ones get a 403).
+  - API and web: the same `PROXY_SHARED_SECRET`. nginx sends the browser's IP in
+    `X-MB-Client-IP` with the secret, and the API trusts that header only when it matches.
+  - The API logs the resolved address as `clientIp`. Check it shows real visitor IPs.
 - **Free services sleep** after 15 minutes idle and take about a minute to wake; sweeps pause
   while asleep. Expired holds still free their slot on the next request, and queued email is
   sent after waking. Fine for staging; production needs paid instances.
