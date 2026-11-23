@@ -9,7 +9,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
   imports: [ReactiveFormsModule, RouterLink, FormField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="mx-auto max-w-sm py-8">
+    <section class="auth-card">
       <h1 class="font-display text-2xl font-bold">Sign in</h1>
       <p class="mt-1 text-slate-600">Manage your bookings and venues.</p>
 

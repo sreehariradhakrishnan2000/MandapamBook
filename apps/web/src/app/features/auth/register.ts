@@ -22,7 +22,7 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
   imports: [ReactiveFormsModule, RouterLink, FormField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="mx-auto max-w-sm py-8">
+    <section class="auth-card">
       @if (done()) {
         <h1 class="font-display text-2xl font-bold">Check your email</h1>
         <p class="mt-2 text-slate-600">

@@ -16,7 +16,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="mx-auto max-w-sm py-8" aria-live="polite">
+    <section class="auth-card" aria-live="polite">
       @switch (state()) {
         @case ('working') {
           <p>Verifying your email…</p>
@@ -62,7 +62,7 @@ export class VerifyEmail implements OnInit {
   imports: [ReactiveFormsModule, RouterLink, FormField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="mx-auto max-w-sm py-8">
+    <section class="auth-card">
       <h1 class="font-display text-2xl font-bold">Reset your password</h1>
       @if (sent()) {
         <p class="mt-2 text-slate-600" role="status">
@@ -126,7 +126,7 @@ export class ForgotPassword {
   imports: [ReactiveFormsModule, RouterLink, FormField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="mx-auto max-w-sm py-8">
+    <section class="auth-card">
       <h1 class="font-display text-2xl font-bold">Choose a new password</h1>
       @if (done()) {
         <p class="mt-2 text-slate-600" role="status">

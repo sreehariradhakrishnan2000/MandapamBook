@@ -27,15 +27,15 @@ export interface SearchFormValue {
   template: `
     <form
       (ngSubmit)="go()"
-      class="grid gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:grid-cols-6"
+      class="grid gap-3 rounded-2xl border border-gold-500/50 bg-white p-5 shadow-xl shadow-brand-900/10 sm:grid-cols-6"
       role="search"
       aria-label="Find a hall"
     >
-      <label class="flex flex-col gap-1 text-sm sm:col-span-2"
+      <label class="flex flex-col gap-1 text-sm font-medium text-slate-700 sm:col-span-2"
         >City
         <select
           name="city"
-          class="rounded-md border border-slate-300 px-2 py-2"
+          class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-ink focus:border-brand-500"
           [(ngModel)]="value.city"
         >
           <option value="">Anywhere</option>
@@ -44,21 +44,21 @@ export interface SearchFormValue {
           }
         </select>
       </label>
-      <label class="flex flex-col gap-1 text-sm"
+      <label class="flex flex-col gap-1 text-sm font-medium text-slate-700"
         >Date
         <input
           name="date"
           type="date"
           [min]="today"
-          class="rounded-md border border-slate-300 px-2 py-2"
+          class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-ink focus:border-brand-500"
           [(ngModel)]="value.date"
         />
       </label>
-      <label class="flex flex-col gap-1 text-sm"
+      <label class="flex flex-col gap-1 text-sm font-medium text-slate-700"
         >Slot
         <select
           name="slot"
-          class="rounded-md border border-slate-300 px-2 py-2"
+          class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-ink focus:border-brand-500"
           [(ngModel)]="value.slot"
         >
           <option value="">Any</option>
@@ -67,7 +67,7 @@ export interface SearchFormValue {
           }
         </select>
       </label>
-      <label class="flex flex-col gap-1 text-sm"
+      <label class="flex flex-col gap-1 text-sm font-medium text-slate-700"
         >Guests
         <input
           name="guests"
@@ -75,11 +75,11 @@ export interface SearchFormValue {
           min="1"
           inputmode="numeric"
           placeholder="e.g. 500"
-          class="rounded-md border border-slate-300 px-2 py-2"
+          class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-ink focus:border-brand-500"
           [(ngModel)]="value.guests"
         />
       </label>
-      <label class="flex flex-col gap-1 text-sm"
+      <label class="flex flex-col gap-1 text-sm font-medium text-slate-700"
         >Budget (₹, max)
         <input
           name="budget"
@@ -87,13 +87,13 @@ export interface SearchFormValue {
           min="0"
           inputmode="numeric"
           placeholder="e.g. 150000"
-          class="rounded-md border border-slate-300 px-2 py-2"
+          class="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 font-normal text-ink focus:border-brand-500"
           [(ngModel)]="value.budgetRupees"
         />
       </label>
       <button
         type="submit"
-        class="rounded-md bg-brand-600 px-4 py-2.5 font-semibold text-white sm:col-span-6 sm:justify-self-end"
+        class="rounded-full bg-brand-600 px-6 py-2.5 font-semibold text-white shadow-md hover:bg-brand-700 sm:col-span-6 sm:justify-self-end"
       >
         Search halls
       </button>
