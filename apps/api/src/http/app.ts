@@ -5,12 +5,14 @@ import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
 import type { Env } from '../config/env.js';
+import { clientIp } from './middleware/client-ip.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { requestId } from './middleware/requestId.js';
 import { healthRouter, type ReadinessCheck } from './routes/health.js';
 
 export interface AppDeps {
-  env: Pick<Env, 'CORS_ORIGINS' | 'BODY_LIMIT' | 'TRUST_PROXY_HOPS'>;
+  env: Pick<Env, 'CORS_ORIGINS' | 'BODY_LIMIT' | 'TRUST_PROXY_HOPS'> &
+    Partial<Pick<Env, 'CLIENT_IP_HEADER' | 'PROXY_SHARED_SECRET'>>;
   logger: Logger;
   readinessChecks: Record<string, ReadinessCheck>;
   /** Versioned API routes, mounted at /api/v1. */
@@ -24,10 +26,14 @@ export function createApp({ env, logger, readinessChecks, api }: AppDeps): Expre
   app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
   app.use(requestId);
+  // Before anything reads req.ip (rate limits, audit context, request logs).
+  app.use(clientIp({ edgeHeader: env.CLIENT_IP_HEADER, proxySecret: env.PROXY_SHARED_SECRET }));
   app.use(
     pinoHttp({
       logger,
       genReqId: (req) => req.id,
+      // The resolved client IP, so the logs show what rate limits are keyed by.
+      customProps: (req) => ({ clientIp: (req as express.Request).ip }),
       customLogLevel: (req, res, err) => {
         // A failing readiness probe is an expected state, already logged per check.
         if (req.url === '/ready') return res.statusCode >= 500 ? 'warn' : 'silent';
