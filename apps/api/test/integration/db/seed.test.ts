@@ -1,4 +1,6 @@
-import { count, eq } from 'drizzle-orm';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { count, eq, inArray } from 'drizzle-orm';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '../../../src/db/client.js';
@@ -6,13 +8,16 @@ import {
   auditoriums,
   cities,
   halls,
+  media,
   platformSettings,
   pricingRules,
 } from '../../../src/db/schema/index.js';
 import { AMENITIES, CITIES } from '../../../src/db/seed/master-data.js';
 import { SAMPLE_AUDITORIUMS } from '../../../src/db/seed/sample-data.js';
 import { DEMO_USERS, seedDemoUsers } from '../../../src/db/seed/demo-users.js';
+import { seedSamplePhotos } from '../../../src/db/seed/sample-photos.js';
 import { seedMasterData, seedSampleData } from '../../../src/db/seed/seed.js';
+import { MemoryObjectStorage } from '../../../src/infra/storage.js';
 import { verifyPassword } from '../../../src/modules/auth/password.js';
 import { ownerStaff, users } from '../../../src/db/schema/index.js';
 import { createTestPool, hasTestDb, testDb } from '../../db-helpers.js';
@@ -89,5 +94,62 @@ describe.skipIf(!hasTestDb)('seed', () => {
       .where(eq(users.email, 'staff.kerala@example.test'));
     const links = await db.select().from(ownerStaff).where(eq(ownerStaff.userId, staff!.id));
     expect(links).toHaveLength(1);
+  });
+
+  it('uploads two READY photos per sample venue once, through presigned PUTs', async () => {
+    // A stand-in for the bucket: accepts PUTs and records what arrived.
+    const received = new Map<string, { type: string | undefined; bytes: number }>();
+    const server = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (c: Buffer) => chunks.push(c));
+      req.on('end', () => {
+        received.set(decodeURIComponent(req.url!.slice(1)), {
+          type: req.headers['content-type'],
+          bytes: Buffer.concat(chunks).length,
+        });
+        res.writeHead(req.method === 'PUT' ? 200 : 405).end();
+      });
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const { port } = server.address() as AddressInfo;
+    const storage = new MemoryObjectStorage();
+    storage.createUploadUrl = async (key, contentType, sizeBytes) => ({
+      url: `http://127.0.0.1:${port}/${encodeURIComponent(key)}`,
+      method: 'PUT',
+      headers: { 'Content-Type': contentType, 'Content-Length': String(sizeBytes) },
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+
+    try {
+      const ids = (
+        await db
+          .select({ id: auditoriums.id })
+          .from(auditoriums)
+          .where(
+            inArray(
+              auditoriums.slug,
+              SAMPLE_AUDITORIUMS.map((v) => v.slug),
+            ),
+          )
+      ).map((a) => a.id);
+      await db.delete(media).where(inArray(media.auditoriumId, ids));
+
+      const first = await seedSamplePhotos(db, storage);
+      expect(first).toEqual({
+        venues: SAMPLE_AUDITORIUMS.length,
+        photos: SAMPLE_AUDITORIUMS.length * 2,
+      });
+      const rows = await db.select().from(media).where(inArray(media.auditoriumId, ids));
+      expect(rows).toHaveLength(SAMPLE_AUDITORIUMS.length * 2);
+      for (const m of rows) {
+        expect(m.status).toBe('READY');
+        expect(m.altText).not.toBe('');
+        expect(received.get(m.storageKey)).toEqual({ type: 'image/webp', bytes: m.sizeBytes });
+      }
+
+      expect(await seedSamplePhotos(db, storage)).toEqual({ venues: 0, photos: 0 });
+    } finally {
+      server.close();
+    }
   });
 });
