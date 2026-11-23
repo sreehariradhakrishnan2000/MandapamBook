@@ -31,6 +31,9 @@ ENV API_UPSTREAM=http://api:4000
 # Origin of the S3-compatible store that browsers upload photos to (added to CSP connect-src),
 # e.g. https://br-xxxx.storage.c-16.us-east-1.aws.neon.tech
 ENV STORAGE_ORIGIN=""
+# Shared with the API (PROXY_SHARED_SECRET): proves X-MB-Client-IP came from this proxy.
+# Empty means not sent as trusted; the API then falls back to the edge's client-IP header.
+ENV PROXY_SHARED_SECRET=""
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY --chmod=0755 docker/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
 # web-entrypoint.sh renders /etc/nginx/templates/*.template into /etc/nginx/conf.d/ at start.

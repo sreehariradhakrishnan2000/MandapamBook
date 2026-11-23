@@ -63,6 +63,23 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   /** Number of trusted reverse-proxy hops in front of the API (affects req.ip). */
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  /**
+   * Header in which the hosting edge puts the real client IP, overwriting any client value
+   * (Render/Cloudflare: cf-connecting-ip). When set, it is used instead of counting
+   * X-Forwarded-For hops. Only set it behind an edge that guarantees that header.
+   */
+  CLIENT_IP_HEADER: z
+    .string()
+    .regex(/^[A-Za-z0-9-]+$/, 'a header name')
+    .optional(),
+  /**
+   * Shared with the web app's nginx: proves that x-mb-client-ip came from our own proxy.
+   * At least 32 base64url characters (node scripts/generate-secrets.mjs).
+   */
+  PROXY_SHARED_SECRET: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{32,}$/, 'at least 32 base64url characters')
+    .optional(),
   /** Comma-separated exact origins allowed by CORS. No wildcards. */
   CORS_ORIGINS: csv.pipe(z.array(z.url()).min(1)),
   /** Public URL of the web app, used in email links. */
