@@ -15,7 +15,8 @@ const file = process.argv[2] ?? 'apps/web/dist/web/browser/index.html';
 const html = readFileSync(file, 'utf8');
 const problems = [];
 
-for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+// The end tag may carry whitespace or junk before ">" (`</script >`), which browsers accept.
+for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)) {
   const [, attrs, body] = m;
   if (!/\bsrc\s*=/.test(attrs) && body.trim())
     problems.push(`inline <script>: ${body.trim().slice(0, 80)}`);
