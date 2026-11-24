@@ -674,6 +674,11 @@ function buildVenue(district: District, town: Town, index: number, ownerEmail: s
             { minDaysBefore: 0, refundPercent: 0 },
           ],
   };
+  // Facilities added later draw from their own stream, so every value above stays the same.
+  const f = rng(index * 31 + 7);
+  venue.sadyaPrepArea = f() < 0.75; // most Kerala venues can host a sadya
+  venue.cookingEquipment = venue.sadyaPrepArea && f() < 0.6;
+  for (const h of venue.halls) h.diningIsAc = h.isAc && f() < 0.6;
   return venue;
 }
 

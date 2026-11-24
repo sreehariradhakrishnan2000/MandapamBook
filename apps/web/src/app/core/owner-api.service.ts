@@ -27,6 +27,7 @@ export interface Hall {
   seatingCapacity: number;
   diningCapacity: number;
   isAc: boolean;
+  diningIsAc: boolean;
   isActive: boolean;
 }
 

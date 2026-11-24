@@ -54,6 +54,8 @@ const venue: VenueDetail = {
   parkingTwoWheelers: 0,
   guestRooms: 0,
   hasGenerator: false,
+  sadyaPrepArea: false,
+  cookingEquipment: false,
   advancePercent: 25,
   instantBook: true,
   halls: [],

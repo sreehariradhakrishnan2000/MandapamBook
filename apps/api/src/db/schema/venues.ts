@@ -107,6 +107,10 @@ export const auditoriums = pgTable(
     parkingTwoWheelers: integer('parking_two_wheelers').notNull().default(0),
     guestRooms: integer('guest_rooms').notNull().default(0),
     hasGenerator: boolean('has_generator').notNull().default(false),
+    /** A space on site where a sadya (Kerala feast) can be prepared. */
+    sadyaPrepArea: boolean('sadya_prep_area').notNull().default(false),
+    /** Cooking equipment provided for it: vessels, stoves, burners. */
+    cookingEquipment: boolean('cooking_equipment').notNull().default(false),
     /** Percentage of the booking total collected online as advance (10–100). */
     advancePercent: smallint('advance_percent').notNull().default(25),
     /** When false, paid bookings wait for the owner in AWAITING_OWNER. */
@@ -162,6 +166,8 @@ export const halls = pgTable(
     seatingCapacity: integer('seating_capacity').notNull(),
     diningCapacity: integer('dining_capacity').notNull().default(0),
     isAc: boolean('is_ac').notNull().default(false),
+    /** The dining area's air-conditioning, which often differs from the main hall's. */
+    diningIsAc: boolean('dining_is_ac').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps(),
   },

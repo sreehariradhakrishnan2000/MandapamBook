@@ -30,6 +30,8 @@ const venue: VenuePage = {
   parkingTwoWheelers: 120,
   guestRooms: 12,
   hasGenerator: true,
+  sadyaPrepArea: true,
+  cookingEquipment: false,
   advancePercent: 25,
   instantBook: true,
   ratingAvg: null,
@@ -41,6 +43,7 @@ const venue: VenuePage = {
       seatingCapacity: 800,
       diningCapacity: 400,
       isAc: true,
+      diningIsAc: false,
       basePrices: { MORNING: 12_000_000 },
     },
   ],
@@ -238,6 +241,62 @@ describe('search page', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent;
     expect(text).toContain('Halls near your location');
     expect(text).toContain('400 m away');
+  });
+
+  it('labels hall AC, dining AC and sadya separately, and filters by sadya', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(Search);
+    fixture.detectChanges();
+    const first = await vi.waitFor(() => http.expectOne((r) => r.url === '/api/v1/auditoriums'));
+    expect(first.request.params.has('sadya')).toBe(false);
+    first.flush({
+      items: [
+        {
+          id: 'v1',
+          slug: 'thulasi',
+          name: 'Thulasi Convention Hall',
+          city: 'Wayanad',
+          locality: 'Sulthan Bathery',
+          maxCapacity: 1650,
+          hasAc: true,
+          diningAc: false,
+          sadyaPrepArea: true,
+          cookingEquipment: true,
+          parkingCars: 250,
+          guestRooms: 0,
+          cateringPolicy: 'OUTSIDE_ALLOWED',
+          ratingAvg: null,
+          ratingCount: 0,
+          fromPricePaise: 2_100_000,
+          photoUrl: null,
+          available: null,
+          distanceKm: null,
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 12,
+    });
+    http.match(() => true).forEach((r) => r.flush({ items: [] }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const labels = [...el.querySelectorAll('ul[aria-label=Facilities] li')].map((li) =>
+      li.textContent?.trim(),
+    );
+    expect(labels).toEqual(['Hall AC', 'Dining non-AC', 'Sadya kitchen + equipment']);
+
+    const sadya = [...el.querySelectorAll('label')].find((l) =>
+      l.textContent?.includes('Sadya preparation area'),
+    )!;
+    sadya.querySelector('input')!.click();
+    const filtered = await vi.waitFor(() =>
+      http.expectOne((r) => r.url === '/api/v1/auditoriums' && r.params.get('sadya') === 'true'),
+    );
+    filtered.flush({ items: [], total: 0, page: 1, pageSize: 12 });
   });
 });
 

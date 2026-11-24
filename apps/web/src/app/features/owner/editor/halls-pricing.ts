@@ -47,8 +47,12 @@ const KIND_LABELS: Record<Kind, string> = {
           <div class="flex flex-wrap items-baseline justify-between gap-2">
             <h3 [id]="'hall-' + hall.id" class="font-semibold">{{ hall.name }}</h3>
             <p class="text-sm text-slate-600">
-              {{ hall.seatingCapacity }} seated · {{ hall.diningCapacity }} dining ·
-              {{ hall.isAc ? 'AC' : 'Non-AC' }}
+              {{ hall.seatingCapacity }} seated · Hall {{ hall.isAc ? 'AC' : 'non-AC' }} ·
+              @if (hall.diningCapacity > 0) {
+                {{ hall.diningCapacity }} dining, {{ hall.diningIsAc ? 'AC' : 'non-AC' }}
+              } @else {
+                No dining area
+              }
             </p>
           </div>
           <div class="mt-3 overflow-x-auto">
@@ -157,7 +161,12 @@ const KIND_LABELS: Record<Kind, string> = {
             [class]="inputClass"
         /></app-form-field>
         <label class="flex items-center gap-2 self-end pb-3 text-sm"
-          ><input type="checkbox" formControlName="isAc" class="size-4" /> Air-conditioned</label
+          ><input type="checkbox" formControlName="isAc" class="size-4" /> Hall
+          air-conditioned</label
+        >
+        <label class="flex items-center gap-2 self-end pb-3 text-sm"
+          ><input type="checkbox" formControlName="diningIsAc" class="size-4" /> Dining area
+          air-conditioned</label
         >
         <button
           type="submit"
@@ -189,6 +198,7 @@ export class HallsPricing {
     seatingCapacity: [300, [Validators.required, Validators.min(1)]],
     diningCapacity: [150, Validators.min(0)],
     isAc: [true],
+    diningIsAc: [true],
   });
   protected readonly priceForm = this.fb.group({
     slot: ['MORNING' as Slot],

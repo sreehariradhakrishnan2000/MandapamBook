@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patchSchema } from './patch.js';
 import { ROLES } from './rbac.js';
 
 /** Reasons are shown to the owner, so they must say what to fix. */
@@ -75,7 +76,7 @@ export const citySchema = z.strictObject({
   nameI18n: i18n,
   isActive: z.boolean().default(true),
 });
-export const cityUpdateSchema = citySchema.omit({ slug: true }).partial();
+export const cityUpdateSchema = patchSchema(citySchema.omit({ slug: true }));
 
 export const amenitySchema = z.strictObject({
   code: z.string().regex(/^[a-z0-9_]{2,40}$/),
@@ -88,7 +89,7 @@ export const amenitySchema = z.strictObject({
   sortOrder: z.number().int().min(0).max(1000).default(0),
   isActive: z.boolean().default(true),
 });
-export const amenityUpdateSchema = amenitySchema.omit({ code: true }).partial();
+export const amenityUpdateSchema = patchSchema(amenitySchema.omit({ code: true }));
 
 export const muhurthamDateSchema = z.strictObject({
   date: z.iso.date(),
