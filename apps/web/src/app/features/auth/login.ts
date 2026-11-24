@@ -3,10 +3,11 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { Router, RouterLink } from '@angular/router';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
 import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
+import { PasswordToggle } from '../../shared/password-toggle';
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule, RouterLink, FormField],
+  imports: [ReactiveFormsModule, RouterLink, FormField, PasswordToggle],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
@@ -30,14 +31,18 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
           />
         </app-form-field>
         <app-form-field for="password" label="Password">
-          <input
-            id="password"
-            type="password"
-            formControlName="password"
-            autocomplete="current-password"
-            [class]="inputClass"
-            [attr.aria-invalid]="invalid('password')"
-          />
+          <div class="relative">
+            <input
+              #pw
+              id="password"
+              type="password"
+              formControlName="password"
+              autocomplete="current-password"
+              [class]="inputClass + ' pr-12'"
+              [attr.aria-invalid]="invalid('password')"
+            />
+            <app-password-toggle [input]="pw" />
+          </div>
         </app-form-field>
         <label class="flex items-center gap-2 text-sm">
           <input type="checkbox" formControlName="rememberMe" class="size-4" />

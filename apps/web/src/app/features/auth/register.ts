@@ -9,6 +9,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
 import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
+import { PasswordToggle } from '../../shared/password-toggle';
 
 /** Indian mobile: 10 digits starting 6–9, optional +91/0 prefix, spaces or dashes allowed. */
 export function indianMobile(control: AbstractControl<string>): ValidationErrors | null {
@@ -19,7 +20,7 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink, FormField],
+  imports: [ReactiveFormsModule, RouterLink, FormField, PasswordToggle],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
@@ -100,14 +101,18 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
             hint="At least 10 characters. A short phrase works well."
             [error]="show('password') ? 'Use 10 to 128 characters' : null"
           >
-            <input
-              id="password"
-              type="password"
-              formControlName="password"
-              autocomplete="new-password"
-              [class]="inputClass"
-              [attr.aria-invalid]="show('password')"
-            />
+            <div class="relative">
+              <input
+                #pw
+                id="password"
+                type="password"
+                formControlName="password"
+                autocomplete="new-password"
+                [class]="inputClass + ' pr-12'"
+                [attr.aria-invalid]="show('password')"
+              />
+              <app-password-toggle [input]="pw" />
+            </div>
           </app-form-field>
           <button type="submit" [class]="buttonClass" [disabled]="busy()">
             {{ busy() ? 'Creating account…' : 'Create account' }}
