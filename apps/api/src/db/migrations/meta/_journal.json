@@ -43,6 +43,13 @@
       "when": 1795339321568,
       "tag": "0005_notifications_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795522137190,
+      "tag": "0006_google_sign_in",
+      "breakpoints": true
     }
   ]
 }

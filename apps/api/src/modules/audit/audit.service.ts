@@ -11,6 +11,7 @@ export type AuditAction =
   | 'auth.register'
   | 'auth.login'
   | 'auth.login_failed'
+  | 'auth.google_linked'
   | 'auth.lockout'
   | 'auth.logout'
   | 'auth.logout_all'
