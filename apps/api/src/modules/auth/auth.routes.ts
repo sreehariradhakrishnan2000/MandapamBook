@@ -117,8 +117,12 @@ export function authRouter({
       returnUrl: safeReturnPath(req.query['returnUrl']),
       expiresAt: Date.now() + GOOGLE_STATE_TTL_MS,
     };
+    // Flags spelled out (not spread from a helper) so they are visible to code scanning.
     res.cookie(GOOGLE_STATE_COOKIE, sealState(google.stateKey, state), {
-      ...googleStateCookieOptions(),
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
       maxAge: GOOGLE_STATE_TTL_MS,
     });
     res.set('Cache-Control', 'no-store').redirect(
