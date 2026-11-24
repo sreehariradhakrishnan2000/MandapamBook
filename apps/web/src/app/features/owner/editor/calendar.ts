@@ -81,11 +81,24 @@ export function isoDate(year: number, monthIndex: number, day: number): string {
                     [class]="
                       e.kind === 'BOOKING'
                         ? 'bg-brand-50 text-brand-700'
-                        : 'bg-slate-200 text-slate-700'
+                        : e.kind === 'OFFLINE'
+                          ? 'bg-forest-50 text-forest-800'
+                          : 'bg-slate-200 text-slate-700'
                     "
                   >
-                    {{ slotLabels[e.slot] }}: {{ e.kind === 'BOOKING' ? 'Booked' : 'Blocked' }}
-                    @if (e.blockId) {
+                    {{ slotLabels[e.slot] }}:
+                    @switch (e.kind) {
+                      @case ('BOOKING') {
+                        Booked
+                      }
+                      @case ('OFFLINE') {
+                        Booked offline · {{ e.customerName }}
+                      }
+                      @default {
+                        Blocked
+                      }
+                    }
+                    @if (e.kind === 'BLOCK' && e.blockId) {
                       <button type="button" class="ml-1 underline" (click)="unblock(e.blockId)">
                         Unblock
                       </button>
@@ -191,6 +204,12 @@ export class VenueCalendar {
     } catch (err) {
       this.error.set(errorMessage(err));
     }
+  }
+
+  /** Reloads the visible month, e.g. after an offline booking was added or cancelled. */
+  refresh(): void {
+    const id = this.hallId();
+    if (id) void this.load(id, this.month());
   }
 
   protected shift(by: number): void {

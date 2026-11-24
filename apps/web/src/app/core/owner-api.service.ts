@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type {
   AuditoriumInput,
+  OfflineBookingInput,
   OwnerProfileInput,
   OwnerProfileView,
   Slot,
@@ -80,9 +81,28 @@ export interface PricingRule {
 export interface CalendarEntry {
   eventDate: string;
   slot: Slot;
-  kind: 'BLOCK' | 'BOOKING';
+  kind: 'BLOCK' | 'BOOKING' | 'OFFLINE';
   blockId: string | null;
   reason: string | null;
+  offlineBookingId?: string | null;
+  customerName?: string | null;
+}
+
+/** A booking the venue took outside the app (phone, walk-in). */
+export interface OfflineBooking {
+  id: string;
+  hallId: string;
+  hallName: string;
+  customerName: string;
+  customerPhone: string;
+  eventType: string | null;
+  amountPaise: number | null;
+  advancePaise: number | null;
+  notes: string | null;
+  status: 'ACTIVE' | 'CANCELLED';
+  cancelledAt: string | null;
+  createdAt: string;
+  slots: { eventDate: string; slot: Slot }[];
 }
 
 export interface City {
@@ -167,6 +187,19 @@ export class OwnerApi {
       reason ? { eventDate, slot, reason } : { eventDate, slot },
     );
   unblock = (blockId: string) => this.send<unknown>('delete', `/blocks/${blockId}`);
+
+  offlineBookings = (venueId: string, status: 'ACTIVE' | 'ALL' = 'ACTIVE') =>
+    this.get<{ items: OfflineBooking[] }>(
+      `/auditoriums/${venueId}/offline-bookings?status=${status}`,
+    );
+  addOfflineBooking = (venueId: string, input: OfflineBookingInput) =>
+    this.send<OfflineBooking>('post', `/auditoriums/${venueId}/offline-bookings`, input);
+  updateOfflineBooking = (
+    id: string,
+    input: Partial<Omit<OfflineBookingInput, 'hallId' | 'slots'>>,
+  ) => this.send<OfflineBooking>('patch', `/offline-bookings/${id}`, input);
+  cancelOfflineBooking = (id: string) =>
+    this.send<OfflineBooking>('post', `/offline-bookings/${id}/cancel`);
 
   addAddon = (venueId: string, input: Omit<Addon, 'id' | 'isActive'>) =>
     this.send<Addon>('post', `/auditoriums/${venueId}/addons`, input);
