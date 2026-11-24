@@ -7,7 +7,13 @@ import {
 } from '@mandapambook/shared';
 import type { z } from 'zod';
 import { type Db, PG_ERROR, pgErrorCode } from '../../db/client.js';
-import { emailTokens, otpChallenges, ownerProfiles, users } from '../../db/schema/index.js';
+import {
+  emailTokens,
+  otpChallenges,
+  ownerProfiles,
+  userIdentities,
+  users,
+} from '../../db/schema/index.js';
 import type { RevocationStore } from '../../infra/revocation-store.js';
 import { hmacSha256, numericCode, randomToken, safeEqual } from '../../lib/crypto.js';
 import { HttpError, errors } from '../../http/errors.js';
@@ -24,9 +30,17 @@ import {
   verifyAgainstDummy,
   verifyPassword,
 } from './password.js';
+import type { GoogleProfile } from './google.js';
 import type { IssuedRefreshToken, RefreshTokenService } from './refresh-tokens.js';
 
 type UserRow = typeof users.$inferSelect;
+
+/** Why a Google sign-in was refused; the code is shown to the user on the sign-in page. */
+export class GoogleSignInError extends Error {
+  constructor(readonly code: 'email_unverified' | 'other_google_account' | 'suspended') {
+    super(`google sign-in refused: ${code}`);
+  }
+}
 
 export interface AuthConfig {
   appBaseUrl: string;
@@ -198,6 +212,156 @@ export class AuthService {
         actorId: user.id,
         actorRole: user.role,
         after: { familyId: refresh.familyId },
+      },
+      ctx,
+    );
+    return { session: await this.sessionFor(user, refresh.familyId), refresh };
+  }
+
+  // ---------------------------------------------------------------- Google
+
+  /**
+   * Signs in (or signs up) with a Google account Google has already authenticated.
+   *
+   * - A Google account seen before is matched by its stable id, whatever its email now is.
+   * - Otherwise a MandapamBook account with the same, Google-verified email is linked. If that
+   *   account had never verified its email, someone else may have registered it to squat on
+   *   the address, so its password and sessions are cleared before linking.
+   * - Otherwise a new, already-verified account is created (an owner if they chose that).
+   */
+  async signInWithGoogle(
+    profile: GoogleProfile,
+    intent: 'CUSTOMER' | 'OWNER',
+    ctx: ClientContext,
+  ): Promise<LoginResult> {
+    if (!profile.emailVerified) throw new GoogleSignInError('email_unverified');
+
+    const { user, takenOver } = await this.db.transaction(async (tx) => {
+      const [linked] = await tx
+        .select({ user: users })
+        .from(userIdentities)
+        .innerJoin(users, eq(users.id, userIdentities.userId))
+        .where(
+          and(eq(userIdentities.provider, 'google'), eq(userIdentities.subject, profile.subject)),
+        );
+      if (linked) {
+        await tx
+          .update(userIdentities)
+          .set({ email: profile.email, lastUsedAt: new Date() })
+          .where(
+            and(eq(userIdentities.provider, 'google'), eq(userIdentities.subject, profile.subject)),
+          );
+        return { user: linked.user, takenOver: false };
+      }
+
+      const [existing] = await tx.select().from(users).where(eq(users.email, profile.email));
+      if (existing) {
+        const [other] = await tx
+          .select({ id: userIdentities.id })
+          .from(userIdentities)
+          .where(
+            and(eq(userIdentities.userId, existing.id), eq(userIdentities.provider, 'google')),
+          );
+        // The account is already tied to a different Google account.
+        if (other) throw new GoogleSignInError('other_google_account');
+
+        const unverified = existing.emailVerifiedAt === null;
+        const [updated] = await tx
+          .update(users)
+          .set(
+            unverified
+              ? {
+                  passwordHash: null,
+                  emailVerifiedAt: new Date(),
+                  status: sql`CASE WHEN ${users.status} = 'PENDING_VERIFICATION' THEN 'ACTIVE'::user_status ELSE ${users.status} END`,
+                }
+              : { updatedAt: new Date() },
+          )
+          .where(eq(users.id, existing.id))
+          .returning();
+        await tx.insert(userIdentities).values({
+          userId: existing.id,
+          provider: 'google',
+          subject: profile.subject,
+          email: profile.email,
+          lastUsedAt: new Date(),
+        });
+        await this.audit.record(
+          {
+            action: 'auth.google_linked',
+            entityType: 'user',
+            entityId: existing.id,
+            actorId: existing.id,
+            actorRole: existing.role,
+            after: { passwordCleared: unverified },
+          },
+          ctx,
+          tx,
+        );
+        return { user: updated ?? existing, takenOver: unverified };
+      }
+
+      const [created] = await tx
+        .insert(users)
+        .values({
+          email: profile.email,
+          fullName: (profile.name ?? profile.email.split('@')[0] ?? 'Guest').slice(0, 120),
+          passwordHash: null,
+          role: intent,
+          status: 'ACTIVE',
+          emailVerifiedAt: new Date(),
+        })
+        .returning();
+      if (!created) throw new Error('user insert returned nothing');
+      if (intent === 'OWNER') {
+        await tx
+          .insert(ownerProfiles)
+          .values({ userId: created.id, businessName: created.fullName });
+      }
+      await tx.insert(userIdentities).values({
+        userId: created.id,
+        provider: 'google',
+        subject: profile.subject,
+        email: profile.email,
+        lastUsedAt: new Date(),
+      });
+      await this.audit.record(
+        {
+          action: 'auth.register',
+          entityType: 'user',
+          entityId: created.id,
+          actorId: created.id,
+          actorRole: created.role,
+          after: { role: created.role, method: 'google' },
+        },
+        ctx,
+        tx,
+      );
+      return { user: created, takenOver: false };
+    });
+
+    if (user.status === 'SUSPENDED') throw new GoogleSignInError('suspended');
+    // Sessions opened with a password someone else may have set must not survive the link.
+    if (takenOver) await this.revokeAllSessions(user.id, 'google_link_unverified');
+
+    await this.db
+      .update(users)
+      .set({ failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() })
+      .where(eq(users.id, user.id));
+    const refresh = await this.refreshTokens.issue(this.db, {
+      userId: user.id,
+      expiresAt: new Date(Date.now() + this.config.refreshRememberDays * DAY_MS),
+      deviceInfo: ctx.deviceInfo ?? null,
+      ip: ctx.ip ?? null,
+    });
+    await this.audit.record(
+      {
+        action: 'auth.login',
+        entityType: 'user',
+        entityId: user.id,
+        actorId: user.id,
+        actorRole: user.role,
+        after: { familyId: refresh.familyId, method: 'google' },
       },
       ctx,
     );

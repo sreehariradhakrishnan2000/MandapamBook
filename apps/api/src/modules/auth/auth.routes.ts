@@ -13,7 +13,22 @@ import type { RequestHandler } from 'express';
 import { type RateLimiters, byIp } from '../../http/middleware/rate-limit.js';
 import { auditContext } from '../audit/audit.service.js';
 import { currentUser } from '../rbac/authenticate.js';
-import type { AuthService, ClientContext, LoginResult } from './auth.service.js';
+import {
+  type AuthService,
+  type ClientContext,
+  GoogleSignInError,
+  type LoginResult,
+} from './auth.service.js';
+import {
+  type GoogleProvider,
+  type OAuthState,
+  openState,
+  pkceChallenge,
+  randomValue,
+  safeEqual,
+  safeReturnPath,
+  sealState,
+} from './google.js';
 
 export const REFRESH_COOKIE = '__Host-mb_rt';
 
@@ -51,15 +66,127 @@ export interface AuthRouterDeps {
   limiters: RateLimiters;
   authenticate: RequestHandler;
   csrf: { issue: RequestHandler; verify: RequestHandler };
+  /** Public URL of the web app: Google returns there, and users land there afterwards. */
+  appBaseUrl: string;
+  /** Present only when Google sign-in is configured. */
+  google?: { provider: GoogleProvider; stateKey: Buffer };
 }
 
-export function authRouter({ auth, limiters, authenticate, csrf }: AuthRouterDeps): Router {
+/** Carries the OAuth state, PKCE verifier and nonce from /google/start to the callback. */
+export const GOOGLE_STATE_COOKIE = '__Host-mb_oauth';
+const GOOGLE_STATE_TTL_MS = 10 * 60_000;
+
+/** Lax, not Strict: the callback is a top-level navigation coming back from Google. */
+function googleStateCookieOptions(): CookieOptions {
+  return { httpOnly: true, secure: true, sameSite: 'lax', path: '/' };
+}
+
+export function authRouter({
+  auth,
+  limiters,
+  authenticate,
+  csrf,
+  appBaseUrl,
+  google,
+}: AuthRouterDeps): Router {
   const r = Router();
   const accepted = {
     message: 'If the details are valid, we have sent you an email with next steps.',
   };
+  const webBase = appBaseUrl.replace(/\/+$/, '');
+  const googleRedirectUri = `${webBase}/api/v1/auth/google/callback`;
 
   r.get('/csrf', csrf.issue);
+
+  /** Which sign-in options the web app should offer. */
+  r.get('/providers', (_req, res) => {
+    res.set('Cache-Control', 'no-store').json({ google: Boolean(google) });
+  });
+
+  r.get('/google/start', limiters.middleware('loginPerIp', byIp), (req, res) => {
+    if (!google) {
+      res.redirect(303, `${webBase}/login?error=google_unavailable`);
+      return;
+    }
+    const codeVerifier = randomValue(48);
+    const state: OAuthState = {
+      state: randomValue(),
+      codeVerifier,
+      nonce: randomValue(),
+      intent: req.query['intent'] === 'owner' ? 'OWNER' : 'CUSTOMER',
+      returnUrl: safeReturnPath(req.query['returnUrl']),
+      expiresAt: Date.now() + GOOGLE_STATE_TTL_MS,
+    };
+    // Flags spelled out (not spread from a helper) so they are visible to code scanning.
+    res.cookie(GOOGLE_STATE_COOKIE, sealState(google.stateKey, state), {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: GOOGLE_STATE_TTL_MS,
+    });
+    res.set('Cache-Control', 'no-store').redirect(
+      302,
+      google.provider.authorizationUrl({
+        state: state.state,
+        nonce: state.nonce,
+        codeChallenge: pkceChallenge(codeVerifier),
+        redirectUri: googleRedirectUri,
+      }),
+    );
+  });
+
+  r.get('/google/callback', limiters.middleware('loginPerIp', byIp), async (req, res) => {
+    const fail = (reason: string): void => {
+      res.set('Cache-Control', 'no-store').redirect(303, `${webBase}/login?error=google_${reason}`);
+    };
+    const cookie: unknown = req.cookies?.[GOOGLE_STATE_COOKIE];
+    res.clearCookie(GOOGLE_STATE_COOKIE, googleStateCookieOptions()); // one use only
+    if (!google) return fail('unavailable');
+    if (typeof req.query['error'] === 'string') {
+      return fail(req.query['error'] === 'access_denied' ? 'cancelled' : 'failed');
+    }
+    const saved = openState(google.stateKey, typeof cookie === 'string' ? cookie : undefined);
+    const { code, state } = req.query;
+    if (
+      !saved ||
+      typeof state !== 'string' ||
+      !safeEqual(state, saved.state) ||
+      typeof code !== 'string' ||
+      !code ||
+      code.length > 2000
+    ) {
+      return fail('expired');
+    }
+
+    let profile;
+    try {
+      profile = await google.provider.exchange({
+        code,
+        codeVerifier: saved.codeVerifier,
+        nonce: saved.nonce,
+        redirectUri: googleRedirectUri,
+      });
+    } catch (err) {
+      req.log.warn({ err }, 'google sign-in: code exchange failed');
+      return fail('failed');
+    }
+
+    let result: LoginResult;
+    try {
+      result = await auth.signInWithGoogle(profile, saved.intent, clientContext(req));
+    } catch (err) {
+      if (err instanceof GoogleSignInError) return fail(err.code);
+      throw err;
+    }
+    // The web app restores the session from this cookie as soon as the page loads.
+    res.cookie(
+      REFRESH_COOKIE,
+      result.refresh.token,
+      refreshCookieOptions(result.refresh.expiresAt),
+    );
+    res.set('Cache-Control', 'no-store').redirect(303, `${webBase}${saved.returnUrl}`);
+  });
 
   r.post('/register', limiters.middleware('registerPerIp', byIp), async (req, res) => {
     await auth.register(registerSchema.parse(req.body), clientContext(req));

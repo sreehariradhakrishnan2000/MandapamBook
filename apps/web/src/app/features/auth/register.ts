@@ -9,6 +9,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
 import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
+import { GoogleSignIn } from '../../shared/google-sign-in';
 import { PasswordToggle } from '../../shared/password-toggle';
 
 /** Indian mobile: 10 digits starting 6–9, optional +91/0 prefix, spaces or dashes allowed. */
@@ -20,7 +21,7 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
 
 @Component({
   selector: 'app-register',
-  imports: [ReactiveFormsModule, RouterLink, FormField, PasswordToggle],
+  imports: [ReactiveFormsModule, RouterLink, FormField, PasswordToggle, GoogleSignIn],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
@@ -52,6 +53,10 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
               venue</label
             >
           </fieldset>
+          <app-google-sign-in
+            [intent]="form.controls.accountType.value === 'OWNER' ? 'owner' : 'customer'"
+            [returnUrl]="form.controls.accountType.value === 'OWNER' ? '/owner' : '/'"
+          />
           <app-form-field
             for="fullName"
             label="Full name"
