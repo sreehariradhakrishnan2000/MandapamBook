@@ -139,7 +139,7 @@ describe('Phase 7 screens', () => {
     expect(el.textContent).toContain('You rated this venue 4 out of 5');
   });
 
-  it('asks for a mobile number before a customer can review', async () => {
+  it('lets a customer with a name and email but no mobile number review', async () => {
     await signIn('CUSTOMER', ['booking:create', 'review:create'], null);
     const fixture = TestBed.createComponent(BookingDetailPage);
     fixture.componentRef.setInput('id', 'b1');
@@ -148,14 +148,10 @@ describe('Phase 7 screens', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('we need a mobile number on your account');
+    expect(el.textContent).not.toContain('Update your account');
     expect(
       [...el.querySelectorAll('button')].some((b) => b.textContent?.includes('Post review')),
-    ).toBe(false);
-    const link = [...el.querySelectorAll('a')].find((a) =>
-      a.textContent?.includes('Add your mobile number'),
-    )!;
-    expect(link.getAttribute('href')).toBe('/account#phone');
+    ).toBe(true);
     http.match(() => true).forEach((r) => r.flush(null));
   });
 

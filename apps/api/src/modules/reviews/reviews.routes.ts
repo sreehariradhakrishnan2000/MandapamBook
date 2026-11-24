@@ -1,5 +1,5 @@
 import { Router, type RequestHandler } from 'express';
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import {
   type PublicReview,
   type ReviewableOfflineBooking,
@@ -66,16 +66,16 @@ export function reviewsRouter(deps: {
   const r = Router();
 
   /**
-   * Only people whose account has a name, an email and a mobile number may review. Their
+   * Only people whose account has a name and an email or a mobile number may review. Their
    * details are copied onto the review, so it stays traceable if the account changes.
    */
   async function reviewerFor(userId: string) {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) throw errors.unauthenticated();
-    if (!user.phone) {
+    if (!user.fullName.trim() || !(user.email || user.phone)) {
       throw errors.conflict(
-        'PHONE_REQUIRED',
-        'Add your mobile number in your account before writing a review',
+        'REVIEWER_DETAILS_REQUIRED',
+        'Add your name and an email address or mobile number to your account before writing a review',
       );
     }
     return {
@@ -87,12 +87,20 @@ export function reviewsRouter(deps: {
   }
 
   /**
-   * Bookings venues took offline for this person, matched on their VERIFIED mobile number:
-   * an unverified number could be anyone's, so it never unlocks someone else's booking.
+   * Bookings venues took offline for this person, matched on the account's VERIFIED email or
+   * VERIFIED mobile number against what the venue recorded. An unverified address or number
+   * could be anyone's, so it never unlocks someone else's booking.
    */
   async function offlineBookingsFor(userId: string) {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (!user?.phone || !user.phoneVerifiedAt) return [];
+    if (!user) return [];
+    const matches = [
+      user.phone && user.phoneVerifiedAt
+        ? eq(offlineBookings.customerPhone, user.phone)
+        : undefined,
+      user.emailVerifiedAt ? eq(offlineBookings.customerEmail, user.email) : undefined,
+    ].filter((m) => m !== undefined);
+    if (!matches.length) return [];
     const firstDate = sql<string>`min(${availabilityBlocks.eventDate})`;
     const lastDate = sql<string>`max(${availabilityBlocks.eventDate})`;
     return db
@@ -112,7 +120,7 @@ export function reviewsRouter(deps: {
       .innerJoin(availabilityBlocks, eq(availabilityBlocks.offlineBookingId, offlineBookings.id))
       .where(
         and(
-          eq(offlineBookings.customerPhone, user.phone),
+          or(...matches),
           eq(offlineBookings.status, 'ACTIVE'),
           eq(auditoriums.status, 'APPROVED'),
         ),

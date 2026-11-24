@@ -1,6 +1,6 @@
 {
-  "id": "4f651863-eb07-4a94-a7e2-582478399b21",
-  "prevId": "a4d4035f-d45f-4a04-a760-3c6b48a84376",
+  "id": "2ed14039-adc5-4970-b327-83b248fc72bb",
+  "prevId": "d7dbf6ec-6369-4af3-8098-467bf2b556b8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -2264,6 +2264,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "customer_email": {
+          "name": "customer_email",
+          "type": "citext",
+          "primaryKey": false,
+          "notNull": false
+        },
         "event_type": {
           "name": "event_type",
           "type": "text",
@@ -2349,6 +2355,21 @@
           "columns": [
             {
               "expression": "customer_phone",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "offline_bookings_email_idx": {
+          "name": "offline_bookings_email_idx",
+          "columns": [
+            {
+              "expression": "customer_email",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

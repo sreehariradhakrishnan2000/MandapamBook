@@ -40,8 +40,8 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
             </p>
           }
           <p class="text-sm text-slate-600">
-            Needed to write reviews. A verified number also shows you bookings a venue made for you
-            by phone or in person, so you can review those too.
+            Optional. A verified number shows you bookings a venue made for you by phone or in
+            person, so you can review those too.
           </p>
           @if (!user.phone || !user.phoneVerified || changingPhone()) {
             <form

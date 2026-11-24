@@ -151,15 +151,14 @@ export class MyBookings implements OnInit {
                 Thank you. You rated this venue
                 <span class="font-semibold">{{ r.rating }} out of 5</span>.
               </p>
-            } @else if (!auth.user()?.phone) {
+            } @else if (
+              !auth.user()?.fullName?.trim() || !(auth.user()?.email || auth.user()?.phone)
+            ) {
               <p>
-                To keep reviews genuine, we need a mobile number on your account before you write
-                one.
-                <a
-                  routerLink="/account"
-                  fragment="phone"
-                  class="font-semibold text-brand-700 underline"
-                  >Add your mobile number</a
+                To keep reviews genuine, your account needs your name and an email address or mobile
+                number before you write one.
+                <a routerLink="/account" class="font-semibold text-brand-700 underline"
+                  >Update your account</a
                 >
               </p>
             } @else {

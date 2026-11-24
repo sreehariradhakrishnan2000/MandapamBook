@@ -261,15 +261,33 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
     expect((await c.send('get', '/api/v1/auditoriums/not-a-uuid/reviews')).status).toBe(404);
   });
 
-  it("needs a phone number on the account, and keeps the reviewer's details", async () => {
+  it("needs a name and an email or mobile number, and keeps the reviewer's details", async () => {
+    // Name and email are enough; a mobile number is not required.
     const noPhone = await login('CUSTOMER', 'Meera Pillai', { phone: null });
-    const refused = await noPhone.c.send(
+    const emailOnly = await noPhone.c.send(
       'post',
       `/api/v1/bookings/${await booking(noPhone.id)}/review`,
       { rating: 5 },
     );
+    expect(emailOnly.status).toBe(201);
+    const [kept] = await h.db.select().from(reviews).where(eq(reviews.id, emailOnly.body.id));
+    expect(kept).toMatchObject({
+      reviewerName: 'Meera Pillai',
+      reviewerEmail: noPhone.email,
+      reviewerPhone: null,
+    });
+
+    // No usable name: refused.
+    const blank = await login('CUSTOMER', '   ');
+    const refused = await blank.c.send(
+      'post',
+      `/api/v1/bookings/${await booking(blank.id)}/review`,
+      {
+        rating: 5,
+      },
+    );
     expect(refused.status).toBe(409);
-    expect(refused.body.error.code).toBe('PHONE_REQUIRED');
+    expect(refused.body.error.code).toBe('REVIEWER_DETAILS_REQUIRED');
 
     const cust = await login('CUSTOMER', 'Anu Varghese');
     const ok = await cust.c.send('post', `/api/v1/bookings/${await booking(cust.id)}/review`, {
@@ -297,7 +315,12 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
   });
 
   describe('guests of bookings taken offline', () => {
-    async function offlineBooking(phone: string, dates: string[], status = 'ACTIVE') {
+    async function offlineBooking(
+      phone: string,
+      dates: string[],
+      status = 'ACTIVE',
+      customerEmail: string | null = null,
+    ) {
       const [ob] = await h.db
         .insert(offlineBookings)
         .values({
@@ -305,6 +328,7 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
           hallId,
           customerName: 'Guest',
           customerPhone: phone,
+          customerEmail,
           status,
         })
         .returning();
@@ -367,6 +391,26 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
         'Deepa M.',
       );
       expect(JSON.stringify(pub.body)).not.toContain(phone);
+    });
+
+    it('matches on a verified email too, so guests can review without SMS', async () => {
+      const guest = await login('CUSTOMER', 'Fathima Rahman', { phone: null });
+      // The venue recorded a different number but the guest's email.
+      const id = await offlineBooking(randomPhone(), [pastDate()], 'ACTIVE', guest.email);
+      const mine = await guest.c.send('get', '/api/v1/me/offline-bookings');
+      expect(mine.body.items).toEqual([
+        expect.objectContaining({ offlineBookingId: id, canReview: true }),
+      ]);
+      expect((await review(guest.c, id, { rating: 5 })).status).toBe(201);
+
+      // An unverified email never matches.
+      const unverified = await login('CUSTOMER', 'Not Verified', { phone: null });
+      await h.db.update(users).set({ emailVerifiedAt: null }).where(eq(users.id, unverified.id));
+      const theirs = await offlineBooking(randomPhone(), [pastDate()], 'ACTIVE', unverified.email);
+      expect((await unverified.c.send('get', '/api/v1/me/offline-bookings')).body.items).toEqual(
+        [],
+      );
+      expect((await review(unverified.c, theirs, { rating: 5 })).status).toBe(404);
     });
 
     it('refuses before the last date, other people, and cancelled bookings', async () => {
