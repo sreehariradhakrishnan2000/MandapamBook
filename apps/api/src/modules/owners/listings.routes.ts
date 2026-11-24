@@ -174,6 +174,12 @@ export function listingsRouter({ db, scoped, audit, storage }: ListingsDeps): Ro
       throw errors.conflict('LISTING_LOCKED', 'This listing is suspended and cannot be edited');
     }
     const input = auditoriumUpdateSchema.parse(req.body);
+    if ((input.latitude === undefined) !== (input.longitude === undefined)) {
+      throw errors.badRequest(
+        'INCOMPLETE_LOCATION',
+        'Provide both latitude and longitude, or neither',
+      );
+    }
     if (input.cityId) {
       const [city] = await db
         .select({ id: cities.id })
