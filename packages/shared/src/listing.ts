@@ -176,6 +176,7 @@ export const blockSchema = z.strictObject({
 const offlineDetails = {
   customerName: fullNameSchema,
   customerPhone: indianMobileSchema,
+  customerEmail: emailSchema.optional(),
   eventType: z.string().trim().min(1).max(80).optional(),
   amountPaise: paise.optional(),
   advancePaise: paise.optional(),

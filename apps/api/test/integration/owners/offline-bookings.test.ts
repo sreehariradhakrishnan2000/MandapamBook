@@ -73,6 +73,7 @@ describe.skipIf(!hasTestDb)('offline bookings', { timeout: 120_000 }, () => {
     hallId,
     customerName: 'Lakshmi Nair',
     customerPhone: '98470 12345',
+    customerEmail: 'Lakshmi.Nair@Example.test',
     eventType: 'Wedding',
     amountPaise: 15_000_000,
     advancePaise: 5_000_000,
@@ -95,6 +96,7 @@ describe.skipIf(!hasTestDb)('offline bookings', { timeout: 120_000 }, () => {
       hallName: 'Main Hall',
       customerName: 'Lakshmi Nair',
       customerPhone: '+919847012345',
+      customerEmail: 'lakshmi.nair@example.test',
       status: 'ACTIVE',
       slots: [
         { eventDate: d1, slot: 'EVENING' },
@@ -164,6 +166,7 @@ describe.skipIf(!hasTestDb)('offline bookings', { timeout: 120_000 }, () => {
     const slots = [{ eventDate: nextDay(), slot: 'MORNING' }];
     for (const bad of [
       { ...base(), slots, customerPhone: '12345' },
+      { ...base(), slots, customerEmail: 'not-an-email' },
       { ...base(), slots, advancePaise: 20_000_000 }, // more than the amount
       { ...base(), slots: [{ eventDate: inDays(-1), slot: 'MORNING' }] },
       { ...base(), slots: [...slots, ...slots] },

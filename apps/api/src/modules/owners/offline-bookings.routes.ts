@@ -63,6 +63,7 @@ export function offlineBookingsRouter(deps: {
       hallName: hallNames.get(b.hallId) ?? '',
       customerName: b.customerName,
       customerPhone: b.customerPhone,
+      customerEmail: b.customerEmail,
       eventType: b.eventType,
       amountPaise: b.amountPaise,
       advancePaise: b.advancePaise,

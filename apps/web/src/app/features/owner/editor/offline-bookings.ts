@@ -22,6 +22,7 @@ interface Draft {
   slots: { eventDate: string; slot: Slot }[];
   customerName: string;
   customerPhone: string;
+  customerEmail: string;
   eventType: string;
   amountRupees: number | null;
   advanceRupees: number | null;
@@ -168,6 +169,17 @@ interface Draft {
               [(ngModel)]="draft.customerPhone"
             />
           </label>
+          <label class="flex flex-col gap-1 sm:col-span-2"
+            >Guest email (optional)
+            <input
+              name="customerEmail"
+              type="email"
+              autocomplete="off"
+              maxlength="254"
+              [class]="input"
+              [(ngModel)]="draft.customerEmail"
+            />
+          </label>
           <label class="flex flex-col gap-1"
             >Amount agreed (₹, optional)
             <input
@@ -201,8 +213,8 @@ interface Draft {
             ></textarea>
           </label>
           <p class="text-xs text-slate-500 sm:col-span-2">
-            The guest's name and number are only visible to you and your staff. They let the guest
-            review your venue after the event.
+            The guest's details are only visible to you and your staff. Their email or mobile number
+            lets them review your venue after the event from their MandapamBook account.
           </p>
           <div class="flex gap-2 sm:col-span-2">
             <button
@@ -254,6 +266,12 @@ interface Draft {
                 </p>
                 <p class="text-slate-600">
                   <a class="underline" [href]="'tel:' + b.customerPhone">{{ b.customerPhone }}</a> ·
+                  @if (b.customerEmail) {
+                    <a class="underline" [href]="'mailto:' + b.customerEmail">{{
+                      b.customerEmail
+                    }}</a>
+                    ·
+                  }
                   {{ b.hallName }}
                 </p>
               </div>
@@ -353,6 +371,7 @@ export class OfflineBookings {
       slots: [{ eventDate: '', slot: 'FULL_DAY' }],
       customerName: '',
       customerPhone: '',
+      customerEmail: '',
       eventType: '',
       amountRupees: null,
       advanceRupees: null,
@@ -382,6 +401,7 @@ export class OfflineBookings {
       slots: b.slots.map((s) => ({ ...s })),
       customerName: b.customerName,
       customerPhone: b.customerPhone,
+      customerEmail: b.customerEmail ?? '',
       eventType: b.eventType ?? '',
       amountRupees: b.amountPaise === null ? null : b.amountPaise / 100,
       advanceRupees: b.advancePaise === null ? null : b.advancePaise / 100,
@@ -420,6 +440,7 @@ export class OfflineBookings {
     const details = {
       customerName: d.customerName.trim(),
       customerPhone: d.customerPhone,
+      ...(d.customerEmail.trim() ? { customerEmail: d.customerEmail.trim() } : {}),
       ...(d.eventType.trim() ? { eventType: d.eventType.trim() } : {}),
       ...(d.amountRupees !== null ? { amountPaise: rupeesToPaiseInput(d.amountRupees) } : {}),
       ...(d.advanceRupees !== null ? { advancePaise: rupeesToPaiseInput(d.advanceRupees) } : {}),
@@ -454,6 +475,8 @@ export class OfflineBookings {
     if (d.customerName.trim().length < 2) return "Enter the guest's name.";
     if (!normalizeIndianMobile(d.customerPhone))
       return 'Enter a valid 10-digit Indian mobile number.';
+    if (d.customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.customerEmail.trim()))
+      return "Check the guest's email address.";
     if (d.amountRupees !== null && d.advanceRupees !== null && d.advanceRupees > d.amountRupees)
       return 'The advance cannot be more than the amount.';
     return null;

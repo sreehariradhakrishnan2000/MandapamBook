@@ -27,7 +27,7 @@ import {
   pricingRuleKind,
 } from './enums.js';
 import { ownerProfiles, users } from './identity.js';
-import { createdAt, id, timestamps } from './types.js';
+import { citext, createdAt, id, timestamps } from './types.js';
 
 // ---------- Master data ----------
 
@@ -301,6 +301,8 @@ export const offlineBookings = pgTable(
     customerName: text('customer_name').notNull(),
     /** E.164 (+91…). Lets the guest review the venue later from an account with this number. */
     customerPhone: text('customer_phone').notNull(),
+    /** Optional. A guest whose verified account email matches can review the venue. */
+    customerEmail: citext('customer_email'),
     eventType: text('event_type'),
     amountPaise: bigint('amount_paise', { mode: 'number' }),
     advancePaise: bigint('advance_paise', { mode: 'number' }),
@@ -313,6 +315,7 @@ export const offlineBookings = pgTable(
   (t) => [
     index('offline_bookings_auditorium_idx').on(t.auditoriumId, t.status),
     index('offline_bookings_phone_idx').on(t.customerPhone),
+    index('offline_bookings_email_idx').on(t.customerEmail),
     check('offline_bookings_status', sql`${t.status} IN ('ACTIVE', 'CANCELLED')`),
     check('offline_bookings_phone', sql`${t.customerPhone} ~ '^\\+91[6-9][0-9]{9}$'`),
     check(
