@@ -47,6 +47,15 @@ import { SearchForm } from './search-form';
             />
             Air-conditioned</label
           >
+          <label class="flex items-center gap-2"
+            ><input
+              type="checkbox"
+              class="size-4"
+              [(ngModel)]="filters.sadya"
+              (ngModelChange)="apply()"
+            />
+            Sadya preparation area</label
+          >
           <label class="flex flex-col gap-1"
             >Catering
             <select
@@ -252,6 +261,7 @@ export class Search {
   protected readonly allAmenities = signal<{ code: string; name: string }[]>([]);
   protected filters = {
     ac: false,
+    sadya: false,
     catering: '' as '' | 'OUTSIDE_ALLOWED' | 'IN_HOUSE_ONLY',
     decoration: '' as '' | 'OUTSIDE_ALLOWED' | 'IN_HOUSE_ONLY',
     minParking: null as number | null,
@@ -328,6 +338,7 @@ export class Search {
       guests: this.guests() ? Number(this.guests()) : undefined,
       maxPricePaise: budget ? Math.round(budget) * 100 : undefined,
       ac: f.ac || undefined,
+      sadya: f.sadya || undefined,
       catering: f.catering || undefined,
       decoration: f.decoration || undefined,
       minParking: f.minParking ?? undefined,

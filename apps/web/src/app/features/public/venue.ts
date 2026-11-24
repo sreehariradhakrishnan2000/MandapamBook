@@ -150,11 +150,21 @@ const POLICY_LABELS: Record<string, string> = {
             <div class="rounded-2xl border border-slate-200 bg-white p-4">
               <p class="font-semibold">
                 {{ h.name }}
-                <span class="font-normal text-slate-600"
-                  >· {{ h.seatingCapacity }} seated · {{ h.diningCapacity }} dining ·
-                  {{ h.isAc ? 'AC' : 'Non-AC' }}</span
-                >
+                <span class="font-normal text-slate-600">· {{ h.seatingCapacity }} seated</span>
               </p>
+              <ul
+                class="mt-2 flex flex-wrap gap-2 text-xs font-medium"
+                aria-label="Air-conditioning"
+              >
+                <li [class]="badge(h.isAc)">Hall: {{ h.isAc ? 'AC' : 'Non-AC' }}</li>
+                @if (h.diningCapacity > 0) {
+                  <li [class]="badge(h.diningIsAc)">
+                    Dining ({{ h.diningCapacity }}): {{ h.diningIsAc ? 'AC' : 'Non-AC' }}
+                  </li>
+                } @else {
+                  <li [class]="badge(false)">No dining area</li>
+                }
+              </ul>
               <ul class="mt-2 grid gap-2 sm:grid-cols-3">
                 @for (s of slots; track s) {
                   @if (h.basePrices[s]; as price) {
@@ -249,6 +259,10 @@ const POLICY_LABELS: Record<string, string> = {
             <dd>{{ v.guestRooms }}</dd>
             <dt class="text-slate-500">Generator</dt>
             <dd>{{ v.hasGenerator ? 'Yes' : 'No' }}</dd>
+            <dt class="text-slate-500">Sadya preparation area</dt>
+            <dd>{{ v.sadyaPrepArea ? 'Yes, on site' : 'No' }}</dd>
+            <dt class="text-slate-500">Cooking equipment</dt>
+            <dd>{{ v.cookingEquipment ? 'Provided' : 'Not provided' }}</dd>
             <dt class="text-slate-500">Advance online</dt>
             <dd>{{ v.advancePercent }}% + platform fee</dd>
           </dl>
@@ -444,6 +458,13 @@ export class Venue {
 
   protected policy(code: string): string {
     return POLICY_LABELS[code] ?? code;
+  }
+
+  /** A small label: green-tinted when the feature is there, neutral when it isn't. */
+  protected badge(on: boolean): string {
+    return on
+      ? 'rounded-full bg-forest-50 px-2.5 py-1 text-forest-800 ring-1 ring-forest-200'
+      : 'rounded-full bg-slate-100 px-2.5 py-1 text-slate-600';
   }
 
   protected takenList(
