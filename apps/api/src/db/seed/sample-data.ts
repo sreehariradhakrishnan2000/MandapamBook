@@ -18,6 +18,8 @@ export interface SampleHall {
   seatingCapacity: number;
   diningCapacity: number;
   isAc: boolean;
+  /** Defaults to the hall's own AC when not given. */
+  diningIsAc?: boolean;
   /** Base price per slot in rupees (converted to paise when seeding). */
   baseRupees: Record<Slot, number>;
   /** Extra percentage on weekends and muhurtham days. */
@@ -42,6 +44,8 @@ export interface SampleAuditorium {
   parkingTwoWheelers: number;
   guestRooms: number;
   hasGenerator: boolean;
+  sadyaPrepArea?: boolean;
+  cookingEquipment?: boolean;
   advancePercent: number;
   instantBook: boolean;
   amenities: string[];

@@ -78,6 +78,8 @@ export const auditoriumSchema = z.strictObject({
   parkingTwoWheelers: z.number().int().min(0).max(10000).default(0),
   guestRooms: z.number().int().min(0).max(500).default(0),
   hasGenerator: z.boolean().default(false),
+  sadyaPrepArea: z.boolean().default(false),
+  cookingEquipment: z.boolean().default(false),
   advancePercent: z.number().int().min(10).max(100).default(25),
   instantBook: z.boolean().default(true),
 });
@@ -89,6 +91,7 @@ export const hallSchema = z.strictObject({
   seatingCapacity: z.number().int().min(1).max(20000),
   diningCapacity: z.number().int().min(0).max(20000).default(0),
   isAc: z.boolean().default(false),
+  diningIsAc: z.boolean().default(false),
   isActive: z.boolean().default(true),
 });
 export const hallUpdateSchema = patchSchema(hallSchema);

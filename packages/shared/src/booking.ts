@@ -44,6 +44,8 @@ export const searchQuerySchema = z
     guests: z.coerce.number().int().min(1).max(20000).optional(),
     maxPricePaise: z.coerce.number().int().min(0).max(10_000_000_00).optional(),
     ac: boolParam.optional(),
+    /** Only venues with a sadya preparation area. */
+    sadya: boolParam.optional(),
     minParking: z.coerce.number().int().min(0).max(5000).optional(),
     minRooms: z.coerce.number().int().min(0).max(500).optional(),
     catering: z.enum(['IN_HOUSE_ONLY', 'OUTSIDE_ALLOWED', 'NO_CATERING']).optional(),
@@ -80,6 +82,10 @@ export interface SearchResult {
   locality: string | null;
   maxCapacity: number;
   hasAc: boolean;
+  /** Some matching hall has an air-conditioned dining area. */
+  diningAc: boolean;
+  sadyaPrepArea: boolean;
+  cookingEquipment: boolean;
   parkingCars: number;
   guestRooms: number;
   cateringPolicy: string;

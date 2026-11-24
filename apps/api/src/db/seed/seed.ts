@@ -181,6 +181,7 @@ export async function seedSampleData(
             seatingCapacity: h.seatingCapacity,
             diningCapacity: h.diningCapacity,
             isAc: h.isAc,
+            diningIsAc: h.diningIsAc ?? h.isAc,
           })
           .returning({ id: halls.id });
         if (!hall) throw new Error(`could not insert hall ${h.name}`);

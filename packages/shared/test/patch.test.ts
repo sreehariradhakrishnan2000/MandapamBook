@@ -10,7 +10,7 @@ import {
 describe('update (PATCH) schemas', () => {
   it('keeps only the fields that were sent: no defaults fill the rest', () => {
     expect(auditoriumUpdateSchema.parse({ guestRooms: 6 })).toEqual({ guestRooms: 6 });
-    expect(hallUpdateSchema.parse({ isAc: true })).toEqual({ isAc: true });
+    expect(hallUpdateSchema.parse({ diningIsAc: true })).toEqual({ diningIsAc: true });
     expect(addonUpdateSchema.parse({ pricePaise: 50_000 })).toEqual({ pricePaise: 50_000 });
     expect(cityUpdateSchema.parse({ name: 'Kochi' })).toEqual({ name: 'Kochi' });
     expect(amenityUpdateSchema.parse({})).toEqual({});
@@ -35,6 +35,8 @@ describe('update (PATCH) schemas', () => {
     expect(created).toMatchObject({
       instantBook: true,
       advancePercent: 25,
+      sadyaPrepArea: false,
+      cookingEquipment: false,
     });
   });
 });
