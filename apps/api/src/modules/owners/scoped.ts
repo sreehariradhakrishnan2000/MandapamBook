@@ -8,6 +8,7 @@ import {
   availabilityBlocks,
   halls,
   media,
+  offlineBookings,
   pricingRules,
 } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
@@ -96,6 +97,17 @@ export class ScopedResources {
       .where(and(eq(availabilityBlocks.id, id), auditoriumScopeCondition(scope)));
     if (!row) throw errors.notFound();
     return row.block;
+  }
+
+  async offlineBooking(scope: OwnerScope, rawId: unknown) {
+    const id = parseId(rawId);
+    const [row] = await this.db
+      .select({ booking: offlineBookings })
+      .from(offlineBookings)
+      .innerJoin(auditoriums, eq(auditoriums.id, offlineBookings.auditoriumId))
+      .where(and(eq(offlineBookings.id, id), auditoriumScopeCondition(scope)));
+    if (!row) throw errors.notFound();
+    return row.booking;
   }
 }
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { patchSchema } from './patch.js';
 import { emailSchema, fullNameSchema } from './auth.js';
+import { indianMobileSchema } from './phone.js';
 
 // ---------------------------------------------------------------- KYC
 
@@ -170,6 +171,47 @@ export const blockSchema = z.strictObject({
   slot: slotSchema,
   reason: z.string().trim().max(200).optional(),
 });
+
+/** Details an owner keeps about a booking taken outside the app (phone, walk-in). */
+const offlineDetails = {
+  customerName: fullNameSchema,
+  customerPhone: indianMobileSchema,
+  eventType: z.string().trim().min(1).max(80).optional(),
+  amountPaise: paise.optional(),
+  advancePaise: paise.optional(),
+  notes: z.string().trim().max(1000).optional(),
+};
+const advanceWithinAmount = (v: {
+  amountPaise?: number | undefined;
+  advancePaise?: number | undefined;
+}) =>
+  v.amountPaise === undefined || v.advancePaise === undefined || v.advancePaise <= v.amountPaise;
+
+export const offlineBookingSchema = z
+  .strictObject({
+    hallId: z.uuid(),
+    /** One booking can hold several days or slots (e.g. engagement and wedding). */
+    slots: z
+      .array(z.strictObject({ eventDate: isoDate, slot: slotSchema }))
+      .min(1)
+      .max(31)
+      .refine(
+        (s) => new Set(s.map((x) => `${x.eventDate}:${x.slot}`)).size === s.length,
+        'Each date and slot can appear once',
+      ),
+    ...offlineDetails,
+  })
+  .refine(advanceWithinAmount, {
+    path: ['advancePaise'],
+    message: 'The advance cannot be more than the amount',
+  });
+export type OfflineBookingInput = z.input<typeof offlineBookingSchema>;
+
+/** Editing an offline booking changes its details only; to move dates, cancel and re-add. */
+export const offlineBookingUpdateSchema = patchSchema(z.strictObject(offlineDetails)).refine(
+  advanceWithinAmount,
+  { path: ['advancePaise'], message: 'The advance cannot be more than the amount' },
+);
 
 export const staffInviteSchema = z.strictObject({
   email: emailSchema,

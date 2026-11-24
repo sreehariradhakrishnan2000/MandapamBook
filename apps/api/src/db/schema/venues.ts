@@ -283,6 +283,45 @@ export const pricingRules = pgTable(
 );
 
 /** Owner-blocked dates (maintenance, private use). Occupies the slot like a booking. */
+/**
+ * A booking the venue took outside MandapamBook (phone, walk-in). It holds its dates through
+ * availability_blocks rows, so online bookings can never be taken on top of it. Cancelling
+ * deletes those blocks and keeps this record.
+ */
+export const offlineBookings = pgTable(
+  'offline_bookings',
+  {
+    id: id(),
+    auditoriumId: uuid('auditorium_id')
+      .notNull()
+      .references(() => auditoriums.id, { onDelete: 'cascade' }),
+    hallId: uuid('hall_id')
+      .notNull()
+      .references(() => halls.id, { onDelete: 'cascade' }),
+    customerName: text('customer_name').notNull(),
+    /** E.164 (+91…). Lets the guest review the venue later from an account with this number. */
+    customerPhone: text('customer_phone').notNull(),
+    eventType: text('event_type'),
+    amountPaise: bigint('amount_paise', { mode: 'number' }),
+    advancePaise: bigint('advance_paise', { mode: 'number' }),
+    notes: text('notes'),
+    status: text('status').notNull().default('ACTIVE'),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id),
+    ...timestamps(),
+  },
+  (t) => [
+    index('offline_bookings_auditorium_idx').on(t.auditoriumId, t.status),
+    index('offline_bookings_phone_idx').on(t.customerPhone),
+    check('offline_bookings_status', sql`${t.status} IN ('ACTIVE', 'CANCELLED')`),
+    check('offline_bookings_phone', sql`${t.customerPhone} ~ '^\\+91[6-9][0-9]{9}$'`),
+    check(
+      'offline_bookings_amounts',
+      sql`(${t.amountPaise} IS NULL OR ${t.amountPaise} >= 0) AND (${t.advancePaise} IS NULL OR ${t.advancePaise} >= 0)`,
+    ),
+  ],
+);
+
 export const availabilityBlocks = pgTable(
   'availability_blocks',
   {
@@ -293,8 +332,15 @@ export const availabilityBlocks = pgTable(
     eventDate: date('event_date', { mode: 'string' }).notNull(),
     slot: bookingSlot('slot').notNull(),
     reason: text('reason'),
+    /** Set when this block holds a date for an offline booking. */
+    offlineBookingId: uuid('offline_booking_id').references(() => offlineBookings.id, {
+      onDelete: 'cascade',
+    }),
     createdBy: uuid('created_by').references(() => users.id),
     createdAt: createdAt(),
   },
-  (t) => [index('availability_blocks_hall_date_idx').on(t.hallId, t.eventDate)],
+  (t) => [
+    index('availability_blocks_hall_date_idx').on(t.hallId, t.eventDate),
+    index('availability_blocks_offline_idx').on(t.offlineBookingId),
+  ],
 );
