@@ -4,6 +4,7 @@ import { count, eq } from 'drizzle-orm';
 import type { ObjectStorage } from '../../infra/storage.js';
 import type { Db } from '../client.js';
 import { auditoriums, media } from '../schema/index.js';
+import { KERALA_TEST_AUDITORIUMS, stockPhotosFor } from './kerala-test-venues.js';
 import { SAMPLE_AUDITORIUMS } from './sample-data.js';
 
 /**
@@ -11,6 +12,7 @@ import { SAMPLE_AUDITORIUMS } from './sample-data.js';
  * named `<venue slug>-<n>.webp`, 1200x800.
  */
 const PHOTO_DIR = new URL('./photos/', import.meta.url);
+const STOCK_DIR = new URL('./photos/stock/', import.meta.url);
 
 const ALT_TEXT: Record<string, [string, string]> = {
   'sree-padmanabha-kalyana-mandapam-kochi': [
@@ -49,10 +51,49 @@ export async function seedSamplePhotos(
   storage: ObjectStorage,
 ): Promise<{ venues: number; photos: number }> {
   const files = (await readdir(PHOTO_DIR)).filter((f) => f.endsWith('.webp')).sort();
+  return uploadVenuePhotos(
+    db,
+    storage,
+    SAMPLE_AUDITORIUMS.map((venue) => ({
+      slug: venue.slug,
+      photos: files
+        .filter((f) => f.startsWith(`${venue.slug}-`))
+        .map((file, i) => ({
+          file: new URL(file, PHOTO_DIR),
+          alt: ALT_TEXT[venue.slug]?.[i] ?? `Photo of ${venue.name}`,
+        })),
+    })),
+  );
+}
+
+/** Photos for the Kerala test venues: two shared stock photos each. */
+export async function seedKeralaTestPhotos(
+  db: Db,
+  storage: ObjectStorage,
+): Promise<{ venues: number; photos: number }> {
+  return uploadVenuePhotos(
+    db,
+    storage,
+    KERALA_TEST_AUDITORIUMS.map((venue, i) => ({
+      slug: venue.slug,
+      photos: stockPhotosFor(i).map(([file, alt]) => ({ file: new URL(file, STOCK_DIR), alt })),
+    })),
+  );
+}
+
+/**
+ * Uploads each venue's photos through the same presigned PUT the browser uses and records
+ * them as READY media. Venues that are missing or already have photos are skipped.
+ */
+export async function uploadVenuePhotos(
+  db: Db,
+  storage: ObjectStorage,
+  plan: { slug: string; photos: { file: URL; alt: string }[] }[],
+): Promise<{ venues: number; photos: number }> {
   let venues = 0;
   let photos = 0;
 
-  for (const venue of SAMPLE_AUDITORIUMS) {
+  for (const venue of plan) {
     const [aud] = await db
       .select({ id: auditoriums.id })
       .from(auditoriums)
@@ -64,9 +105,8 @@ export async function seedSamplePhotos(
       .where(eq(media.auditoriumId, aud.id));
     if ((existing?.n ?? 0) > 0) continue;
 
-    const mine = files.filter((f) => f.startsWith(`${venue.slug}-`));
-    for (const [i, file] of mine.entries()) {
-      const body = await readFile(new URL(file, PHOTO_DIR));
+    for (const [i, { file, alt }] of venue.photos.entries()) {
+      const body = await readFile(file);
       const storageKey = `venues/${aud.id}/${randomUUID()}.webp`;
       const target = await storage.createUploadUrl(storageKey, 'image/webp', body.length, 300);
       // fetch sets Content-Length itself from the body, which matches the signed size.
@@ -83,13 +123,13 @@ export async function seedSamplePhotos(
         sizeBytes: body.length,
         width: 1200,
         height: 800,
-        altText: ALT_TEXT[venue.slug]?.[i] ?? `Photo of ${venue.name}`,
+        altText: alt,
         sortOrder: i,
         status: 'READY',
       });
       photos++;
     }
-    if (mine.length) venues++;
+    if (venue.photos.length) venues++;
   }
   return { venues, photos };
 }

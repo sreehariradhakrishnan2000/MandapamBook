@@ -2,6 +2,7 @@
  * Seed entrypoint.
  *   pnpm db:seed              master data + fictional sample venues (dev/test only)
  *   pnpm db:seed --master     master data only (allowed in production)
+ *   pnpm db:seed --kerala     also 140 test venues, 10 in each Kerala district (dev/staging)
  *   SEED_DEMO_PASSWORD=...    also give demo accounts for every role that password (dev only)
  *   STORAGE_PROVIDER=s3       also upload photos for the sample venues (S3_* must be set)
  */
@@ -10,7 +11,8 @@ import { z } from 'zod';
 import { createObjectStorage } from '../../infra/storage.js';
 import { createDb } from '../client.js';
 import { seedDemoUsers } from './demo-users.js';
-import { seedSamplePhotos } from './sample-photos.js';
+import { KERALA_TEST_AUDITORIUMS, KERALA_TEST_OWNERS } from './kerala-test-venues.js';
+import { seedKeralaTestPhotos, seedSamplePhotos } from './sample-photos.js';
 import { seedMasterData, seedSampleData } from './seed.js';
 
 const env = z
@@ -40,6 +42,7 @@ if (!env.success) {
 }
 
 const masterOnly = process.argv.includes('--master');
+const kerala = process.argv.includes('--kerala');
 if (env.data.NODE_ENV === 'production' && !masterOnly) {
   console.error(
     'Refusing to load sample data in production. Use --master for reference data only.',
@@ -64,6 +67,19 @@ try {
       console.error(`Sample photos: ${photos.photos} uploaded for ${photos.venues} venues.`);
     } else {
       console.error('Sample photos: skipped (set STORAGE_PROVIDER=s3 to upload them).');
+    }
+    if (kerala) {
+      const k = await seedSampleData(db, {
+        owners: KERALA_TEST_OWNERS,
+        auditoriums: KERALA_TEST_AUDITORIUMS,
+      });
+      console.error(
+        `Kerala test venues: ${k.auditoriumsCreated} created, ${k.auditoriumsSkipped} already present.`,
+      );
+      if (env.data.STORAGE_PROVIDER === 's3') {
+        const p = await seedKeralaTestPhotos(db, createObjectStorage(env.data));
+        console.error(`Kerala test photos: ${p.photos} uploaded for ${p.venues} venues.`);
+      }
     }
     if (env.data.SEED_DEMO_PASSWORD) {
       const n = await seedDemoUsers(db, env.data.SEED_DEMO_PASSWORD);

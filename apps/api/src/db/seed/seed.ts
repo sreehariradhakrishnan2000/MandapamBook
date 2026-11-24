@@ -16,7 +16,12 @@ import {
   users,
 } from '../schema/index.js';
 import { AMENITIES, CITIES, PLATFORM_SETTINGS } from './master-data.js';
-import { SAMPLE_AUDITORIUMS, SAMPLE_OWNERS } from './sample-data.js';
+import {
+  SAMPLE_AUDITORIUMS,
+  SAMPLE_OWNERS,
+  type SampleAuditorium,
+  type SampleOwner,
+} from './sample-data.js';
 
 const SLOTS = ['MORNING', 'EVENING', 'FULL_DAY'] as const;
 
@@ -79,12 +84,16 @@ export async function seedMasterData(db: Db): Promise<Pick<SeedSummary, 'cities'
  */
 export async function seedSampleData(
   db: Db,
+  set: { owners: SampleOwner[]; auditoriums: SampleAuditorium[] } = {
+    owners: SAMPLE_OWNERS,
+    auditoriums: SAMPLE_AUDITORIUMS,
+  },
 ): Promise<Pick<SeedSummary, 'auditoriumsCreated' | 'auditoriumsSkipped'>> {
   let created = 0;
   let skipped = 0;
 
   await db.transaction(async (tx) => {
-    for (const owner of SAMPLE_OWNERS) {
+    for (const owner of set.owners) {
       const [user] = await tx
         .insert(users)
         .values({
@@ -110,7 +119,7 @@ export async function seedSampleData(
       .where(
         inArray(
           users.email,
-          SAMPLE_OWNERS.map((o) => o.email),
+          set.owners.map((o) => o.email),
         ),
       );
     const ownerByEmail = new Map(ownerRows.map((o) => [o.email, o.id]));
@@ -127,7 +136,7 @@ export async function seedSampleData(
       ]),
     );
 
-    for (const venue of SAMPLE_AUDITORIUMS) {
+    for (const venue of set.auditoriums) {
       const existing = await tx
         .select({ id: auditoriums.id })
         .from(auditoriums)
