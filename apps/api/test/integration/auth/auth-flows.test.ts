@@ -367,6 +367,28 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
       });
       expect(res.status).toBe(202);
     });
+
+    it('still answers normally when the mail server is down', async () => {
+      const user = await createUser(h.db);
+      const send = h.email.send;
+      h.email.send = () => Promise.reject(new Error('smtp unreachable'));
+      try {
+        const c = new Client(h.app);
+        // Same answer as for an unknown email: a mail failure must not reveal the account.
+        const forgot = await c.send('post', '/api/v1/auth/password/forgot', { email: user.email });
+        expect(forgot.status).toBe(202);
+        const email = uniqueEmail('mailfail');
+        const reg = await c.send('post', '/api/v1/auth/register', {
+          email,
+          password: PASSWORD,
+          fullName: 'Mail Fail',
+        });
+        expect(reg.status).toBe(202);
+        expect(await h.db.select().from(users).where(eq(users.email, email))).toHaveLength(1);
+      } finally {
+        h.email.send = send;
+      }
+    });
   });
 
   describe('phone OTP', () => {

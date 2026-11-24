@@ -40,7 +40,7 @@ export function startSweeps(deps: {
   const payments = new PaymentService(db, createPaymentProvider(env), settings, audit, logger);
   const notifications = new NotificationService(
     db,
-    createEmailSender(env, logger),
+    createEmailSender(env, logger.child({ component: 'email' })),
     new InvoiceService(db),
     env.APP_BASE_URL,
     logger,
