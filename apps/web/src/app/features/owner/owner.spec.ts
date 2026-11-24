@@ -10,6 +10,7 @@ import { InrPipe, rupeesToPaiseInput } from '../../shared/inr.pipe';
 import { isoDate } from './editor/calendar';
 import { VenueEditor } from './editor/venue-editor';
 import { VenueForm } from './editor/venue-form';
+import { OfflineBookings } from './editor/offline-bookings';
 
 const ownerSession: AuthSession = {
   accessToken: 'owner-token',
@@ -193,6 +194,124 @@ describe('owner area', () => {
     const alert = el.querySelector('[role=alert]');
     expect(alert?.textContent).toContain('Add at least one hall');
     expect(alert?.textContent).toContain('Set a cancellation policy');
+  });
+
+  it('records an offline booking over several dates, and checks it first', async () => {
+    const fixture = TestBed.createComponent(OfflineBookings);
+    fixture.componentRef.setInput('venueId', 'v1');
+    fixture.componentRef.setInput('halls', [
+      {
+        id: 'h1',
+        name: 'Main Hall',
+        seatingCapacity: 500,
+        diningCapacity: 200,
+        isAc: true,
+        diningIsAc: true,
+        isActive: true,
+      },
+    ]);
+    fixture.detectChanges();
+    (await pending('/api/v1/owner/auditoriums/v1/offline-bookings?status=ALL')).flush({
+      items: [],
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.textContent).toContain('No offline bookings recorded.');
+
+    [...el.querySelectorAll('button')]
+      .find((b) => b.textContent?.includes('Record an offline booking'))!
+      .click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const set = async (selector: string, value: string) => {
+      const field = el.querySelector<HTMLInputElement | HTMLSelectElement>(selector);
+      if (!field) throw new Error(`no field ${selector}`);
+      field.value = value;
+      field.dispatchEvent(new Event(field.tagName === 'SELECT' ? 'change' : 'input'));
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+    const submit = async () => {
+      el.querySelector<HTMLButtonElement>('form button[type=submit]')!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    await set('fieldset > div:nth-of-type(1) input[type=date]', '2030-01-09');
+    [...el.querySelectorAll('button')]
+      .find((b) => b.textContent?.includes('Add another date'))!
+      .click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await set('fieldset > div:nth-of-type(2) input[type=date]', '2030-01-10');
+    await set('fieldset > div:nth-of-type(2) select', 'MORNING');
+    await set('input[name=customerName]', 'Lakshmi Nair');
+    await set('input[name=customerPhone]', '12345');
+    await submit();
+    expect(el.querySelector('[role=alert]')?.textContent).toContain('valid 10-digit');
+
+    await set('input[name=customerPhone]', '98470 12345');
+    await set('input[name=amount]', '150000');
+    await set('input[name=advance]', '200000');
+    await submit();
+    expect(el.querySelector('[role=alert]')?.textContent).toContain(
+      'cannot be more than the amount',
+    );
+    http.expectNone('/api/v1/owner/auditoriums/v1/offline-bookings');
+
+    await set('input[name=advance]', '50000');
+    await submit();
+    const save = await pending('/api/v1/owner/auditoriums/v1/offline-bookings');
+    expect(save.request.method).toBe('POST');
+    expect(save.request.body).toEqual({
+      hallId: 'h1',
+      slots: [
+        { eventDate: '2030-01-09', slot: 'FULL_DAY' },
+        { eventDate: '2030-01-10', slot: 'MORNING' },
+      ],
+      customerName: 'Lakshmi Nair',
+      customerPhone: '98470 12345',
+      amountPaise: 15_000_000,
+      advancePaise: 5_000_000,
+    });
+    save.flush({});
+    const booking = {
+      id: 'o1',
+      hallId: 'h1',
+      hallName: 'Main Hall',
+      customerName: 'Lakshmi Nair',
+      customerPhone: '+919847012345',
+      eventType: null,
+      amountPaise: 15_000_000,
+      advancePaise: 5_000_000,
+      notes: null,
+      status: 'ACTIVE',
+      cancelledAt: null,
+      createdAt: '2026-11-24T00:00:00Z',
+      slots: [{ eventDate: '2030-01-09', slot: 'FULL_DAY' }],
+    };
+    (await pending('/api/v1/owner/auditoriums/v1/offline-bookings?status=ALL')).flush({
+      items: [booking],
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Lakshmi Nair');
+    expect(el.textContent).toContain('Balance');
+
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    [...el.querySelectorAll('button')]
+      .find((b) => b.textContent?.includes('Cancel booking'))!
+      .click();
+    expect(confirm.mock.calls[0]![0]).toContain('Lakshmi Nair');
+    const cancel = await pending('/api/v1/owner/offline-bookings/o1/cancel');
+    expect(cancel.request.method).toBe('POST');
+    cancel.flush({ ...booking, status: 'CANCELLED', slots: [] });
+    (await pending('/api/v1/owner/auditoriums/v1/offline-bookings?status=ALL')).flush({
+      items: [],
+    });
+    confirm.mockRestore();
   });
 
   it('exposes tabs with proper roles', async () => {
