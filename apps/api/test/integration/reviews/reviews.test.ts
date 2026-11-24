@@ -4,11 +4,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   auditLogs,
   auditoriums,
+  availabilityBlocks,
   bookings,
   cities,
   halls,
+  offlineBookings,
   ownerStaff,
   reviews,
+  users,
 } from '../../../src/db/schema/index.js';
 import { bookingValues, hasTestDb } from '../../db-helpers.js';
 import { Client, type Harness, createHarness, createUser } from '../../auth-harness.js';
@@ -23,8 +26,17 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
   const pastDate = () =>
     new Date(Date.UTC(2025, 0, 1) + day++ * 86_400_000).toISOString().slice(0, 10);
 
-  async function login(role: 'CUSTOMER' | 'OWNER' | 'ADMIN' | 'OWNER_STAFF', fullName?: string) {
-    const u = await createUser(h.db, role, fullName ? { fullName } : {});
+  /** A unique, valid Indian mobile number. */
+  const randomPhone = () => `+919${String(Math.floor(Math.random() * 1e9)).padStart(9, '0')}`;
+
+  async function login(
+    role: 'CUSTOMER' | 'OWNER' | 'ADMIN' | 'OWNER_STAFF',
+    fullName?: string,
+    extra: { phone?: string | null } = {},
+  ) {
+    // Reviewers need a phone number on their account; customers get one unless a test says not.
+    const phone = 'phone' in extra ? extra.phone : role === 'CUSTOMER' ? randomPhone() : null;
+    const u = await createUser(h.db, role, { ...(fullName ? { fullName } : {}), phone });
     const c = new Client(h.app);
     await c.login(u.email);
     return { ...u, c };
@@ -247,5 +259,138 @@ describe.skipIf(!hasTestDb)('reviews', { timeout: 120_000 }, () => {
         .status,
     ).toBe(404);
     expect((await c.send('get', '/api/v1/auditoriums/not-a-uuid/reviews')).status).toBe(404);
+  });
+
+  it("needs a phone number on the account, and keeps the reviewer's details", async () => {
+    const noPhone = await login('CUSTOMER', 'Meera Pillai', { phone: null });
+    const refused = await noPhone.c.send(
+      'post',
+      `/api/v1/bookings/${await booking(noPhone.id)}/review`,
+      { rating: 5 },
+    );
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe('PHONE_REQUIRED');
+
+    const cust = await login('CUSTOMER', 'Anu Varghese');
+    const ok = await cust.c.send('post', `/api/v1/bookings/${await booking(cust.id)}/review`, {
+      rating: 5,
+    });
+    expect(ok.status).toBe(201);
+    const [stored] = await h.db.select().from(reviews).where(eq(reviews.id, ok.body.id));
+    const [account] = await h.db.select().from(users).where(eq(users.id, cust.id));
+    expect(stored).toMatchObject({
+      reviewerName: 'Anu Varghese',
+      reviewerEmail: cust.email,
+      reviewerPhone: account!.phone,
+    });
+
+    // Changing the account later doesn't rewrite who wrote the review.
+    await h.db.update(users).set({ fullName: 'Someone Else' }).where(eq(users.id, cust.id));
+    const admin = await login('ADMIN');
+    const list = await admin.c.send('get', '/api/v1/admin/reviews?limit=50');
+    expect(list.body.items.find((i: { id: string }) => i.id === ok.body.id)).toMatchObject({
+      customerName: 'Anu Varghese',
+      customerEmail: cust.email,
+      customerPhone: account!.phone,
+      source: 'APP',
+    });
+  });
+
+  describe('guests of bookings taken offline', () => {
+    async function offlineBooking(phone: string, dates: string[], status = 'ACTIVE') {
+      const [ob] = await h.db
+        .insert(offlineBookings)
+        .values({
+          auditoriumId: venueId,
+          hallId,
+          customerName: 'Guest',
+          customerPhone: phone,
+          status,
+        })
+        .returning();
+      for (const eventDate of dates) {
+        await h.db
+          .insert(availabilityBlocks)
+          .values({ hallId, eventDate, slot: 'FULL_DAY', offlineBookingId: ob!.id });
+      }
+      return ob!.id;
+    }
+    const futureDate = () =>
+      new Date(Date.now() + (200 + day++) * 86_400_000).toISOString().slice(0, 10);
+    const review = (c: Client, id: string, body: object) =>
+      c.send('post', `/api/v1/offline-bookings/${id}/review`, body);
+
+    it('can review once the event is over, only from a verified number that matches', async () => {
+      const phone = randomPhone();
+      const [d1, d2] = [pastDate(), pastDate()];
+      const id = await offlineBooking(phone, [d1, d2]);
+      const guest = await login('CUSTOMER', 'Deepa Menon', { phone });
+
+      // The number is on the account but not verified: nothing is unlocked.
+      expect((await guest.c.send('get', '/api/v1/me/offline-bookings')).body.items).toEqual([]);
+      expect((await review(guest.c, id, { rating: 5 })).status).toBe(404);
+
+      await h.db.update(users).set({ phoneVerifiedAt: new Date() }).where(eq(users.id, guest.id));
+      const mine = await guest.c.send('get', '/api/v1/me/offline-bookings');
+      expect(mine.body.items).toEqual([
+        expect.objectContaining({
+          offlineBookingId: id,
+          venueName: 'Meenakshi Kalyana Mandapam',
+          firstDate: d1,
+          lastDate: d2,
+          canReview: true,
+          review: null,
+        }),
+      ]);
+
+      const before = (await rating()).ratingCount;
+      const posted = await review(guest.c, id, { rating: 4, body: 'Lovely sadya kitchen.' });
+      expect(posted.status).toBe(201);
+      expect((await rating()).ratingCount).toBe(before + 1);
+      const [stored] = await h.db.select().from(reviews).where(eq(reviews.id, posted.body.id));
+      expect(stored).toMatchObject({
+        offlineBookingId: id,
+        bookingId: null,
+        eventDate: d1,
+        reviewerName: 'Deepa Menon',
+        reviewerPhone: phone,
+      });
+      expect((await review(guest.c, id, { rating: 5 })).body.error.code).toBe('ALREADY_REVIEWED');
+      const after = await guest.c.send('get', '/api/v1/me/offline-bookings');
+      expect(after.body.items[0]).toMatchObject({ canReview: false, review: { rating: 4 } });
+
+      const pub = await new Client(h.app).send(
+        'get',
+        `/api/v1/auditoriums/${venueId}/reviews?limit=50`,
+      );
+      expect(pub.body.items.find((i: { id: string }) => i.id === posted.body.id).author).toBe(
+        'Deepa M.',
+      );
+      expect(JSON.stringify(pub.body)).not.toContain(phone);
+    });
+
+    it('refuses before the last date, other people, and cancelled bookings', async () => {
+      const phone = randomPhone();
+      const guest = await login('CUSTOMER', 'Joseph Mathew', { phone });
+      await h.db.update(users).set({ phoneVerifiedAt: new Date() }).where(eq(users.id, guest.id));
+
+      // A two-day booking whose second day is still ahead.
+      const upcoming = await offlineBooking(phone, [pastDate(), futureDate()]);
+      expect((await review(guest.c, upcoming, { rating: 5 })).body.error.code).toBe(
+        'NOT_REVIEWABLE',
+      );
+      const listed = await guest.c.send('get', '/api/v1/me/offline-bookings');
+      expect(
+        listed.body.items.find(
+          (i: { offlineBookingId: string }) => i.offlineBookingId === upcoming,
+        ),
+      ).toMatchObject({ canReview: false });
+
+      const someoneElses = await offlineBooking(randomPhone(), [pastDate()]);
+      expect((await review(guest.c, someoneElses, { rating: 1 })).status).toBe(404);
+
+      const cancelled = await offlineBooking(phone, [pastDate()], 'CANCELLED');
+      expect((await review(guest.c, cancelled, { rating: 1 })).status).toBe(404);
+    });
   });
 });
