@@ -6,3 +6,4 @@ export * from './listing.js';
 export * from './admin.js';
 export * from './booking.js';
 export * from './review.js';
+export * from './geo.js';

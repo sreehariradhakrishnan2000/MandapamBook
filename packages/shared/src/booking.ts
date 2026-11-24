@@ -19,30 +19,57 @@ export const SEARCH_SORTS = [
   'price_desc',
   'rating',
   'capacity',
+  'distance',
 ] as const;
 
-/** Public venue search. Prices are paise; dates are IST calendar dates. */
-export const searchQuerySchema = z.strictObject({
-  city: z
-    .string()
-    .regex(/^[a-z0-9-]{2,80}$/)
-    .optional(),
-  date: isoDate.optional(),
-  slot: slotSchema.optional(),
-  guests: z.coerce.number().int().min(1).max(20000).optional(),
-  maxPricePaise: z.coerce.number().int().min(0).max(10_000_000_00).optional(),
-  ac: boolParam.optional(),
-  minParking: z.coerce.number().int().min(0).max(5000).optional(),
-  minRooms: z.coerce.number().int().min(0).max(500).optional(),
-  catering: z.enum(['IN_HOUSE_ONLY', 'OUTSIDE_ALLOWED', 'NO_CATERING']).optional(),
-  decoration: z.enum(['IN_HOUSE_ONLY', 'OUTSIDE_ALLOWED', 'NOT_ALLOWED']).optional(),
-  amenities: csv.pipe(z.array(z.string().regex(/^[a-z0-9_]+$/)).max(20)).optional(),
-  minRating: z.coerce.number().min(1).max(5).optional(),
-  q: z.string().trim().max(80).optional(),
-  sort: z.enum(SEARCH_SORTS).default('recommended'),
-  page: z.coerce.number().int().min(1).max(100).default(1),
-  pageSize: z.coerce.number().int().min(1).max(50).default(12),
-});
+/** Radius used for a "near me" search when none is given. */
+export const DEFAULT_SEARCH_RADIUS_KM = 25;
+export const SEARCH_RADII_KM = [5, 10, 25, 50, 100] as const;
+
+/**
+ * Public venue search. Prices are paise; dates are IST calendar dates. `lat`/`lng` limit
+ * results to venues within `radiusKm` of that point and add a distance to each result.
+ */
+export const searchQuerySchema = z
+  .strictObject({
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
+    radiusKm: z.coerce.number().int().min(1).max(500).optional(),
+    city: z
+      .string()
+      .regex(/^[a-z0-9-]{2,80}$/)
+      .optional(),
+    date: isoDate.optional(),
+    slot: slotSchema.optional(),
+    guests: z.coerce.number().int().min(1).max(20000).optional(),
+    maxPricePaise: z.coerce.number().int().min(0).max(10_000_000_00).optional(),
+    ac: boolParam.optional(),
+    minParking: z.coerce.number().int().min(0).max(5000).optional(),
+    minRooms: z.coerce.number().int().min(0).max(500).optional(),
+    catering: z.enum(['IN_HOUSE_ONLY', 'OUTSIDE_ALLOWED', 'NO_CATERING']).optional(),
+    decoration: z.enum(['IN_HOUSE_ONLY', 'OUTSIDE_ALLOWED', 'NOT_ALLOWED']).optional(),
+    amenities: csv.pipe(z.array(z.string().regex(/^[a-z0-9_]+$/)).max(20)).optional(),
+    minRating: z.coerce.number().min(1).max(5).optional(),
+    q: z.string().trim().max(80).optional(),
+    sort: z.enum(SEARCH_SORTS).default('recommended'),
+    page: z.coerce.number().int().min(1).max(100).default(1),
+    pageSize: z.coerce.number().int().min(1).max(50).default(12),
+  })
+  .superRefine((q, ctx) => {
+    if ((q.lat === undefined) !== (q.lng === undefined)) {
+      ctx.addIssue({ code: 'custom', path: ['lat'], message: 'Give both lat and lng' });
+    }
+    if (q.sort === 'distance' && q.lat === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sort'],
+        message: 'Sorting by distance needs a location',
+      });
+    }
+    if (q.radiusKm !== undefined && q.lat === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['radiusKm'], message: 'A radius needs a location' });
+    }
+  });
 export type SearchQuery = z.input<typeof searchQuerySchema>;
 
 export interface SearchResult {
@@ -63,6 +90,8 @@ export interface SearchResult {
   photoUrl: string | null;
   /** True when a date was given and at least one matching hall is free. */
   available: boolean | null;
+  /** Kilometres from the searched location, to one decimal; null without `lat`/`lng`. */
+  distanceKm: number | null;
 }
 
 export const quoteRequestSchema = z.strictObject({
