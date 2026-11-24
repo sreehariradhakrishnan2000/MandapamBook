@@ -37,26 +37,26 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
       @if (venue(); as v) {
         <header class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <h1 class="font-display text-2xl font-bold">{{ v.name }}</h1>
+            <h1 class="font-display text-3xl font-medium">{{ v.name }}</h1>
             <app-status-chip [status]="v.status" />
           </div>
           @if (isOwner && (v.status === 'DRAFT' || v.status === 'REJECTED')) {
             <button
               type="button"
               (click)="submit()"
-              class="rounded-md bg-brand-600 px-4 py-2 font-semibold text-white"
+              class="rounded-full bg-brand-600 px-4 py-2 font-semibold text-white"
             >
               Submit for review
             </button>
           }
         </header>
         @if (v.status === 'REJECTED' && v.rejectionReason) {
-          <p class="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
+          <p class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
             Reviewer feedback: {{ v.rejectionReason }}
           </p>
         }
         @if (missing().length) {
-          <div class="rounded-md bg-brand-50 px-4 py-3 text-sm text-brand-700" role="alert">
+          <div class="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700" role="alert">
             <p class="font-semibold">Finish these before submitting:</p>
             <ul class="mt-1 list-disc pl-5">
               @for (m of missing(); track m) {
@@ -66,7 +66,7 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
           </div>
         }
         @if (message()) {
-          <p class="rounded-md bg-leaf-600/10 px-4 py-3 text-sm text-leaf-600" role="status">
+          <p class="rounded-xl bg-leaf-600/10 px-4 py-3 text-sm text-leaf-600" role="status">
             {{ message() }}
           </p>
         }
@@ -185,7 +185,7 @@ export class VenueEditor implements OnInit {
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
-      <h1 class="font-display text-2xl font-bold">Add a venue</h1>
+      <h1 class="font-display text-3xl font-medium">Add a venue</h1>
       <p class="text-slate-600">Start with the basics. You'll add halls, prices and photos next.</p>
       <app-venue-form (saved)="open($event.id)" />
     </section>

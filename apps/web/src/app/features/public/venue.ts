@@ -34,7 +34,7 @@ const POLICY_LABELS: Record<string, string> = {
     @if (venue(); as v) {
       <article class="flex flex-col gap-6 py-4">
         <header>
-          <h1 class="font-display text-3xl font-bold text-balance">{{ v.name }}</h1>
+          <h1 class="font-display text-3xl font-medium text-balance">{{ v.name }}</h1>
           <p class="mt-1 text-slate-600">
             {{ v.addressLine }}{{ v.locality ? ', ' + v.locality : '' }}, {{ v.city }}
             {{ v.pincode }}
@@ -55,19 +55,45 @@ const POLICY_LABELS: Record<string, string> = {
         </header>
 
         @if (v.photos.length) {
-          <div
-            class="flex snap-x gap-2 overflow-x-auto"
-            role="region"
-            aria-label="Photos"
-            tabindex="0"
-          >
-            @for (p of v.photos; track p.url) {
-              <img
-                [src]="p.url"
-                [alt]="p.altText || 'Photo of ' + v.name"
-                class="aspect-[4/3] w-72 shrink-0 snap-start rounded-lg object-cover sm:w-96"
-                loading="lazy"
-              />
+          <!-- A large lead photo with up to four beside it; any more scroll underneath. -->
+          <div role="region" aria-label="Photos" class="flex flex-col gap-2">
+            <div
+              class="grid gap-2"
+              [class.md:grid-cols-4]="v.photos.length > 1"
+              [class.md:grid-rows-2]="v.photos.length > 2"
+            >
+              @for (p of v.photos.slice(0, 5); track p.url; let i = $index) {
+                <img
+                  [src]="p.url"
+                  [alt]="p.altText || 'Photo of ' + v.name"
+                  class="h-full w-full rounded-2xl object-cover"
+                  [class]="
+                    i === 0
+                      ? 'aspect-[3/2] md:col-span-2 md:row-span-2 md:aspect-auto md:min-h-96'
+                      : 'hidden aspect-[3/2] md:block' +
+                        (v.photos.length === 2 ? ' md:col-span-2 md:aspect-auto' : '')
+                  "
+                  [attr.loading]="i === 0 ? null : 'lazy'"
+                />
+              }
+            </div>
+            <!-- Phones see the lead photo above and the rest here; wide screens only the 6th on. -->
+            @for (row of overflowRows(v.photos.length); track row.from) {
+              <div
+                class="flex snap-x gap-2 overflow-x-auto"
+                [class]="row.className"
+                tabindex="0"
+                aria-label="More photos"
+              >
+                @for (p of v.photos.slice(row.from); track p.url) {
+                  <img
+                    [src]="p.url"
+                    [alt]="p.altText || 'Photo of ' + v.name"
+                    class="aspect-[4/3] w-60 shrink-0 snap-start rounded-xl object-cover"
+                    loading="lazy"
+                  />
+                }
+              </div>
             }
           </div>
         }
@@ -77,9 +103,9 @@ const POLICY_LABELS: Record<string, string> = {
         }
 
         <section aria-labelledby="halls-h" class="flex flex-col gap-3">
-          <h2 id="halls-h" class="font-display text-xl font-semibold">Halls and prices</h2>
+          <h2 id="halls-h" class="font-display text-xl font-medium">Halls and prices</h2>
           @for (h of v.halls; track h.id) {
-            <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <div class="rounded-2xl border border-slate-200 bg-white p-4">
               <p class="font-semibold">
                 {{ h.name }}
                 <span class="font-normal text-slate-600"
@@ -91,7 +117,7 @@ const POLICY_LABELS: Record<string, string> = {
                 @for (s of slots; track s) {
                   @if (h.basePrices[s]; as price) {
                     <li
-                      class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm"
+                      class="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm"
                     >
                       <span
                         >{{ slotLabels[s] }}<br /><span class="font-semibold tabular-nums">{{
@@ -106,7 +132,7 @@ const POLICY_LABELS: Record<string, string> = {
                           guests: guests() || null,
                           slug: v.slug,
                         }"
-                        class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white"
+                        class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
                         >Book</a
                       >
                     </li>
@@ -123,12 +149,12 @@ const POLICY_LABELS: Record<string, string> = {
 
         <section aria-labelledby="avail-h" class="flex flex-col gap-2">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <h2 id="avail-h" class="font-display text-xl font-semibold">Availability</h2>
+            <h2 id="avail-h" class="font-display text-xl font-medium">Availability</h2>
             <div class="flex items-center gap-2">
               <button
                 type="button"
                 (click)="shift(-1)"
-                class="rounded border px-2 py-1"
+                class="rounded-full border border-slate-300 bg-white px-3 py-1 hover:border-slate-400"
                 aria-label="Previous month"
               >
                 ‹
@@ -139,7 +165,7 @@ const POLICY_LABELS: Record<string, string> = {
               <button
                 type="button"
                 (click)="shift(1)"
-                class="rounded border px-2 py-1"
+                class="rounded-full border border-slate-300 bg-white px-3 py-1 hover:border-slate-400"
                 aria-label="Next month"
               >
                 ›
@@ -167,7 +193,7 @@ const POLICY_LABELS: Record<string, string> = {
         <section aria-labelledby="facts-h" class="grid gap-4 sm:grid-cols-2">
           <h2 id="facts-h" class="sr-only">Venue details</h2>
           <dl
-            class="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-white p-4 text-sm"
+            class="grid grid-cols-2 gap-x-4 gap-y-1 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
           >
             <dt class="text-slate-500">Catering</dt>
             <dd>{{ policy(v.cateringPolicy) }}</dd>
@@ -184,7 +210,7 @@ const POLICY_LABELS: Record<string, string> = {
             <dt class="text-slate-500">Advance online</dt>
             <dd>{{ v.advancePercent }}% + platform fee</dd>
           </dl>
-          <div class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm">
+          <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm">
             <p class="font-semibold">Amenities</p>
             <p>
               @for (a of v.amenities; track a.code) {
@@ -210,10 +236,10 @@ const POLICY_LABELS: Record<string, string> = {
 
         @if (v.addons.length) {
           <section aria-labelledby="addons-h">
-            <h2 id="addons-h" class="font-display text-xl font-semibold">Add-ons</h2>
+            <h2 id="addons-h" class="font-display text-xl font-medium">Add-ons</h2>
             <ul class="mt-2 grid gap-2 text-sm sm:grid-cols-2">
               @for (a of v.addons; track a.id) {
-                <li class="rounded-md bg-white px-3 py-2 ring-1 ring-slate-200">
+                <li class="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200">
                   {{ a.name }}: {{ a.pricePaise | inr
                   }}{{
                     a.unit === 'PER_ROOM' ? ' per room' : a.unit === 'PER_HOUR' ? ' per hour' : ''
@@ -225,7 +251,7 @@ const POLICY_LABELS: Record<string, string> = {
         }
 
         <section aria-labelledby="reviews-h" class="flex flex-col gap-3">
-          <h2 id="reviews-h" class="font-display text-xl font-semibold">
+          <h2 id="reviews-h" class="font-display text-xl font-medium">
             Reviews
             @if (reviews()?.ratingAvg; as avg) {
               <span class="text-base font-normal text-slate-600"
@@ -235,7 +261,7 @@ const POLICY_LABELS: Record<string, string> = {
           </h2>
           <ul class="flex flex-col gap-3">
             @for (r of reviews()?.items ?? []; track r.id) {
-              <li class="rounded-md bg-white p-3 text-sm ring-1 ring-slate-200">
+              <li class="rounded-xl bg-white p-3 text-sm ring-1 ring-slate-200">
                 <p class="flex flex-wrap justify-between gap-2">
                   <span class="font-semibold"
                     ><span class="text-amber-500" [attr.aria-label]="r.rating + ' out of 5'">{{
@@ -261,7 +287,7 @@ const POLICY_LABELS: Record<string, string> = {
           @if ((reviews()?.items?.length ?? 0) < (reviews()?.ratingCount ?? 0)) {
             <button
               type="button"
-              class="w-fit rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+              class="w-fit rounded-full border border-slate-300 px-3 py-1.5 text-sm"
               (click)="moreReviews()"
             >
               More reviews
@@ -271,7 +297,7 @@ const POLICY_LABELS: Record<string, string> = {
       </article>
     } @else if (notFound()) {
       <section class="py-16 text-center">
-        <h1 class="font-display text-2xl font-bold">Venue not found</h1>
+        <h1 class="font-display text-3xl font-medium">Venue not found</h1>
         <a routerLink="/" class="mt-4 inline-block text-brand-700 underline">Search halls</a>
       </section>
     } @else {
@@ -356,6 +382,14 @@ export class Venue {
     const [y, m] = this.month().split('-').map(Number) as [number, number];
     const d = new Date(Date.UTC(y, m - 1 + by, 1));
     this.month.set(d.toISOString().slice(0, 7));
+  }
+
+  /** Photo rows under the gallery: phones scroll photos 2+, wide screens photos 6+. */
+  protected overflowRows(n: number): { from: number; className: string }[] {
+    const rows: { from: number; className: string }[] = [];
+    if (n > 1) rows.push({ from: 1, className: 'md:hidden' });
+    if (n > 5) rows.push({ from: 5, className: 'hidden md:flex' });
+    return rows;
   }
 
   protected policy(code: string): string {

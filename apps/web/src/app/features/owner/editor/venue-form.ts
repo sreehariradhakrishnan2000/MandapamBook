@@ -21,13 +21,13 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../../shared/form-field
   template: `
     <form [formGroup]="form" (ngSubmit)="save()" class="grid gap-4 sm:grid-cols-2" novalidate>
       @if (error()) {
-        <p class="sm:col-span-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="sm:col-span-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
       @if (showSaved()) {
         <p
-          class="sm:col-span-2 rounded-md bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600"
+          class="sm:col-span-2 rounded-xl bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600"
           role="status"
         >
           Saved.

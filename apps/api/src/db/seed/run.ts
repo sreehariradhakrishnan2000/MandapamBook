@@ -3,11 +3,14 @@
  *   pnpm db:seed              master data + fictional sample venues (dev/test only)
  *   pnpm db:seed --master     master data only (allowed in production)
  *   SEED_DEMO_PASSWORD=...    also give demo accounts for every role that password (dev only)
+ *   STORAGE_PROVIDER=s3       also upload photos for the sample venues (S3_* must be set)
  */
 import pg from 'pg';
 import { z } from 'zod';
+import { createObjectStorage } from '../../infra/storage.js';
 import { createDb } from '../client.js';
 import { seedDemoUsers } from './demo-users.js';
+import { seedSamplePhotos } from './sample-photos.js';
 import { seedMasterData, seedSampleData } from './seed.js';
 
 const env = z
@@ -15,8 +18,21 @@ const env = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     DATABASE_URL: z.url(),
     SEED_DEMO_PASSWORD: z.union([z.literal(''), z.string().min(10)]).optional(),
+    STORAGE_PROVIDER: z.enum(['s3', 'memory']).default('memory'),
+    S3_ENDPOINT: z.url().optional(),
+    S3_REGION: z.string().min(1).default('us-east-1'),
+    S3_BUCKET: z.string().min(3).default('mandapambook-media'),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_FORCE_PATH_STYLE: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
   })
-  .safeParse(process.env);
+  .safeParse(
+    // Empty .env entries mean "unset", not an empty value.
+    Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== '')),
+  );
 
 if (!env.success) {
   console.error('Set DATABASE_URL to run the seed.');
@@ -42,6 +58,13 @@ try {
     console.error(
       `Sample data: ${sample.auditoriumsCreated} venues created, ${sample.auditoriumsSkipped} already present.`,
     );
+    // Photos need real object storage: an in-memory store would vanish with this process.
+    if (env.data.STORAGE_PROVIDER === 's3') {
+      const photos = await seedSamplePhotos(db, createObjectStorage(env.data));
+      console.error(`Sample photos: ${photos.photos} uploaded for ${photos.venues} venues.`);
+    } else {
+      console.error('Sample photos: skipped (set STORAGE_PROVIDER=s3 to upload them).');
+    }
     if (env.data.SEED_DEMO_PASSWORD) {
       const n = await seedDemoUsers(db, env.data.SEED_DEMO_PASSWORD);
       console.error(`Demo accounts: ${n} users can sign in with SEED_DEMO_PASSWORD.`);

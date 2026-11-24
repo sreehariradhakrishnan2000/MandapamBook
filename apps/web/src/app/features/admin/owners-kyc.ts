@@ -11,11 +11,11 @@ import { errorMessage } from '../../core/auth/auth.service';
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
-      <h1 class="font-display text-2xl font-bold">Owner KYC</h1>
+      <h1 class="font-display text-3xl font-medium">Owner KYC</h1>
       <label class="text-sm"
         >Show
         <select
-          class="ml-1 rounded-md border border-slate-300 px-2 py-1.5"
+          class="ml-1 rounded-xl border border-slate-300 px-2 py-1.5"
           [(ngModel)]="status"
           (ngModelChange)="load()"
         >
@@ -26,14 +26,14 @@ import { errorMessage } from '../../core/auth/auth.service';
         </select>
       </label>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
 
       <ul class="flex flex-col gap-3">
         @for (o of items(); track o.ownerId) {
-          <li class="rounded-md border border-slate-200 bg-white p-4 text-sm">
+          <li class="rounded-xl border border-slate-200 bg-white p-4 text-sm">
             <p class="font-semibold">
               {{ o.businessName }}
               <span class="font-normal text-slate-500">· {{ o.fullName }} · {{ o.email }}</span>
@@ -59,14 +59,14 @@ import { errorMessage } from '../../core/auth/auth.service';
                 <label class="flex flex-col gap-1"
                   >Reason for viewing full numbers
                   <input
-                    class="rounded-md border border-slate-300 px-2 py-1"
+                    class="rounded-xl border border-slate-300 px-2 py-1"
                     [(ngModel)]="purpose[o.ownerId]"
                     placeholder="e.g. match PAN card"
                   />
                 </label>
                 <button
                   type="button"
-                  class="rounded-md border border-slate-300 px-3 py-1"
+                  class="rounded-full border border-slate-300 px-3 py-1"
                   (click)="reveal(o)"
                 >
                   Show full numbers
@@ -75,7 +75,7 @@ import { errorMessage } from '../../core/auth/auth.service';
               @if (o.kycStatus === 'SUBMITTED') {
                 <button
                   type="button"
-                  class="rounded-md bg-leaf-600 px-3 py-1 font-semibold text-white"
+                  class="rounded-full bg-leaf-600 px-3 py-1 font-semibold text-white"
                   (click)="verify(o)"
                 >
                   Verify
@@ -83,13 +83,13 @@ import { errorMessage } from '../../core/auth/auth.service';
                 <label class="flex flex-col gap-1"
                   >Rejection reason
                   <input
-                    class="rounded-md border border-slate-300 px-2 py-1"
+                    class="rounded-xl border border-slate-300 px-2 py-1"
                     [(ngModel)]="rejectReason[o.ownerId]"
                   />
                 </label>
                 <button
                   type="button"
-                  class="rounded-md border border-red-300 px-3 py-1 text-red-700"
+                  class="rounded-full border border-red-300 px-3 py-1 text-red-700"
                   (click)="reject(o)"
                 >
                   Reject

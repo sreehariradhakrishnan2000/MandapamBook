@@ -23,32 +23,32 @@ const today = () =>
   template: `
     <section class="flex flex-col gap-4 py-4">
       <header class="flex flex-wrap items-end justify-between gap-3">
-        <h1 class="font-display text-2xl font-bold">Reports</h1>
+        <h1 class="font-display text-3xl font-medium">Reports</h1>
         <div class="flex flex-wrap items-end gap-2 text-sm">
           <label class="flex flex-col"
             >From
             <input
               type="date"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="from"
           /></label>
           <label class="flex flex-col"
             >To
             <input
               type="date"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="to"
           /></label>
           <button
             type="button"
-            class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white"
+            class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
             (click)="load()"
           >
             Show
           </button>
           <button
             type="button"
-            class="rounded-md border border-slate-300 bg-white px-3 py-1.5"
+            class="rounded-full border border-slate-300 bg-white px-3 py-1.5"
             [disabled]="exporting()"
             (click)="exportCsv()"
           >
@@ -63,7 +63,7 @@ const today = () =>
         </p>
         <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
           @for (m of metrics(s); track m.label) {
-            <div class="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+            <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
               <dt class="text-slate-600">{{ m.label }}</dt>
               <dd class="text-lg font-semibold tabular-nums">{{ m.value | inr }}</dd>
             </div>
@@ -72,7 +72,7 @@ const today = () =>
         <div class="grid gap-4 sm:grid-cols-2">
           <section
             aria-labelledby="status-h"
-            class="rounded-lg bg-white p-3 text-sm ring-1 ring-slate-200"
+            class="rounded-2xl bg-white p-3 text-sm ring-1 ring-slate-200"
           >
             <h2 id="status-h" class="font-semibold">Bookings by status</h2>
             <ul class="mt-1 tabular-nums">
@@ -87,7 +87,7 @@ const today = () =>
           </section>
           <section
             aria-labelledby="cities-h"
-            class="rounded-lg bg-white p-3 text-sm ring-1 ring-slate-200"
+            class="rounded-2xl bg-white p-3 text-sm ring-1 ring-slate-200"
           >
             <h2 id="cities-h" class="font-semibold">Top cities</h2>
             <ol class="mt-1 tabular-nums">
@@ -103,7 +103,7 @@ const today = () =>
         </div>
       }
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
@@ -169,11 +169,11 @@ export class AdminReports implements OnInit {
   template: `
     <section class="flex flex-col gap-4 py-4">
       <header class="flex flex-wrap items-end justify-between gap-3">
-        <h1 class="font-display text-2xl font-bold">Owner payouts</h1>
+        <h1 class="font-display text-3xl font-medium">Owner payouts</h1>
         <label class="flex flex-col text-sm"
           >Status
           <select
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [ngModel]="status()"
             (ngModelChange)="status.set($event); load()"
           >
@@ -210,13 +210,13 @@ export class AdminReports implements OnInit {
                       <label class="sr-only" [for]="'ref-' + p.id">Transfer reference</label>
                       <input
                         [id]="'ref-' + p.id"
-                        class="w-36 rounded-md border border-slate-300 px-2 py-1"
+                        class="w-36 rounded-xl border border-slate-300 px-2 py-1"
                         placeholder="UTR / reference"
                         [(ngModel)]="refs[p.id]"
                         [name]="'ref-' + p.id"
                       />
                       <button
-                        class="rounded-md bg-brand-600 px-2 py-1 font-semibold text-white disabled:opacity-50"
+                        class="rounded-full bg-brand-600 px-2 py-1 font-semibold text-white disabled:opacity-50"
                         [disabled]="!refs[p.id]?.trim()"
                       >
                         Mark paid
@@ -234,7 +234,7 @@ export class AdminReports implements OnInit {
         </table>
       </div>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
@@ -274,11 +274,11 @@ export class AdminPayouts implements OnInit {
   template: `
     <section class="flex flex-col gap-4 py-4">
       <header class="flex flex-wrap items-end justify-between gap-3">
-        <h1 class="font-display text-2xl font-bold">Review moderation</h1>
+        <h1 class="font-display text-3xl font-medium">Review moderation</h1>
         <label class="flex flex-col text-sm"
           >Show
           <select
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [ngModel]="status()"
             (ngModelChange)="status.set($event); load()"
           >
@@ -289,7 +289,7 @@ export class AdminPayouts implements OnInit {
       </header>
       <ul class="flex flex-col gap-3">
         @for (r of items(); track r.id) {
-          <li class="flex flex-col gap-2 rounded-lg bg-white p-4 text-sm ring-1 ring-slate-200">
+          <li class="flex flex-col gap-2 rounded-2xl bg-white p-4 text-sm ring-1 ring-slate-200">
             <p class="flex flex-wrap justify-between gap-2">
               <span class="font-semibold">{{ r.rating }}/5 · {{ r.venueName }}</span>
               <span class="text-slate-500"
@@ -303,12 +303,12 @@ export class AdminPayouts implements OnInit {
               <label class="flex flex-col"
                 >Reason (recorded in the audit log)
                 <input
-                  class="rounded-md border border-slate-300 px-2 py-1"
+                  class="rounded-xl border border-slate-300 px-2 py-1"
                   [(ngModel)]="reasons[r.id]"
                   [name]="'reason-' + r.id"
               /></label>
               <button
-                class="rounded-md border px-3 py-1 font-semibold disabled:opacity-50"
+                class="rounded-full border px-3 py-1 font-semibold disabled:opacity-50"
                 [class.border-red-300]="r.status === 'PUBLISHED'"
                 [class.text-red-700]="r.status === 'PUBLISHED'"
                 [disabled]="(reasons[r.id] ?? '').trim().length < 3"
@@ -322,7 +322,7 @@ export class AdminPayouts implements OnInit {
         }
       </ul>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }

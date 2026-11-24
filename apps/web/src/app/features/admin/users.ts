@@ -13,19 +13,19 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
-      <h1 class="font-display text-2xl font-bold">Users</h1>
+      <h1 class="font-display text-3xl font-medium">Users</h1>
       <form class="flex flex-wrap items-end gap-2 text-sm" (ngSubmit)="load()">
         <label class="flex flex-col gap-1"
           >Name, email or phone<input
             name="q"
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="q"
         /></label>
         <label class="flex flex-col gap-1"
           >Role
           <select
             name="role"
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="role"
           >
             <option value="">Any</option>
@@ -34,16 +34,19 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
             }
           </select>
         </label>
-        <button type="submit" class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white">
+        <button
+          type="submit"
+          class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
+        >
           Search
         </button>
       </form>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
-      <div class="overflow-x-auto rounded-md border border-slate-200 bg-white">
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table class="w-full min-w-[40rem] text-sm">
           <caption class="sr-only">
             Users
@@ -71,7 +74,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
                     <label class="sr-only" [for]="'role-' + u.id">Role for {{ u.fullName }}</label>
                     <select
                       [id]="'role-' + u.id"
-                      class="rounded border border-slate-300 px-1 py-0.5"
+                      class="rounded-xl border border-slate-300 px-1 py-0.5"
                       [ngModel]="u.role"
                       (ngModelChange)="changeRole(u, $event)"
                     >
@@ -120,7 +123,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
       </div>
       <label class="flex max-w-md flex-col gap-1 text-sm"
         >Reason for suspending or reactivating (required)
-        <input class="rounded-md border border-slate-300 px-2 py-1.5" [(ngModel)]="reason" />
+        <input class="rounded-xl border border-slate-300 px-2 py-1.5" [(ngModel)]="reason" />
       </label>
     </section>
   `,

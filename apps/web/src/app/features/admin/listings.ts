@@ -23,13 +23,13 @@ import { StatusChip } from '../owner/status-chip';
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
-      <h1 class="font-display text-2xl font-bold">Listing approvals</h1>
+      <h1 class="font-display text-3xl font-medium">Listing approvals</h1>
       <form class="flex flex-wrap items-end gap-2 text-sm" (ngSubmit)="load()">
         <label class="flex flex-col gap-1"
           >Status
           <select
             name="status"
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="status"
           >
             <option value="PENDING_REVIEW">In review</option>
@@ -42,15 +42,18 @@ import { StatusChip } from '../owner/status-chip';
         <label class="flex flex-col gap-1"
           >Search venue or owner email<input
             name="q"
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="q"
         /></label>
-        <button type="submit" class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white">
+        <button
+          type="submit"
+          class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
+        >
           Show
         </button>
       </form>
       <p class="text-sm text-slate-600" aria-live="polite">{{ total() }} listing(s)</p>
-      <ul class="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
+      <ul class="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
         @for (l of items(); track l.id) {
           <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
             <span class="min-w-0">
@@ -102,7 +105,7 @@ export class AdminListings implements OnInit {
       >
       @if (detail(); as d) {
         <header class="flex flex-wrap items-center gap-3">
-          <h1 class="font-display text-2xl font-bold">{{ d.name }}</h1>
+          <h1 class="font-display text-3xl font-medium">{{ d.name }}</h1>
           <app-status-chip [status]="d.status" />
         </header>
         <p class="text-sm text-slate-600">
@@ -112,7 +115,7 @@ export class AdminListings implements OnInit {
         </p>
 
         @if (d.gaps.length || d.owner.kycStatus !== 'VERIFIED') {
-          <div class="rounded-md bg-brand-50 px-4 py-3 text-sm text-brand-700">
+          <div class="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700">
             <p class="font-semibold">Blocking approval</p>
             <ul class="list-disc pl-5">
               @if (d.owner.kycStatus !== 'VERIFIED') {
@@ -175,17 +178,17 @@ export class AdminListings implements OnInit {
         </p>
 
         <form
-          class="flex flex-col gap-3 rounded-md border border-slate-200 bg-white p-4"
+          class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4"
           (ngSubmit)="decide()"
         >
           <h2 class="font-semibold">Decision</h2>
           @if (error()) {
-            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               {{ error() }}
             </p>
           }
           @if (done()) {
-            <p class="rounded-md bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
+            <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
               {{ done() }}
             </p>
           }
@@ -206,14 +209,14 @@ export class AdminListings implements OnInit {
                 rows="3"
                 minlength="10"
                 required
-                class="rounded-md border border-slate-300 px-2 py-1.5"
+                class="rounded-xl border border-slate-300 px-2 py-1.5"
                 [(ngModel)]="reason"
               ></textarea>
             </label>
           }
           <button
             type="submit"
-            class="w-fit rounded-md bg-brand-600 px-4 py-2 font-semibold text-white"
+            class="w-fit rounded-full bg-brand-600 px-4 py-2 font-semibold text-white"
             [disabled]="!options().length"
           >
             Confirm

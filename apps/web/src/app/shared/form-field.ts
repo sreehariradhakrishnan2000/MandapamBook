@@ -24,7 +24,7 @@ export class FormField {
 }
 
 export const INPUT_CLASS =
-  'w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-base shadow-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/40 aria-[invalid=true]:border-red-600';
+  'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/40 aria-[invalid=true]:border-red-600';
 
 export const BUTTON_CLASS =
-  'inline-flex w-full items-center justify-center rounded-md bg-brand-600 px-4 py-2.5 font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex w-full items-center justify-center rounded-full bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60';

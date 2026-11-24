@@ -40,7 +40,8 @@ test('a customer searches, holds a date, pays in test mode and gets a confirmati
 
   let refCode = '';
   await test.step('customer holds the date with a 10-minute hold', async () => {
-    await page.getByRole('link', { name: 'Book' }).last().click();
+    // Exact and inside main: "My bookings" in the footer would otherwise match last.
+    await page.getByRole('main').getByRole('link', { name: 'Book', exact: true }).last().click();
     await expect(page.getByRole('heading', { name: /Book Main Hall/ })).toBeVisible();
     await expect(page.getByLabel('Guests')).toHaveValue('500');
     await page.getByRole('button', { name: 'Hold this date' }).click();

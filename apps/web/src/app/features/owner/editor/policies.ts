@@ -30,12 +30,12 @@ const DEFAULT_TIERS: CancellationTier[] = [
   template: `
     <div class="flex flex-col gap-8">
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
       @if (message()) {
-        <p class="rounded-md bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
+        <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
           {{ message() }}
         </p>
       }
@@ -58,7 +58,7 @@ const DEFAULT_TIERS: CancellationTier[] = [
         <button
           type="button"
           (click)="saveAmenities()"
-          class="w-fit rounded-md border border-brand-600 px-3 py-1.5 text-sm font-semibold text-brand-700"
+          class="w-fit rounded-full border border-brand-600 px-3 py-1.5 text-sm font-semibold text-brand-700"
         >
           Save amenities
         </button>
@@ -77,7 +77,7 @@ const DEFAULT_TIERS: CancellationTier[] = [
               type="number"
               min="0"
               max="365"
-              class="w-20 rounded-md border border-slate-300 px-2 py-1"
+              class="w-20 rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="t.minDaysBefore"
             />
             <span>days before:</span>
@@ -87,7 +87,7 @@ const DEFAULT_TIERS: CancellationTier[] = [
               type="number"
               min="0"
               max="100"
-              class="w-20 rounded-md border border-slate-300 px-2 py-1"
+              class="w-20 rounded-xl border border-slate-300 px-2 py-1"
               [(ngModel)]="t.refundPercent"
             />
             <span>% refund</span>
@@ -96,7 +96,7 @@ const DEFAULT_TIERS: CancellationTier[] = [
         <button
           type="button"
           (click)="savePolicy()"
-          class="w-fit rounded-md border border-brand-600 px-3 py-1.5 text-sm font-semibold text-brand-700"
+          class="w-fit rounded-full border border-brand-600 px-3 py-1.5 text-sm font-semibold text-brand-700"
         >
           Save policy
         </button>
@@ -124,19 +124,19 @@ const DEFAULT_TIERS: CancellationTier[] = [
         <div class="flex flex-wrap items-end gap-2 text-sm">
           <label class="flex flex-col gap-1"
             >Name<input
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="addonName"
           /></label>
           <label class="flex flex-col gap-1"
             >Price (₹)<input
               type="number"
               min="0"
-              class="w-28 rounded-md border border-slate-300 px-2 py-1.5"
+              class="w-28 rounded-xl border border-slate-300 px-2 py-1.5"
               [(ngModel)]="addonRupees"
           /></label>
           <label class="flex flex-col gap-1"
             >Charged
-            <select class="rounded-md border border-slate-300 px-2 py-1.5" [(ngModel)]="addonUnit">
+            <select class="rounded-xl border border-slate-300 px-2 py-1.5" [(ngModel)]="addonUnit">
               <option value="PER_EVENT">per event</option>
               <option value="PER_ROOM">per room</option>
               <option value="PER_HOUR">per hour</option>
@@ -145,7 +145,7 @@ const DEFAULT_TIERS: CancellationTier[] = [
           <button
             type="button"
             (click)="addAddon()"
-            class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white"
+            class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
           >
             Add
           </button>

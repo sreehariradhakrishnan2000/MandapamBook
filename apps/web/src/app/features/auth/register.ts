@@ -22,9 +22,9 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
   imports: [ReactiveFormsModule, RouterLink, FormField],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="mx-auto max-w-sm py-8">
+    <section class="auth-card">
       @if (done()) {
-        <h1 class="font-display text-2xl font-bold">Check your email</h1>
+        <h1 class="font-display text-3xl font-medium">Check your email</h1>
         <p class="mt-2 text-slate-600">
           We sent a verification link to <strong>{{ form.controls.email.value }}</strong>. Open it
           within 24 hours, then sign in.
@@ -33,10 +33,10 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
           >Go to sign in</a
         >
       } @else {
-        <h1 class="font-display text-2xl font-bold">Create your account</h1>
+        <h1 class="font-display text-3xl font-medium">Create your account</h1>
         <form [formGroup]="form" (ngSubmit)="submit()" class="mt-6 flex flex-col gap-4" novalidate>
           @if (error()) {
-            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               {{ error() }}
             </p>
           }

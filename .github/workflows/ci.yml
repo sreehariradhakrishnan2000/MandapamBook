@@ -49,6 +49,8 @@ jobs:
           pnpm --filter @mandapambook/api test:unit
           pnpm --filter @mandapambook/web test
       - run: pnpm build
+      - name: Web build has nothing inline that the CSP would block
+        run: node scripts/check-csp-html.mjs apps/web/dist/web/browser/index.html
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
