@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { errorMessage } from '../../core/auth/auth.service';
+import { AuthService, errorMessage } from '../../core/auth/auth.service';
 import {
   type BookingDetail,
   type BookingSummary,
@@ -22,13 +22,14 @@ import { API } from '../../core/auth/auth.service';
 import { FileDownload } from '../../core/file-download';
 import { InsightsApi } from '../../core/insights-api.service';
 import { InrPipe } from '../../shared/inr.pipe';
+import { OfflineReviews } from './offline-reviews';
 
 const CANCELLABLE = new Set(['HELD', 'PENDING_PAYMENT', 'AWAITING_OWNER', 'CONFIRMED']);
 const INVOICEABLE = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED']);
 
 @Component({
   selector: 'app-my-bookings',
-  imports: [DatePipe, RouterLink, InrPipe],
+  imports: [DatePipe, RouterLink, InrPipe, OfflineReviews],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
@@ -64,6 +65,7 @@ const INVOICEABLE = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCEL
           }
         }
       </ul>
+      <app-offline-reviews class="mt-6" />
     </section>
   `,
 })
@@ -148,6 +150,17 @@ export class MyBookings implements OnInit {
               <p>
                 Thank you. You rated this venue
                 <span class="font-semibold">{{ r.rating }} out of 5</span>.
+              </p>
+            } @else if (!auth.user()?.phone) {
+              <p>
+                To keep reviews genuine, we need a mobile number on your account before you write
+                one.
+                <a
+                  routerLink="/account"
+                  fragment="phone"
+                  class="font-semibold text-brand-700 underline"
+                  >Add your mobile number</a
+                >
               </p>
             } @else {
               <fieldset class="flex flex-col gap-1">
@@ -257,6 +270,7 @@ export class BookingDetailPage implements OnInit {
   private readonly api = inject(BookingApi);
   private readonly insights = inject(InsightsApi);
   private readonly files = inject(FileDownload);
+  protected readonly auth = inject(AuthService);
   protected readonly stars = [1, 2, 3, 4, 5];
   protected readonly rating = signal(0);
   protected readonly submitting = signal(false);

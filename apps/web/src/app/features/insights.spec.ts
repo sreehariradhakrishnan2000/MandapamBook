@@ -74,7 +74,11 @@ describe('Phase 7 screens', () => {
   let http: HttpTestingController;
   const saved: { name: string; type: string }[] = [];
 
-  async function signIn(role: Role, permissions: Permission[]) {
+  async function signIn(
+    role: Role,
+    permissions: Permission[],
+    phone: string | null = '+919847012345',
+  ) {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -86,7 +90,8 @@ describe('Phase 7 screens', () => {
     const files = TestBed.inject(FileDownload);
     files.save = (blob, name) => void saved.push({ name, type: blob.type });
     const login = TestBed.inject(AuthService).login('u@example.test', 'pw', false);
-    http.expectOne('/api/v1/auth/login').flush(session(role, permissions));
+    const s = session(role, permissions);
+    http.expectOne('/api/v1/auth/login').flush({ ...s, user: { ...s.user, phone } });
     await login;
   }
 
@@ -132,6 +137,26 @@ describe('Phase 7 screens', () => {
     await fixture.whenStable();
     fixture.detectChanges();
     expect(el.textContent).toContain('You rated this venue 4 out of 5');
+  });
+
+  it('asks for a mobile number before a customer can review', async () => {
+    await signIn('CUSTOMER', ['booking:create', 'review:create'], null);
+    const fixture = TestBed.createComponent(BookingDetailPage);
+    fixture.componentRef.setInput('id', 'b1');
+    fixture.detectChanges();
+    (await pending('/api/v1/bookings/b1')).flush(completed);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('we need a mobile number on your account');
+    expect(
+      [...el.querySelectorAll('button')].some((b) => b.textContent?.includes('Post review')),
+    ).toBe(false);
+    const link = [...el.querySelectorAll('a')].find((a) =>
+      a.textContent?.includes('Add your mobile number'),
+    )!;
+    expect(link.getAttribute('href')).toBe('/account#phone');
+    http.match(() => true).forEach((r) => r.flush(null));
   });
 
   it('hides the reply action from staff', async () => {
