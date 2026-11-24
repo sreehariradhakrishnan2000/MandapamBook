@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import type { Type } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -33,6 +34,35 @@ describe('auth forms', () => {
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
+  });
+
+  it.each<[string, Type<unknown>]>([
+    ['login', Login],
+    ['register', Register],
+  ])('%s can show and hide the password, keeping what was typed', async (_, component) => {
+    const fixture = TestBed.createComponent(component);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const field = el.querySelector<HTMLInputElement>('#password')!;
+    const toggle = el.querySelector<HTMLButtonElement>('button[aria-controls=password]')!;
+    field.value = 'mandapam-2026';
+    field.dispatchEvent(new Event('input'));
+    expect(toggle.textContent?.trim()).toBe('Show password');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.type).toBe('button'); // never submits the form
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(field.type).toBe('text');
+    expect(field.value).toBe('mandapam-2026');
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.title).toBe('Hide password');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(field.type).toBe('password');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    TestBed.inject(HttpTestingController).verify();
   });
 
   it('login shows a message and sends nothing when fields are empty', async () => {
