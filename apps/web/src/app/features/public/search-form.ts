@@ -10,6 +10,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SLOTS, type Slot } from '@mandapambook/shared';
 import { BookingApi, SLOT_LABELS } from '../../core/booking-api.service';
+import { GeolocationService, LocationError } from '../../core/geolocation.service';
 
 export interface SearchFormValue {
   city: string;
@@ -100,12 +101,42 @@ export interface SearchFormValue {
         <span class="lg:sr-only">Search halls</span>
       </button>
     </form>
+    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-2 text-sm">
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+        [disabled]="locating()"
+        (click)="nearMe()"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          class="size-4"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <circle cx="12" cy="12" r="3.5" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          <circle cx="12" cy="12" r="7.5" />
+        </svg>
+        {{ locating() ? 'Finding you…' : 'Use my current location' }}
+      </button>
+      @if (locationError()) {
+        <span class="text-red-700" role="alert">{{ locationError() }}</span>
+      }
+    </div>
   `,
 })
 export class SearchForm implements OnInit {
   private readonly api = inject(BookingApi);
   private readonly router = inject(Router);
+  private readonly geo = inject(GeolocationService);
   readonly initial = input<Partial<SearchFormValue>>({});
+
+  protected readonly locating = signal(false);
+  protected readonly locationError = signal<string | null>(null);
 
   protected readonly cities = signal<{ slug: string; name: string; state: string }[]>([]);
   protected readonly field =
@@ -138,15 +169,36 @@ export class SearchForm implements OnInit {
   }
 
   protected go(): void {
-    const v = this.value;
     void this.router.navigate(['/search'], {
-      queryParams: {
-        city: v.city || null,
-        date: v.date || null,
-        slot: v.slot || null,
-        guests: v.guests || null,
-        budget: v.budgetRupees || null,
-      },
+      queryParams: { ...this.commonParams(), city: this.value.city || null },
     });
+  }
+
+  /** Searches around the user's position instead of a city, keeping the other choices. */
+  protected async nearMe(): Promise<void> {
+    this.locating.set(true);
+    this.locationError.set(null);
+    try {
+      const here = await this.geo.current();
+      await this.router.navigate(['/search'], {
+        queryParams: { ...this.commonParams(), lat: here.latitude, lng: here.longitude },
+      });
+    } catch (err) {
+      this.locationError.set(
+        err instanceof LocationError ? err.message : 'Could not find your location.',
+      );
+    } finally {
+      this.locating.set(false);
+    }
+  }
+
+  private commonParams(): Record<string, string | number | null> {
+    const v = this.value;
+    return {
+      date: v.date || null,
+      slot: v.slot || null,
+      guests: v.guests || null,
+      budget: v.budgetRupees || null,
+    };
   }
 }

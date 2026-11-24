@@ -39,7 +39,12 @@ import { InrPipe } from './inr.pipe';
       </div>
       <div class="flex flex-1 flex-col gap-1 px-2 pt-3 pb-2">
         <h3 class="text-base font-semibold text-ink">{{ v.name }}</h3>
-        <p class="text-sm text-slate-600">{{ v.locality ? v.locality + ', ' : '' }}{{ v.city }}</p>
+        <p class="text-sm text-slate-600">
+          {{ v.locality ? v.locality + ', ' : '' }}{{ v.city }}
+          @if (v.distanceKm !== null && v.distanceKm !== undefined) {
+            <span class="font-medium text-forest-800"> · {{ distance(v.distanceKm) }} away</span>
+          }
+        </p>
         <p class="text-sm text-slate-600">
           Up to {{ v.maxCapacity }} guests · {{ v.hasAc ? 'AC' : 'Non-AC' }} ·
           {{ v.parkingCars }} car parking
@@ -57,4 +62,8 @@ import { InrPipe } from './inr.pipe';
 export class HallCard {
   readonly venue = input.required<SearchResult>();
   readonly queryParams = input<Record<string, string | null>>({});
+
+  protected distance(km: number): string {
+    return km < 1 ? `${Math.max(100, Math.round(km * 10) * 100)} m` : `${km.toFixed(1)} km`;
+  }
 }

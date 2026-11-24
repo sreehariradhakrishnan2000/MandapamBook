@@ -9,7 +9,12 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { SLOTS, type Slot } from '@mandapambook/shared';
+import {
+  googleMapsDirectionsUrl,
+  googleMapsPlaceUrl,
+  SLOTS,
+  type Slot,
+} from '@mandapambook/shared';
 import {
   type Availability,
   BookingApi,
@@ -38,13 +43,50 @@ const POLICY_LABELS: Record<string, string> = {
           <p class="mt-1 text-slate-600">
             {{ v.addressLine }}{{ v.locality ? ', ' + v.locality : '' }}, {{ v.city }}
             {{ v.pincode }}
-            @if (mapUrl()) {
-              ·
-              <a [href]="mapUrl()" target="_blank" rel="noopener" class="text-brand-700 underline"
-                >View on map</a
-              >
-            }
           </p>
+          @if (maps(); as m) {
+            <div class="mt-2 flex flex-wrap gap-2 text-sm">
+              <a
+                [href]="m.place"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 font-medium hover:border-slate-400"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  class="size-4 text-brand-600"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                >
+                  <path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z" />
+                  <circle cx="12" cy="9.5" r="2.5" />
+                </svg>
+                Open in Google Maps<span class="sr-only"> (opens in a new tab)</span>
+              </a>
+              <a
+                [href]="m.directions"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1.5 rounded-full bg-forest-800 px-3.5 py-1.5 font-medium text-white hover:bg-forest-700"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  class="size-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                >
+                  <path d="m3 11 18-8-8 18-2-8-8-2Z" />
+                </svg>
+                Get directions<span class="sr-only"> (opens in a new tab)</span>
+              </a>
+            </div>
+          }
           <p class="mt-1 text-sm text-slate-600">
             Hosted by {{ v.hostedBy }}
             @if (v.ratingAvg) {
@@ -325,12 +367,20 @@ export class Venue {
     const [y, m] = this.month().split('-').map(Number) as [number, number];
     return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   });
-  /** OpenStreetMap link (no embedded third-party map, so no tracking and no extra CSP). */
-  protected readonly mapUrl = computed(() => {
+  /**
+   * Google Maps links (plain links, no embedded map: no API key, tracking or extra CSP). The
+   * pin when the owner set one, otherwise a search for the full address.
+   */
+  protected readonly maps = computed(() => {
     const v = this.venue();
-    return v?.latitude && v.longitude
-      ? `https://www.openstreetmap.org/?mlat=${v.latitude}&mlon=${v.longitude}#map=17/${v.latitude}/${v.longitude}`
-      : null;
+    if (!v) return null;
+    const target =
+      v.latitude !== null && v.longitude !== null
+        ? { latitude: v.latitude, longitude: v.longitude }
+        : [v.name, v.addressLine, v.locality, `${v.city} ${v.pincode}`, v.state]
+            .filter(Boolean)
+            .join(', ');
+    return { place: googleMapsPlaceUrl(target), directions: googleMapsDirectionsUrl(target) };
   });
 
   constructor() {
