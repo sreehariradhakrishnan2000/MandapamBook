@@ -34,14 +34,14 @@ const KIND_LABELS: Record<Kind, string> = {
   template: `
     <div class="flex flex-col gap-6">
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
 
       @for (hall of halls(); track hall.id) {
         <section
-          class="rounded-lg border border-slate-200 bg-white p-4"
+          class="rounded-2xl border border-slate-200 bg-white p-4"
           [attr.aria-labelledby]="'hall-' + hall.id"
         >
           <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -90,7 +90,7 @@ const KIND_LABELS: Record<Kind, string> = {
             <select
               [id]="'slot-' + hall.id"
               formControlName="slot"
-              class="rounded-md border border-slate-300 px-2 py-2 text-sm"
+              class="rounded-xl border border-slate-300 px-2 py-2 text-sm"
             >
               @for (s of slots; track s) {
                 <option [value]="s">{{ slotLabels[s] }}</option>
@@ -100,7 +100,7 @@ const KIND_LABELS: Record<Kind, string> = {
             <select
               [id]="'kind-' + hall.id"
               formControlName="kind"
-              class="rounded-md border border-slate-300 px-2 py-2 text-sm"
+              class="rounded-xl border border-slate-300 px-2 py-2 text-sm"
             >
               @for (k of kinds; track k) {
                 <option [value]="k">{{ kindLabels[k] }}</option>
@@ -114,11 +114,11 @@ const KIND_LABELS: Record<Kind, string> = {
               step="1"
               formControlName="rupees"
               placeholder="₹ amount"
-              class="w-36 rounded-md border border-slate-300 px-2 py-2 text-sm"
+              class="w-36 rounded-xl border border-slate-300 px-2 py-2 text-sm"
             />
             <button
               type="submit"
-              class="rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+              class="rounded-full bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
             >
               Set price
             </button>
@@ -133,7 +133,7 @@ const KIND_LABELS: Record<Kind, string> = {
       <form
         [formGroup]="hallForm"
         (ngSubmit)="addHall()"
-        class="grid gap-3 rounded-lg border border-dashed border-slate-300 p-4 sm:grid-cols-4"
+        class="grid gap-3 rounded-2xl border border-dashed border-slate-300 p-4 sm:grid-cols-4"
         novalidate
       >
         <h3 class="font-semibold sm:col-span-4">Add a hall</h3>
@@ -161,7 +161,7 @@ const KIND_LABELS: Record<Kind, string> = {
         >
         <button
           type="submit"
-          class="rounded-md border border-brand-600 px-3 py-2 font-semibold text-brand-700 sm:col-span-4 sm:justify-self-start"
+          class="rounded-full border border-brand-600 px-3 py-2 font-semibold text-brand-700 sm:col-span-4 sm:justify-self-start"
         >
           Add hall
         </button>

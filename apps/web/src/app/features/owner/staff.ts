@@ -11,23 +11,23 @@ import { OwnerApi, type StaffMember, type VenueSummary } from '../../core/owner-
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-5 py-4">
       <a routerLink=".." class="text-sm text-brand-700 underline">← My venues</a>
-      <h1 class="font-display text-2xl font-bold">Staff</h1>
+      <h1 class="font-display text-3xl font-medium">Staff</h1>
       <p class="text-sm text-slate-600">
         Staff can view bookings and manage the calendar. They can't change prices, payouts or
         listings.
       </p>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
       @if (message()) {
-        <p class="rounded-md bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
+        <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
           {{ message() }}
         </p>
       }
 
-      <ul class="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
+      <ul class="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
         @for (s of staff(); track s.userId) {
           <li class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
             <span
@@ -47,7 +47,7 @@ import { OwnerApi, type StaffMember, type VenueSummary } from '../../core/owner-
       </ul>
 
       <form
-        class="flex flex-col gap-3 rounded-md border border-dashed border-slate-300 p-4 text-sm"
+        class="flex flex-col gap-3 rounded-xl border border-dashed border-slate-300 p-4 text-sm"
         (ngSubmit)="invite()"
       >
         <h2 class="font-semibold">Invite a staff member</h2>
@@ -55,7 +55,7 @@ import { OwnerApi, type StaffMember, type VenueSummary } from '../../core/owner-
           >Full name<input
             name="fullName"
             required
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="fullName"
         /></label>
         <label class="flex flex-col gap-1"
@@ -63,7 +63,7 @@ import { OwnerApi, type StaffMember, type VenueSummary } from '../../core/owner-
             name="email"
             type="email"
             required
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [(ngModel)]="email"
         /></label>
         <fieldset class="flex flex-col gap-1">
@@ -82,7 +82,7 @@ import { OwnerApi, type StaffMember, type VenueSummary } from '../../core/owner-
         </fieldset>
         <button
           type="submit"
-          class="w-fit rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white"
+          class="w-fit rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white"
         >
           Send invitation
         </button>

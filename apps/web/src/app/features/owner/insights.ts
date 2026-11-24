@@ -44,11 +44,11 @@ const PAYOUT_LABELS: Record<string, string> = {
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
       <header class="flex flex-wrap items-end justify-between gap-3">
-        <h1 class="font-display text-2xl font-bold">Earnings</h1>
+        <h1 class="font-display text-3xl font-medium">Earnings</h1>
         <label class="flex flex-col text-sm"
           >Financial year
           <select
-            class="rounded-md border border-slate-300 px-2 py-1.5"
+            class="rounded-xl border border-slate-300 px-2 py-1.5"
             [compareWith]="sameYear"
             [ngModel]="fy()"
             (ngModelChange)="fy.set($event); load()"
@@ -62,19 +62,19 @@ const PAYOUT_LABELS: Record<string, string> = {
 
       @if (s(); as s) {
         <dl class="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <div class="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+          <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
             <dt class="text-slate-600">Bookings</dt>
             <dd class="text-xl font-semibold tabular-nums">{{ s.bookings }}</dd>
           </div>
-          <div class="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+          <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
             <dt class="text-slate-600">Booking value</dt>
             <dd class="text-xl font-semibold tabular-nums">{{ s.bookingValuePaise | inr }}</dd>
           </div>
-          <div class="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+          <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
             <dt class="text-slate-600">Due to you</dt>
             <dd class="text-xl font-semibold tabular-nums">{{ s.pendingPaise | inr }}</dd>
           </div>
-          <div class="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+          <div class="rounded-2xl bg-white p-3 ring-1 ring-slate-200">
             <dt class="text-slate-600">Paid out</dt>
             <dd class="text-xl font-semibold tabular-nums">{{ s.paidOutPaise | inr }}</dd>
           </div>
@@ -126,7 +126,7 @@ const PAYOUT_LABELS: Record<string, string> = {
         </table>
       </div>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
@@ -171,10 +171,10 @@ export class OwnerEarningsPage implements OnInit {
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
-      <h1 class="font-display text-2xl font-bold">Reviews</h1>
+      <h1 class="font-display text-3xl font-medium">Reviews</h1>
       <ul class="flex flex-col gap-3">
         @for (r of items(); track r.id) {
-          <li class="flex flex-col gap-2 rounded-lg bg-white p-4 text-sm ring-1 ring-slate-200">
+          <li class="flex flex-col gap-2 rounded-2xl bg-white p-4 text-sm ring-1 ring-slate-200">
             <p class="flex flex-wrap justify-between gap-2">
               <span class="font-semibold"
                 ><span class="text-amber-500" [attr.aria-label]="r.rating + ' out of 5'">{{
@@ -202,7 +202,7 @@ export class OwnerEarningsPage implements OnInit {
                 <label class="flex flex-col gap-1"
                   >Public reply
                   <textarea
-                    class="rounded-md border border-slate-300 px-2 py-1.5"
+                    class="rounded-xl border border-slate-300 px-2 py-1.5"
                     rows="2"
                     maxlength="1000"
                     [(ngModel)]="draft"
@@ -211,7 +211,7 @@ export class OwnerEarningsPage implements OnInit {
                 <div class="flex gap-2">
                   <button
                     type="button"
-                    class="rounded-md bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+                    class="rounded-full bg-brand-600 px-3 py-1.5 font-semibold text-white disabled:opacity-50"
                     [disabled]="!draft.trim()"
                     (click)="send(r.id)"
                   >
@@ -219,7 +219,7 @@ export class OwnerEarningsPage implements OnInit {
                   </button>
                   <button
                     type="button"
-                    class="rounded-md border border-slate-300 px-3 py-1.5"
+                    class="rounded-full border border-slate-300 px-3 py-1.5"
                     (click)="editing.set(null)"
                   >
                     Cancel
@@ -241,7 +241,7 @@ export class OwnerEarningsPage implements OnInit {
         }
       </ul>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }

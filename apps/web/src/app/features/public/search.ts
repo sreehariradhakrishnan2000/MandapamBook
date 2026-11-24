@@ -8,16 +8,15 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import type { SearchQuery, SearchResult, Slot } from '@mandapambook/shared';
 import { errorMessage } from '../../core/auth/auth.service';
 import { BookingApi } from '../../core/booking-api.service';
-import { InrPipe } from '../../shared/inr.pipe';
+import { HallCard } from '../../shared/hall-card';
 import { SearchForm } from './search-form';
 
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, RouterLink, InrPipe, SearchForm],
+  imports: [FormsModule, HallCard, SearchForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-5 py-4">
@@ -26,9 +25,9 @@ import { SearchForm } from './search-form';
       <div class="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <aside
           aria-label="Filters"
-          class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm"
+          class="flex h-fit flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm"
         >
-          <h2 class="font-semibold">Filters</h2>
+          <h2 class="font-display text-xl">Filters</h2>
           <label class="flex items-center gap-2"
             ><input
               type="checkbox"
@@ -41,7 +40,7 @@ import { SearchForm } from './search-form';
           <label class="flex flex-col gap-1"
             >Catering
             <select
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
               [(ngModel)]="filters.catering"
               (ngModelChange)="apply()"
             >
@@ -53,7 +52,7 @@ import { SearchForm } from './search-form';
           <label class="flex flex-col gap-1"
             >Decoration
             <select
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
               [(ngModel)]="filters.decoration"
               (ngModelChange)="apply()"
             >
@@ -67,7 +66,7 @@ import { SearchForm } from './search-form';
             <input
               type="number"
               min="0"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
               [(ngModel)]="filters.minParking"
               (change)="apply()"
             />
@@ -77,7 +76,7 @@ import { SearchForm } from './search-form';
             <input
               type="number"
               min="0"
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
               [(ngModel)]="filters.minRooms"
               (change)="apply()"
             />
@@ -85,7 +84,7 @@ import { SearchForm } from './search-form';
           <label class="flex flex-col gap-1"
             >Rating at least
             <select
-              class="rounded-md border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
               [(ngModel)]="filters.minRating"
               (ngModelChange)="apply()"
             >
@@ -119,7 +118,7 @@ import { SearchForm } from './search-form';
             <label class="text-sm"
               >Sort
               <select
-                class="ml-1 rounded-md border border-slate-300 px-2 py-1.5"
+                class="ml-1 rounded-full border border-slate-300 bg-white px-3 py-1.5"
                 [(ngModel)]="filters.sort"
                 (ngModelChange)="apply()"
               >
@@ -132,59 +131,19 @@ import { SearchForm } from './search-form';
             </label>
           </div>
           @if (error()) {
-            <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               {{ error() }}
             </p>
           }
-          <ul class="grid gap-4 sm:grid-cols-2">
+          <ul class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             @for (v of results(); track v.id) {
-              <li class="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                <a [routerLink]="['/venues', v.slug]" [queryParams]="venueParams()" class="block">
-                  @if (v.photoUrl) {
-                    <img
-                      [src]="v.photoUrl"
-                      [alt]="'Photo of ' + v.name"
-                      class="aspect-[16/9] w-full object-cover"
-                      loading="lazy"
-                    />
-                  } @else {
-                    <div
-                      class="flex aspect-[16/9] items-center justify-center bg-slate-100 text-sm text-slate-500"
-                    >
-                      No photo yet
-                    </div>
-                  }
-                  <div class="flex flex-col gap-1 p-4">
-                    <h3 class="font-semibold">{{ v.name }}</h3>
-                    <p class="text-sm text-slate-600">
-                      {{ v.locality ? v.locality + ', ' : '' }}{{ v.city }}
-                    </p>
-                    <p class="text-sm text-slate-600">
-                      Up to {{ v.maxCapacity }} guests · {{ v.hasAc ? 'AC' : 'Non-AC' }} ·
-                      {{ v.parkingCars }} car parking
-                    </p>
-                    <p class="mt-1 flex items-baseline justify-between">
-                      @if (v.fromPricePaise !== null) {
-                        <span
-                          ><span class="text-xs text-slate-500">from </span
-                          ><span class="font-semibold tabular-nums">{{
-                            v.fromPricePaise | inr
-                          }}</span></span
-                        >
-                      }
-                      @if (v.ratingAvg) {
-                        <span class="text-sm"
-                          >★ {{ v.ratingAvg.toFixed(1) }} ({{ v.ratingCount }})</span
-                        >
-                      }
-                    </p>
-                  </div>
-                </a>
+              <li>
+                <app-hall-card [venue]="v" [queryParams]="venueParams()" />
               </li>
             } @empty {
               @if (!loading()) {
                 <li
-                  class="rounded-lg border border-dashed border-slate-300 p-6 text-slate-600 sm:col-span-2"
+                  class="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-600 sm:col-span-2 xl:col-span-3"
                 >
                   No halls match. Try another date or fewer filters.
                 </li>
@@ -194,7 +153,7 @@ import { SearchForm } from './search-form';
           @if (total() > results().length + (page() - 1) * pageSize) {
             <button
               type="button"
-              class="w-fit self-center rounded-md border border-slate-300 px-4 py-2 text-sm"
+              class="w-fit self-center rounded-full border border-slate-300 bg-white px-5 py-2 text-sm font-medium hover:border-slate-400"
               (click)="more()"
             >
               Show more

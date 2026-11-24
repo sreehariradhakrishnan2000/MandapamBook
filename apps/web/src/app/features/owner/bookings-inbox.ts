@@ -19,11 +19,11 @@ import { InrPipe } from '../../shared/inr.pipe';
   template: `
     <section class="flex flex-col gap-4 py-4">
       <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
-      <h1 class="font-display text-2xl font-bold">Bookings</h1>
+      <h1 class="font-display text-3xl font-medium">Bookings</h1>
       <label class="text-sm"
         >Show
         <select
-          class="ml-1 rounded-md border border-slate-300 px-2 py-1.5"
+          class="ml-1 rounded-xl border border-slate-300 px-2 py-1.5"
           [(ngModel)]="status"
           (ngModelChange)="load()"
         >
@@ -34,14 +34,14 @@ import { InrPipe } from '../../shared/inr.pipe';
         </select>
       </label>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }
       <ul class="flex flex-col gap-2">
         @for (b of items(); track b.id) {
           <li
-            class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 text-sm"
+            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
           >
             <span class="min-w-0">
               <span class="block font-semibold"
@@ -63,7 +63,7 @@ import { InrPipe } from '../../shared/inr.pipe';
               @if (canApprove && b.status === 'AWAITING_OWNER') {
                 <button
                   type="button"
-                  class="rounded-md bg-leaf-600 px-3 py-1 font-semibold text-white"
+                  class="rounded-full bg-leaf-600 px-3 py-1 font-semibold text-white"
                   (click)="accept(b)"
                 >
                   Accept
@@ -72,7 +72,7 @@ import { InrPipe } from '../../shared/inr.pipe';
               @if (canApprove && b.status === 'CONFIRMED') {
                 <button
                   type="button"
-                  class="rounded-md border border-slate-300 px-3 py-1"
+                  class="rounded-full border border-slate-300 px-3 py-1"
                   (click)="markPaid(b)"
                 >
                   Balance received
@@ -81,7 +81,7 @@ import { InrPipe } from '../../shared/inr.pipe';
             </span>
           </li>
         } @empty {
-          <li class="rounded-lg border border-dashed border-slate-300 p-6 text-slate-600">
+          <li class="rounded-2xl border border-dashed border-slate-300 p-6 text-slate-600">
             No bookings yet.
           </li>
         }

@@ -18,13 +18,13 @@ interface Tile {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-6 py-4">
-      <h1 class="font-display text-2xl font-bold">Admin console</h1>
+      <h1 class="font-display text-3xl font-medium">Admin console</h1>
       <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         @for (t of tiles(); track t.link) {
           <li>
             <a
               [routerLink]="t.link"
-              class="flex h-full flex-col gap-1 rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-500"
+              class="flex h-full flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-5 hover:border-brand-500"
             >
               <span class="flex items-center justify-between font-semibold">
                 {{ t.title }}

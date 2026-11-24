@@ -19,14 +19,14 @@ import { InrPipe } from '../../shared/inr.pipe';
     <div class="flex flex-col gap-2">
       <button
         type="button"
-        class="w-full rounded-md bg-brand-600 px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+        class="w-full rounded-full bg-brand-600 px-4 py-2.5 font-semibold text-white disabled:opacity-60"
         [disabled]="busy()"
         (click)="pay()"
       >
         {{ busy() ? 'Opening payment…' : 'Pay ' + (amountPaise() | inr) + ' now' }}
       </button>
       @if (error()) {
-        <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+        <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
           {{ error() }}
         </p>
       }

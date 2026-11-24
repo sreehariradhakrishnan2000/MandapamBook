@@ -9,11 +9,11 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
   template: `
     <section class="flex flex-col gap-8 py-6">
       <header>
-        <h1 class="font-display text-2xl font-bold">Your account</h1>
+        <h1 class="font-display text-3xl font-medium">Your account</h1>
         @if (auth.user(); as user) {
           <p class="mt-1 text-slate-600">{{ user.fullName }} · {{ user.email }}</p>
           @if (!user.emailVerified) {
-            <p class="mt-3 rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-700">
+            <p class="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700">
               Verify your email to make bookings. Check your inbox for the link.
             </p>
           }
@@ -22,13 +22,11 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
 
       <section aria-labelledby="sessions-heading">
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="sessions-heading" class="font-display text-lg font-semibold">
-            Signed-in devices
-          </h2>
+          <h2 id="sessions-heading" class="font-display text-lg font-medium">Signed-in devices</h2>
           <button
             type="button"
             (click)="logoutAll()"
-            class="rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+            class="rounded-full border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
           >
             Sign out of all devices
           </button>
@@ -36,7 +34,7 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
         @if (error()) {
           <p class="mt-3 text-sm text-red-700" role="alert">{{ error() }}</p>
         }
-        <ul class="mt-4 divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
+        <ul class="mt-4 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
           @for (s of sessions(); track s.familyId) {
             <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div class="min-w-0">

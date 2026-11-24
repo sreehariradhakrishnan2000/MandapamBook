@@ -13,7 +13,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
   template: `
     <section class="mx-auto max-w-lg py-4">
       <a routerLink=".." class="text-sm text-brand-700 underline">← My venues</a>
-      <h1 class="mt-2 font-display text-2xl font-bold">Business & payout details</h1>
+      <h1 class="mt-2 font-display text-3xl font-medium">Business & payout details</h1>
       <p class="mt-1 text-sm text-slate-600">
         Needed to receive payouts. PAN and account numbers are encrypted and only the last four
         digits are ever shown.
@@ -22,7 +22,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
       @if (current(); as p) {
         @if (p.panMasked) {
           <dl
-            class="mt-4 grid grid-cols-2 gap-2 rounded-md bg-white p-4 text-sm ring-1 ring-slate-200"
+            class="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-white p-4 text-sm ring-1 ring-slate-200"
           >
             <dt class="text-slate-500">PAN</dt>
             <dd class="font-mono">{{ p.panMasked }}</dd>
@@ -42,7 +42,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
             </dd>
           </dl>
           @if (p.kycStatus === 'REJECTED' && p.kycRejectionReason) {
-            <p class="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+            <p class="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
               We could not verify these details: {{ p.kycRejectionReason }}
             </p>
           }
@@ -52,12 +52,12 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
 
       <form [formGroup]="form" (ngSubmit)="save()" class="mt-6 flex flex-col gap-4" novalidate>
         @if (message()) {
-          <p class="rounded-md bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
+          <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-sm text-leaf-600" role="status">
             {{ message() }}
           </p>
         }
         @if (error()) {
-          <p class="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
             {{ error() }}
           </p>
         }

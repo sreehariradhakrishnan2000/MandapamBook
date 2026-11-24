@@ -25,19 +25,19 @@ import { type PaymentStatus, PaymentsService } from '../../core/payments.service
         @case ('done') {
           @if (result(); as r) {
             @if (r.bookingStatus === 'CONFIRMED') {
-              <h1 class="font-display text-2xl font-bold text-leaf-600">Booking confirmed</h1>
+              <h1 class="font-display text-3xl font-medium text-leaf-600">Booking confirmed</h1>
               <p>
                 Reference <span class="font-mono font-semibold">{{ r.refCode }}</span>. We have
                 emailed your confirmation.
               </p>
             } @else if (r.bookingStatus === 'AWAITING_OWNER') {
-              <h1 class="font-display text-2xl font-bold">Payment received</h1>
+              <h1 class="font-display text-3xl font-medium">Payment received</h1>
               <p>
                 The venue will confirm your request within a day. If they decline, you get a full
                 refund.
               </p>
             } @else {
-              <h1 class="font-display text-2xl font-bold">Payment received</h1>
+              <h1 class="font-display text-3xl font-medium">Payment received</h1>
               <p>
                 Your booking is {{ statusLabels[r.bookingStatus].toLowerCase() }}. Any amount we
                 cannot use is refunded automatically.
@@ -51,14 +51,14 @@ import { type PaymentStatus, PaymentsService } from '../../core/payments.service
           }
         }
         @case ('failed') {
-          <h1 class="font-display text-2xl font-bold">Payment not completed</h1>
+          <h1 class="font-display text-3xl font-medium">Payment not completed</h1>
           <p>{{ message() }}</p>
           <a routerLink="/account/bookings" class="font-semibold text-brand-700 underline"
             >My bookings</a
           >
         }
         @case ('pending') {
-          <h1 class="font-display text-2xl font-bold">Payment pending</h1>
+          <h1 class="font-display text-3xl font-medium">Payment pending</h1>
           <p>
             Your bank has not confirmed the payment yet. We'll update your booking as soon as it
             does.
