@@ -186,6 +186,16 @@ describe.skipIf(!hasTestDb)('owner listings', () => {
         (await c.send('patch', `/api/v1/owner/auditoriums/${venue.id}`, { status: 'APPROVED' }))
           .status,
       ).toBe(400);
+      const half = await c.send('patch', `/api/v1/owner/auditoriums/${venue.id}`, {
+        latitude: 10.1,
+      });
+      expect(half.status).toBe(400);
+      expect(half.body.error.code).toBe('INCOMPLETE_LOCATION');
+      const moved = await c.send('patch', `/api/v1/owner/auditoriums/${venue.id}`, {
+        latitude: 9.93,
+        longitude: 78.12,
+      });
+      expect(moved.body).toMatchObject({ latitude: 9.93, longitude: 78.12 });
     });
 
     it('lists what is missing, then submits a complete listing for review', async () => {

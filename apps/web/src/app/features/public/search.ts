@@ -6,9 +6,19 @@ import {
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import type { SearchQuery, SearchResult, Slot } from '@mandapambook/shared';
+import { Router, RouterLink } from '@angular/router';
+import {
+  type Coordinates,
+  DEFAULT_SEARCH_RADIUS_KM,
+  googleMapsPlaceUrl,
+  SEARCH_RADII_KM,
+  type SearchQuery,
+  type SearchResult,
+  type Slot,
+} from '@mandapambook/shared';
 import { errorMessage } from '../../core/auth/auth.service';
 import { BookingApi } from '../../core/booking-api.service';
 import { HallCard } from '../../shared/hall-card';
@@ -16,7 +26,7 @@ import { SearchForm } from './search-form';
 
 @Component({
   selector: 'app-search',
-  imports: [FormsModule, HallCard, SearchForm],
+  imports: [FormsModule, RouterLink, HallCard, SearchForm],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-5 py-4">
@@ -111,6 +121,38 @@ import { SearchForm } from './search-form';
         </aside>
 
         <div class="flex min-w-0 flex-col gap-3">
+          @if (near(); as here) {
+            <div
+              class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-forest-50 px-4 py-3 text-sm text-forest-900"
+            >
+              <span class="font-medium">Halls near your location</span>
+              <label class="inline-flex items-center gap-1.5"
+                >within
+                <select
+                  class="rounded-full border border-forest-200 bg-white px-3 py-1"
+                  [ngModel]="radiusKm()"
+                  (ngModelChange)="setRadius($event)"
+                >
+                  @for (r of radii; track r) {
+                    <option [ngValue]="r">{{ r }} km</option>
+                  }
+                </select>
+              </label>
+              <a
+                [href]="placeUrl(here)"
+                target="_blank"
+                rel="noopener"
+                class="text-forest-800 underline"
+                >See on Google Maps</a
+              >
+              <a
+                routerLink="/search"
+                [queryParams]="withoutLocation()"
+                class="ml-auto font-medium text-forest-800 underline"
+                >Clear location</a
+              >
+            </div>
+          }
           <div class="flex flex-wrap items-center justify-between gap-2">
             <p class="text-sm text-slate-600" aria-live="polite">
               {{ loading() ? 'Searching…' : total() + ' hall(s) found' }}
@@ -122,6 +164,9 @@ import { SearchForm } from './search-form';
                 [(ngModel)]="filters.sort"
                 (ngModelChange)="apply()"
               >
+                @if (near()) {
+                  <option value="distance">Distance: nearest first</option>
+                }
                 <option value="recommended">Recommended</option>
                 <option value="price_asc">Price: low to high</option>
                 <option value="price_desc">Price: high to low</option>
@@ -145,7 +190,12 @@ import { SearchForm } from './search-form';
                 <li
                   class="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-600 sm:col-span-2 xl:col-span-3"
                 >
-                  No halls match. Try another date or fewer filters.
+                  @if (near()) {
+                    No halls within {{ radiusKm() }} km match. Try a wider radius, another date or
+                    fewer filters.
+                  } @else {
+                    No halls match. Try another date or fewer filters.
+                  }
                 </li>
               }
             }
@@ -166,6 +216,7 @@ import { SearchForm } from './search-form';
 })
 export class Search {
   private readonly api = inject(BookingApi);
+  private readonly router = inject(Router);
 
   // Bound from the URL by the router (withComponentInputBinding).
   readonly city = input<string>();
@@ -173,6 +224,24 @@ export class Search {
   readonly slot = input<Slot>();
   readonly guests = input<string>();
   readonly budget = input<string>();
+  readonly lat = input<string>();
+  readonly lng = input<string>();
+  readonly radius = input<string>();
+
+  protected readonly radii = SEARCH_RADII_KM;
+  protected readonly placeUrl = googleMapsPlaceUrl;
+  /** The searched point, when the URL has a valid lat/lng pair. */
+  protected readonly near = computed<Coordinates | null>(() => {
+    const latitude = Number(this.lat());
+    const longitude = Number(this.lng());
+    return this.lat() && this.lng() && Number.isFinite(latitude) && Number.isFinite(longitude)
+      ? { latitude, longitude }
+      : null;
+  });
+  protected readonly radiusKm = computed(() => {
+    const r = Number(this.radius());
+    return (SEARCH_RADII_KM as readonly number[]).includes(r) ? r : DEFAULT_SEARCH_RADIUS_KM;
+  });
 
   protected readonly pageSize = 12;
   protected readonly results = signal<SearchResult[]>([]);
@@ -213,16 +282,47 @@ export class Search {
     );
     effect(() => {
       this.formInitial(); // re-run whenever the URL query changes
-      this.page.set(1);
-      void this.load(false);
+      const near = this.near();
+      this.radiusKm();
+      // A location search starts nearest first; distance makes no sense without one.
+      if (near && this.lastNear === null) this.filters.sort = 'distance';
+      if (!near && this.filters.sort === 'distance') this.filters.sort = 'recommended';
+      this.lastNear = near;
+      // Untracked: load() reads page() and other state, and "Show more" must not restart here.
+      untracked(() => {
+        this.page.set(1);
+        void this.load(false);
+      });
+    });
+  }
+
+  private lastNear: Coordinates | null = null;
+
+  /** The current URL query without the location, for "Clear location". */
+  protected readonly withoutLocation = computed(() => ({
+    date: this.date() ?? null,
+    slot: this.slot() ?? null,
+    guests: this.guests() ?? null,
+    budget: this.budget() ?? null,
+  }));
+
+  protected setRadius(km: number): void {
+    void this.router.navigate([], {
+      queryParams: { radius: km },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 
   private query(): SearchQuery {
     const f = this.filters;
     const budget = this.budget() ? Number(this.budget()) : undefined;
+    const near = this.near();
     return {
-      city: this.city() || undefined,
+      lat: near?.latitude,
+      lng: near?.longitude,
+      radiusKm: near ? this.radiusKm() : undefined,
+      city: near ? undefined : this.city() || undefined,
       date: this.date() || undefined,
       slot: this.slot() || undefined,
       guests: this.guests() ? Number(this.guests()) : undefined,

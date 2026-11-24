@@ -9,6 +9,7 @@ import { OwnerApi, type VenueDetail } from '../../core/owner-api.service';
 import { InrPipe, rupeesToPaiseInput } from '../../shared/inr.pipe';
 import { isoDate } from './editor/calendar';
 import { VenueEditor } from './editor/venue-editor';
+import { VenueForm } from './editor/venue-form';
 
 const ownerSession: AuthSession = {
   accessToken: 'owner-token',
@@ -123,6 +124,39 @@ describe('owner area', () => {
 
     (await pending('/api/v1/owner/media/m1/confirm')).flush({ id: 'm1', status: 'READY' });
     await done;
+  });
+
+  it('saves a map pin read from a pasted Google Maps link, and rejects one it cannot read', async () => {
+    const fixture = TestBed.createComponent(VenueForm);
+    fixture.componentRef.setInput('venue', venue);
+    fixture.detectChanges();
+    (await pending('/api/v1/cities')).flush({
+      items: [{ id: 'c1', name: 'Kochi', state: 'Kerala' }],
+    });
+    await fixture.whenStable();
+    const el: HTMLElement = fixture.nativeElement;
+    const field = el.querySelector<HTMLInputElement>('#location')!;
+    const submit = () => {
+      el.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+      fixture.detectChanges();
+    };
+
+    field.value = 'https://maps.app.goo.gl/AbCdEf123';
+    field.dispatchEvent(new Event('input'));
+    submit();
+    expect(el.textContent).toContain('Could not read a location');
+    http.expectNone('/api/v1/owner/auditoriums/v1');
+
+    field.value =
+      'https://www.google.com/maps/place/Hall/@10.02,76.30,17z/data=!3d10.0261!4d76.3084';
+    field.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(el.querySelector('a[href^="https://www.google.com/maps/search/"]')).not.toBeNull();
+    submit();
+    const save = await pending('/api/v1/owner/auditoriums/v1');
+    expect(save.request.body).toMatchObject({ latitude: 10.0261, longitude: 76.3084 });
+    expect(save.request.body).not.toHaveProperty('location');
+    save.flush({ ...venue, latitude: 10.0261, longitude: 76.3084 });
   });
 
   it('shows what is missing when a listing is not ready for review', async () => {

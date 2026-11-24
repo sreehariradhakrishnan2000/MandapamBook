@@ -7,6 +7,7 @@ import { authInterceptor } from '../../core/auth/auth.interceptor';
 import { AuthService } from '../../core/auth/auth.service';
 import type { VenuePage } from '../../core/booking-api.service';
 import { Search } from '../public/search';
+import { SearchForm } from '../public/search-form';
 import { Book } from './book';
 
 const venue: VenuePage = {
@@ -184,5 +185,90 @@ describe('search page', () => {
     expect(req.request.params.get('guests')).toBe('500');
     req.flush({ items: [], total: 0, page: 1, pageSize: 12 });
     http.match(() => true).forEach((r) => r.flush({ items: [] }));
+  });
+
+  it('searches near a location nearest first, ignoring the city, and shows distances', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(Search);
+    fixture.componentRef.setInput('city', 'chennai');
+    fixture.componentRef.setInput('lat', '13.034');
+    fixture.componentRef.setInput('lng', '80.27');
+    fixture.componentRef.setInput('radius', '10');
+    fixture.detectChanges();
+    const req = await vi.waitFor(() => http.expectOne((r) => r.url === '/api/v1/auditoriums'));
+    const p = req.request.params;
+    expect([p.get('lat'), p.get('lng'), p.get('radiusKm'), p.get('sort')]).toEqual([
+      '13.034',
+      '80.27',
+      '10',
+      'distance',
+    ]);
+    expect(p.has('city')).toBe(false);
+    req.flush({
+      items: [
+        {
+          id: 'v1',
+          slug: 'sundaram-mahal',
+          name: 'Sundaram Thirumana Mahal',
+          city: 'Chennai',
+          locality: 'Mylapore',
+          maxCapacity: 800,
+          hasAc: true,
+          parkingCars: 60,
+          guestRooms: 4,
+          cateringPolicy: 'IN_HOUSE_ONLY',
+          ratingAvg: null,
+          ratingCount: 0,
+          fromPricePaise: 9_500_000,
+          photoUrl: null,
+          available: null,
+          distanceKm: 0.4,
+        },
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 12,
+    });
+    http.match(() => true).forEach((r) => r.flush({ items: [] }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent;
+    expect(text).toContain('Halls near your location');
+    expect(text).toContain('400 m away');
+  });
+});
+
+describe('search form', () => {
+  it('searches around the current position when asked', async () => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const getCurrentPosition = vi.fn((ok: PositionCallback) =>
+      ok({ coords: { latitude: 9.931234, longitude: 76.267345 } } as GeolocationPosition),
+    );
+    const original = Object.getOwnPropertyDescriptor(navigator, 'geolocation');
+    Object.defineProperty(navigator, 'geolocation', {
+      configurable: true,
+      value: { getCurrentPosition },
+    });
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    try {
+      const fixture = TestBed.createComponent(SearchForm);
+      fixture.detectChanges();
+      http.match(() => true).forEach((r) => r.flush({ items: [] }));
+      const button = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+        (b) => b.textContent?.includes('Use my current location'),
+      )!;
+      button.click();
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalled());
+      expect(navigate.mock.calls[0]![1]!.queryParams).toMatchObject({ lat: 9.931, lng: 76.267 });
+    } finally {
+      if (original) Object.defineProperty(navigator, 'geolocation', original);
+      else delete (navigator as { geolocation?: unknown }).geolocation;
+    }
   });
 });

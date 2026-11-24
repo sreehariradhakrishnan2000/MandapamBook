@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { SearchQuery, SearchResult } from '@mandapambook/shared';
 import { BookingApi } from '../../core/booking-api.service';
@@ -258,8 +265,11 @@ export class Home {
       (c) => this.cities.set(c.items),
       () => undefined,
     );
+    // Only the chip choice may re-run this: loadPopular reads and writes popularState before
+    // its first await, and tracking that would reload the list in an endless loop.
     effect(() => {
-      void this.loadPopular(this.sort());
+      const sort = this.sort();
+      untracked(() => void this.loadPopular(sort));
     });
   }
 

@@ -1,6 +1,13 @@
 import { Router } from 'express';
-import { and, asc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm';
-import { type SearchResult, searchQuerySchema } from '@mandapambook/shared';
+import { and, asc, eq, gte, ilike, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
+import {
+  boundingBox,
+  type Coordinates,
+  DEFAULT_SEARCH_RADIUS_KM,
+  distanceKm,
+  type SearchResult,
+  searchQuerySchema,
+} from '@mandapambook/shared';
 import { z } from 'zod';
 import type { Db } from '../../db/client.js';
 import {
@@ -89,7 +96,18 @@ export function venuesRouter(deps: { db: Db; storage: ObjectStorage }): Router {
     if (q.date && q.date < todayInIst())
       throw errors.badRequest('DATE_IN_PAST', 'Choose today or a future date');
 
+    // "Near me": a bounding box narrows candidates in SQL; the exact distance is checked below.
+    const centre: Coordinates | null =
+      q.lat !== undefined && q.lng !== undefined ? { latitude: q.lat, longitude: q.lng } : null;
+    const radiusKm = q.radiusKm ?? DEFAULT_SEARCH_RADIUS_KM;
+    const box = centre ? boundingBox(centre, radiusKm) : null;
+
     const conditions = [
+      box ? isNotNull(auditoriums.latitude) : undefined,
+      box ? gte(auditoriums.latitude, box.minLat) : undefined,
+      box ? lte(auditoriums.latitude, box.maxLat) : undefined,
+      box ? gte(auditoriums.longitude, box.minLon) : undefined,
+      box ? lte(auditoriums.longitude, box.maxLon) : undefined,
       eq(auditoriums.status, 'APPROVED'),
       q.city ? eq(cities.slug, q.city) : undefined,
       q.minParking !== undefined ? gte(auditoriums.parkingCars, q.minParking) : undefined,
@@ -120,7 +138,7 @@ export function venuesRouter(deps: { db: Db; storage: ObjectStorage }): Router {
       );
     }
 
-    const venues = await db
+    const candidates = await db
       .select({
         id: auditoriums.id,
         slug: auditoriums.slug,
@@ -128,6 +146,8 @@ export function venuesRouter(deps: { db: Db; storage: ObjectStorage }): Router {
         city: cities.name,
         state: cities.state,
         locality: auditoriums.locality,
+        latitude: auditoriums.latitude,
+        longitude: auditoriums.longitude,
         parkingCars: auditoriums.parkingCars,
         guestRooms: auditoriums.guestRooms,
         cateringPolicy: auditoriums.cateringPolicy,
@@ -139,6 +159,13 @@ export function venuesRouter(deps: { db: Db; storage: ObjectStorage }): Router {
       .innerJoin(cities, eq(cities.id, auditoriums.cityId))
       .where(and(...conditions))
       .limit(CANDIDATE_LIMIT);
+    type Candidate = (typeof candidates)[number] & { distanceKm: number | null };
+    const venues = candidates.flatMap((v): Candidate[] => {
+      if (!centre) return [{ ...v, distanceKm: null }];
+      if (v.latitude === null || v.longitude === null) return [];
+      const d = distanceKm(centre, { latitude: v.latitude, longitude: v.longitude });
+      return d <= radiusKm ? [{ ...v, distanceKm: Math.round(d * 10) / 10 }] : [];
+    });
     const venueIds = venues.map((v) => v.id);
 
     const hallRows = venueIds.length
@@ -225,6 +252,7 @@ export function venuesRouter(deps: { db: Db; storage: ObjectStorage }): Router {
         fromPricePaise: best,
         photoUrl: key ? await storage.createDownloadUrl(key, PHOTO_TTL) : null,
         available: q.date ? true : null,
+        distanceKm: v.distanceKm,
         _updated: v.updatedAt.getTime(),
       });
     }
@@ -240,6 +268,7 @@ export function venuesRouter(deps: { db: Db; storage: ObjectStorage }): Router {
       price_desc: (a, b) => (b.fromPricePaise ?? 0) - (a.fromPricePaise ?? 0),
       rating: (a, b) => (b.ratingAvg ?? 0) - (a.ratingAvg ?? 0) || b.ratingCount - a.ratingCount,
       capacity: (a, b) => b.maxCapacity - a.maxCapacity,
+      distance: (a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity),
     };
     results.sort(sorters[q.sort]);
     const start = (q.page - 1) * q.pageSize;

@@ -7,11 +7,34 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import type { AuditoriumInput } from '@mandapambook/shared';
+import {
+  type AbstractControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  type ValidationErrors,
+  Validators,
+} from '@angular/forms';
+import {
+  type AuditoriumInput,
+  type Coordinates,
+  googleMapsPlaceUrl,
+  parseCoordinates,
+} from '@mandapambook/shared';
 import { errorMessage } from '../../../core/auth/auth.service';
+import { GeolocationService, LocationError } from '../../../core/geolocation.service';
 import { type City, OwnerApi, type VenueDetail } from '../../../core/owner-api.service';
 import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../../shared/form-field';
+
+/** Empty, or coordinates (typed or from a Google Maps link) inside the area the API accepts. */
+function locationValidator(control: AbstractControl<string>): ValidationErrors | null {
+  const text = control.value.trim();
+  if (!text) return null;
+  const pin = parseCoordinates(text);
+  if (!pin) return { location: true };
+  const inIndia =
+    pin.latitude >= 6 && pin.latitude <= 37 && pin.longitude >= 68 && pin.longitude <= 98;
+  return inIndia ? null : { outsideIndia: true };
+}
 
 /** Venue basics, used both to create a draft and to edit an existing listing. */
 @Component({
@@ -87,6 +110,44 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../../shared/form-field
       <app-form-field for="locality" label="Locality (optional)">
         <input id="locality" formControlName="locality" [class]="inputClass" />
       </app-form-field>
+      <div class="sm:col-span-2">
+        <app-form-field
+          for="location"
+          label="Map location (optional)"
+          hint="Paste the venue's link from Google Maps (Share → Copy link, or the address bar), or type latitude, longitude. Customers use it to find halls near them and get directions."
+          [error]="locationProblem()"
+        >
+          <input
+            id="location"
+            formControlName="location"
+            placeholder="e.g. 10.0261, 76.3084"
+            [class]="inputClass"
+            [attr.aria-invalid]="!!locationProblem()"
+          />
+        </app-form-field>
+        <div class="mt-2 flex flex-wrap items-center gap-3 text-sm">
+          <button
+            type="button"
+            class="rounded-full border border-slate-300 bg-white px-3.5 py-1.5 font-medium hover:border-slate-400 disabled:opacity-60"
+            [disabled]="locating()"
+            (click)="useCurrentLocation()"
+          >
+            {{ locating() ? 'Finding you…' : 'Use my current location' }}
+          </button>
+          @if (pin(); as p) {
+            <a
+              [href]="previewUrl(p)"
+              target="_blank"
+              rel="noopener"
+              class="text-brand-700 underline"
+              >Check the pin on Google Maps</a
+            >
+          }
+          @if (geoError()) {
+            <span class="text-red-700" role="alert">{{ geoError() }}</span>
+          }
+        </div>
+      </div>
       <div class="sm:col-span-2">
         <app-form-field
           for="description"
@@ -174,6 +235,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../../shared/form-field
 })
 export class VenueForm implements OnInit {
   private readonly api = inject(OwnerApi);
+  private readonly geo = inject(GeolocationService);
   readonly venue = input<VenueDetail | null>(null);
   readonly saved = output<{ id: string }>();
 
@@ -189,6 +251,7 @@ export class VenueForm implements OnInit {
     cityId: ['', Validators.required],
     addressLine: ['', [Validators.required, Validators.minLength(5)]],
     locality: [''],
+    location: ['', locationValidator],
     pincode: ['', [Validators.required, Validators.pattern(/^[1-9][0-9]{5}$/)]],
     description: [''],
     cateringPolicy: ['OUTSIDE_ALLOWED' as AuditoriumInput['cateringPolicy']],
@@ -203,11 +266,55 @@ export class VenueForm implements OnInit {
 
   async ngOnInit(): Promise<void> {
     const v = this.venue();
-    if (v) this.form.patchValue({ ...v, locality: v.locality ?? '' });
+    if (v) {
+      this.form.patchValue({
+        ...v,
+        locality: v.locality ?? '',
+        location:
+          v.latitude !== null && v.longitude !== null ? `${v.latitude}, ${v.longitude}` : '',
+      });
+    }
     try {
       this.cities.set((await this.api.cities()).items);
     } catch (err) {
       this.error.set(errorMessage(err, 'Could not load cities.'));
+    }
+  }
+
+  protected readonly previewUrl = googleMapsPlaceUrl;
+  protected readonly locating = signal(false);
+  protected readonly geoError = signal<string | null>(null);
+
+  /** The pin read from the location field, when it is valid. */
+  protected pin(): Coordinates | null {
+    const c = this.form.controls.location;
+    return c.valid ? parseCoordinates(c.value) : null;
+  }
+
+  protected locationProblem(): string | null {
+    const c = this.form.controls.location;
+    if (!c.touched || c.valid) return null;
+    return c.hasError('outsideIndia')
+      ? 'That point is outside India. Check the link or the numbers.'
+      : 'Could not read a location. Paste the full Google Maps link (short maps.app.goo.gl links do not include it) or type latitude, longitude.';
+  }
+
+  protected async useCurrentLocation(): Promise<void> {
+    this.locating.set(true);
+    this.geoError.set(null);
+    try {
+      const here = await this.geo.current({ precise: true });
+      const round = (n: number) => Math.round(n * 1e6) / 1e6;
+      const c = this.form.controls.location;
+      c.setValue(`${round(here.latitude)}, ${round(here.longitude)}`);
+      c.markAsTouched();
+      c.markAsDirty();
+    } catch (err) {
+      this.geoError.set(
+        err instanceof LocationError ? err.message : 'Could not find your location.',
+      );
+    } finally {
+      this.locating.set(false);
     }
   }
 
@@ -223,8 +330,13 @@ export class VenueForm implements OnInit {
     this.error.set(null);
     this.showSaved.set(false);
     try {
-      const { locality, ...rest } = this.form.getRawValue();
-      const body: AuditoriumInput = locality.trim() ? { ...rest, locality } : rest;
+      const { locality, location, ...rest } = this.form.getRawValue();
+      const pin = parseCoordinates(location);
+      const body: AuditoriumInput = {
+        ...rest,
+        ...(locality.trim() ? { locality } : {}),
+        ...(pin ? { latitude: pin.latitude, longitude: pin.longitude } : {}),
+      };
       const v = this.venue();
       const result = v ? await this.api.updateVenue(v.id, body) : await this.api.createVenue(body);
       this.showSaved.set(true);

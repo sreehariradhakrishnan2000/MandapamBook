@@ -163,6 +163,30 @@ describe.skipIf(!hasTestDb)('search, quotes, holds and bookings', { timeout: 120
       expect((await c.send('get', `/api/v1/auditoriums?date=2020-01-01`)).status).toBe(400);
     });
 
+    it('finds venues near a location, nearest first, with the distance', async () => {
+      await h.db
+        .update(auditoriums)
+        .set({ latitude: 13.0339, longitude: 80.2619 })
+        .where(eq(auditoriums.id, venue.id));
+      const c = new Client(h.app);
+      const near = await c.send(
+        'get',
+        '/api/v1/auditoriums?lat=13.0339&lng=80.27&radiusKm=5&sort=distance',
+      );
+      expect(near.status).toBe(200);
+      const found = near.body.items.find((v: { id: string }) => v.id === venue.id);
+      expect(found.distanceKm).toBeCloseTo(0.9, 1);
+
+      const far = await c.send('get', '/api/v1/auditoriums?lat=9.9312&lng=76.2673&radiusKm=50');
+      expect(far.body.items.map((v: { id: string }) => v.id)).not.toContain(venue.id);
+
+      const plain = await c.send('get', `/api/v1/auditoriums?city=${citySlug}`);
+      expect(plain.body.items[0].distanceKm).toBeNull();
+
+      expect((await c.send('get', '/api/v1/auditoriums?lat=13.03')).status).toBe(400);
+      expect((await c.send('get', '/api/v1/auditoriums?sort=distance')).status).toBe(400);
+    });
+
     it('prices for the requested date and hides venues whose slot is taken', async () => {
       const date = nextDate();
       const c = new Client(h.app);
