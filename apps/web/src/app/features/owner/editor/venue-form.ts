@@ -222,6 +222,14 @@ function locationValidator(control: AbstractControl<string>): ValidationErrors |
         available</label
       >
       <label class="flex items-center gap-2 text-sm"
+        ><input type="checkbox" formControlName="sadyaPrepArea" class="size-4" /> Sadya preparation
+        area on site</label
+      >
+      <label class="flex items-center gap-2 text-sm"
+        ><input type="checkbox" formControlName="cookingEquipment" class="size-4" /> Cooking
+        equipment provided (vessels, stoves, burners)</label
+      >
+      <label class="flex items-center gap-2 text-sm"
         ><input type="checkbox" formControlName="instantBook" class="size-4" /> Confirm bookings
         instantly (otherwise I approve each one)</label
       >
@@ -261,6 +269,8 @@ export class VenueForm implements OnInit {
     guestRooms: [0, Validators.min(0)],
     advancePercent: [25, [Validators.min(10), Validators.max(100)]],
     hasGenerator: [false],
+    sadyaPrepArea: [false],
+    cookingEquipment: [false],
     instantBook: [true],
   });
 

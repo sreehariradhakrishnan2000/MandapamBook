@@ -1,7 +1,8 @@
 import { Router, type RequestHandler } from 'express';
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import {
   type PublicReview,
+  type ReviewableOfflineBooking,
   adminReviewQuerySchema,
   createReviewSchema,
   moderateReviewSchema,
@@ -11,7 +12,16 @@ import {
 } from '@mandapambook/shared';
 import type { Db } from '../../db/client.js';
 import { PG_ERROR, pgErrorCode } from '../../db/client.js';
-import { auditoriums, bookings, reviews, users } from '../../db/schema/index.js';
+import {
+  auditoriums,
+  availabilityBlocks,
+  bookings,
+  halls,
+  offlineBookings,
+  reviews,
+  users,
+} from '../../db/schema/index.js';
+import { todayInIst } from '../../lib/time.js';
 import { errors } from '../../http/errors.js';
 import type { RateLimiters } from '../../http/middleware/rate-limit.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
@@ -55,6 +65,159 @@ export function reviewsRouter(deps: {
   const { db, authenticate, scoped, audit, limiters } = deps;
   const r = Router();
 
+  /**
+   * Only people whose account has a name and an email or a mobile number may review. Their
+   * details are copied onto the review, so it stays traceable if the account changes.
+   */
+  async function reviewerFor(userId: string) {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) throw errors.unauthenticated();
+    if (!user.fullName.trim() || !(user.email || user.phone)) {
+      throw errors.conflict(
+        'REVIEWER_DETAILS_REQUIRED',
+        'Add your name and an email address or mobile number to your account before writing a review',
+      );
+    }
+    return {
+      reviewerName: user.fullName,
+      reviewerEmail: user.email,
+      reviewerPhone: user.phone,
+      user,
+    };
+  }
+
+  /**
+   * Bookings venues took offline for this person, matched on the account's VERIFIED email or
+   * VERIFIED mobile number against what the venue recorded. An unverified address or number
+   * could be anyone's, so it never unlocks someone else's booking.
+   */
+  async function offlineBookingsFor(userId: string) {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return [];
+    const matches = [
+      user.phone && user.phoneVerifiedAt
+        ? eq(offlineBookings.customerPhone, user.phone)
+        : undefined,
+      user.emailVerifiedAt ? eq(offlineBookings.customerEmail, user.email) : undefined,
+    ].filter((m) => m !== undefined);
+    if (!matches.length) return [];
+    const firstDate = sql<string>`min(${availabilityBlocks.eventDate})`;
+    const lastDate = sql<string>`max(${availabilityBlocks.eventDate})`;
+    return db
+      .select({
+        id: offlineBookings.id,
+        auditoriumId: offlineBookings.auditoriumId,
+        venueName: auditoriums.name,
+        venueSlug: auditoriums.slug,
+        hallName: halls.name,
+        eventType: offlineBookings.eventType,
+        firstDate,
+        lastDate,
+      })
+      .from(offlineBookings)
+      .innerJoin(auditoriums, eq(auditoriums.id, offlineBookings.auditoriumId))
+      .innerJoin(halls, eq(halls.id, offlineBookings.hallId))
+      .innerJoin(availabilityBlocks, eq(availabilityBlocks.offlineBookingId, offlineBookings.id))
+      .where(
+        and(
+          or(...matches),
+          eq(offlineBookings.status, 'ACTIVE'),
+          eq(auditoriums.status, 'APPROVED'),
+        ),
+      )
+      .groupBy(offlineBookings.id, auditoriums.id, halls.id)
+      .orderBy(desc(lastDate));
+  }
+
+  /** Events venues booked for me outside the app, and whether I can review them yet. */
+  r.get(
+    '/me/offline-bookings',
+    authenticate,
+    requirePermission('review:create'),
+    async (req, res) => {
+      const me = currentUser(req);
+      const rows = await offlineBookingsFor(me.userId);
+      const existing = rows.length
+        ? await db
+            .select()
+            .from(reviews)
+            .where(
+              and(
+                eq(reviews.customerId, me.userId),
+                inArray(
+                  reviews.offlineBookingId,
+                  rows.map((x) => x.id),
+                ),
+              ),
+            )
+        : [];
+      const today = todayInIst();
+      const items: ReviewableOfflineBooking[] = rows.map((x) => {
+        const review = existing.find((rv) => rv.offlineBookingId === x.id);
+        return {
+          offlineBookingId: x.id,
+          venueName: x.venueName,
+          venueSlug: x.venueSlug,
+          hallName: x.hallName,
+          eventType: x.eventType,
+          firstDate: x.firstDate,
+          lastDate: x.lastDate,
+          canReview: !review && x.lastDate < today,
+          review: review
+            ? { id: review.id, rating: review.rating, body: review.body, status: review.status }
+            : null,
+        };
+      });
+      res.set('Cache-Control', 'no-store').json({ items });
+    },
+  );
+
+  r.post(
+    '/offline-bookings/:id/review',
+    authenticate,
+    requirePermission('review:create'),
+    async (req, res) => {
+      const me = currentUser(req);
+      await limiters.consume('reviewWritePerUser', me.userId);
+      const id = parseId(req.params['id']);
+      const input = createReviewSchema.parse(req.body);
+      const reviewer = await reviewerFor(me.userId);
+      // Not matching your verified number looks exactly like not existing.
+      const booking = (await offlineBookingsFor(me.userId)).find((x) => x.id === id);
+      if (!booking) throw errors.notFound('Booking not found');
+      if (booking.lastDate >= todayInIst()) {
+        throw errors.conflict('NOT_REVIEWABLE', 'You can review a booking after the event');
+      }
+      try {
+        const created = await db.transaction(async (tx) => {
+          const [row] = await tx
+            .insert(reviews)
+            .values({
+              offlineBookingId: booking.id,
+              customerId: me.userId,
+              auditoriumId: booking.auditoriumId,
+              rating: input.rating,
+              body: input.body,
+              eventDate: booking.firstDate,
+              reviewerName: reviewer.reviewerName,
+              reviewerEmail: reviewer.reviewerEmail,
+              reviewerPhone: reviewer.reviewerPhone,
+            })
+            .returning();
+          await refreshRating(tx, booking.auditoriumId);
+          if (!row) throw new Error('review insert returned no row');
+          return row;
+        });
+        res.status(201).json({ id: created.id, rating: created.rating, status: created.status });
+      } catch (err) {
+        if (pgErrorCode(err) === PG_ERROR.UNIQUE_VIOLATION) {
+          throw errors.conflict('ALREADY_REVIEWED', 'This booking has already been reviewed');
+        }
+        throw err;
+      }
+    },
+  );
+
   r.get('/auditoriums/:id/reviews', async (req, res) => {
     const id = parseId(req.params['id']);
     const q = reviewListQuerySchema.parse(req.query);
@@ -64,20 +227,18 @@ export function reviewsRouter(deps: {
       .where(and(eq(auditoriums.id, id), eq(auditoriums.status, 'APPROVED')));
     if (!venue) throw errors.notFound();
     const rows = await db
-      .select({ r: reviews, name: users.fullName, eventDate: bookings.eventDate })
+      .select()
       .from(reviews)
-      .innerJoin(users, eq(users.id, reviews.customerId))
-      .innerJoin(bookings, eq(bookings.id, reviews.bookingId))
       .where(and(eq(reviews.auditoriumId, id), eq(reviews.status, 'PUBLISHED')))
       .orderBy(desc(reviews.createdAt))
       .limit(q.limit)
       .offset(q.offset);
-    const items: PublicReview[] = rows.map(({ r: rv, name, eventDate }) => ({
+    const items: PublicReview[] = rows.map((rv) => ({
       id: rv.id,
       rating: rv.rating,
       body: rv.body,
-      author: reviewerDisplayName(name),
-      eventMonth: monthOf(eventDate),
+      author: reviewerDisplayName(rv.reviewerName),
+      eventMonth: monthOf(rv.eventDate),
       createdAt: rv.createdAt.toISOString(),
       ownerReply: rv.ownerReply,
     }));
@@ -97,6 +258,7 @@ export function reviewsRouter(deps: {
       await limiters.consume('reviewWritePerUser', me.userId);
       const id = parseId(req.params['id']);
       const input = createReviewSchema.parse(req.body);
+      const reviewer = await reviewerFor(me.userId);
       try {
         const created = await db.transaction(async (tx) => {
           const [b] = await tx
@@ -115,6 +277,10 @@ export function reviewsRouter(deps: {
               auditoriumId: b.auditoriumId,
               rating: input.rating,
               body: input.body,
+              eventDate: b.eventDate,
+              reviewerName: reviewer.reviewerName,
+              reviewerEmail: reviewer.reviewerEmail,
+              reviewerPhone: reviewer.reviewerPhone,
             })
             .returning();
           await refreshRating(tx, b.auditoriumId);
@@ -139,21 +305,21 @@ export function reviewsRouter(deps: {
       const scope = await scoped.scope(req);
       const q = reviewListQuerySchema.parse(req.query);
       const rows = await db
-        .select({ r: reviews, venueName: auditoriums.name, name: users.fullName })
+        .select({ r: reviews, venueName: auditoriums.name })
         .from(reviews)
         .innerJoin(auditoriums, eq(auditoriums.id, reviews.auditoriumId))
-        .innerJoin(users, eq(users.id, reviews.customerId))
         .where(auditoriumScopeCondition(scope))
         .orderBy(desc(reviews.createdAt))
         .limit(q.limit)
         .offset(q.offset);
       res.set('Cache-Control', 'no-store').json({
-        items: rows.map(({ r: rv, venueName, name }) => ({
+        items: rows.map(({ r: rv, venueName }) => ({
           id: rv.id,
           venueName,
           rating: rv.rating,
           body: rv.body,
-          author: reviewerDisplayName(name),
+          author: reviewerDisplayName(rv.reviewerName),
+          source: rv.offlineBookingId ? 'OFFLINE' : 'APP',
           status: rv.status,
           ownerReply: rv.ownerReply,
           createdAt: rv.createdAt.toISOString(),
@@ -204,10 +370,9 @@ export function reviewsRouter(deps: {
     const where = q.status ? eq(reviews.status, q.status) : undefined;
     const [rows, [total]] = await Promise.all([
       db
-        .select({ r: reviews, venueName: auditoriums.name, customerName: users.fullName })
+        .select({ r: reviews, venueName: auditoriums.name })
         .from(reviews)
         .innerJoin(auditoriums, eq(auditoriums.id, reviews.auditoriumId))
-        .innerJoin(users, eq(users.id, reviews.customerId))
         .where(where)
         .orderBy(desc(reviews.createdAt))
         .limit(q.limit)
@@ -216,10 +381,15 @@ export function reviewsRouter(deps: {
     ]);
     res.set('Cache-Control', 'no-store').json({
       total: total?.n ?? 0,
-      items: rows.map(({ r: rv, venueName, customerName }) => ({
+      // Admins moderating reviews see who wrote each one, as their account said at the time.
+      items: rows.map(({ r: rv, venueName }) => ({
         id: rv.id,
         venueName,
-        customerName,
+        customerName: rv.reviewerName,
+        customerEmail: rv.reviewerEmail,
+        customerPhone: rv.reviewerPhone,
+        source: rv.offlineBookingId ? 'OFFLINE' : 'APP',
+        eventDate: rv.eventDate,
         rating: rv.rating,
         body: rv.body,
         status: rv.status,

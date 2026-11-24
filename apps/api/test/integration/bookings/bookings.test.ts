@@ -163,6 +163,34 @@ describe.skipIf(!hasTestDb)('search, quotes, holds and bookings', { timeout: 120
       expect((await c.send('get', `/api/v1/auditoriums?date=2020-01-01`)).status).toBe(400);
     });
 
+    it('reports dining AC and sadya facilities and filters by sadya', async () => {
+      const c = new Client(h.app);
+      const before = await c.send('get', `/api/v1/auditoriums?city=${citySlug}&sadya=true`);
+      expect(before.body.items).toHaveLength(0);
+
+      await h.db
+        .update(auditoriums)
+        .set({ sadyaPrepArea: true, cookingEquipment: true })
+        .where(eq(auditoriums.id, venue.id));
+      // Dining AC only counts for a hall that has a dining area at all.
+      await h.db
+        .update(halls)
+        .set({ diningIsAc: true, diningCapacity: 400 })
+        .where(eq(halls.id, hallId));
+
+      const after = await c.send('get', `/api/v1/auditoriums?city=${citySlug}&sadya=true`);
+      expect(after.body.items.map((v: { id: string }) => v.id)).toEqual([venue.id]);
+      expect(after.body.items[0]).toMatchObject({
+        hasAc: true,
+        diningAc: true,
+        sadyaPrepArea: true,
+        cookingEquipment: true,
+      });
+      const page = await c.send('get', `/api/v1/auditoriums/${venue.slug}`);
+      expect(page.body).toMatchObject({ sadyaPrepArea: true, cookingEquipment: true });
+      expect(page.body.halls[0]).toMatchObject({ isAc: true, diningIsAc: true });
+    });
+
     it('finds venues near a location, nearest first, with the distance', async () => {
       await h.db
         .update(auditoriums)
