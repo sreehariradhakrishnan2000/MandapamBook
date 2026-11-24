@@ -31,6 +31,8 @@ export interface VenuePage {
   parkingTwoWheelers: number;
   guestRooms: number;
   hasGenerator: boolean;
+  sadyaPrepArea: boolean;
+  cookingEquipment: boolean;
   advancePercent: number;
   instantBook: boolean;
   ratingAvg: number | null;
@@ -41,6 +43,7 @@ export interface VenuePage {
     seatingCapacity: number;
     diningCapacity: number;
     isAc: boolean;
+    diningIsAc: boolean;
     basePrices: Partial<Record<Slot, number>>;
   }[];
   amenities: { code: string; name: string }[];

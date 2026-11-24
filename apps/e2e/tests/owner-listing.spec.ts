@@ -51,7 +51,7 @@ test('an owner lists a venue and an admin approves it', async ({ page, browser }
     await page.getByRole('tab', { name: 'Halls & prices' }).click();
     await page.getByLabel('Name', { exact: true }).fill('Main Hall');
     await page.getByLabel('Seating').fill('800');
-    await page.getByLabel('Dining').fill('300');
+    await page.getByLabel('Dining', { exact: true }).fill('300');
     await page.getByRole('button', { name: 'Add hall' }).click();
     const hall = page.getByRole('region', { name: 'Main Hall' });
     await expect(hall).toBeVisible();

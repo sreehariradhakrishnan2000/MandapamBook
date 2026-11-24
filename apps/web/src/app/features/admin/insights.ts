@@ -296,6 +296,16 @@ export class AdminPayouts implements OnInit {
                 >{{ r.customerName }} · {{ r.createdAt | date: 'd MMM y' }}</span
               >
             </p>
+            <p class="text-xs text-slate-500">
+              {{ r.customerEmail }}
+              @if (r.customerPhone) {
+                · {{ r.customerPhone }}
+              }
+              · Event {{ r.eventDate | date: 'd MMM y' }} ·
+              {{
+                r.source === 'OFFLINE' ? 'Booked offline with the venue' : 'Booked on MandapamBook'
+              }}
+            </p>
             @if (r.body) {
               <p class="whitespace-pre-line">{{ r.body }}</p>
             }

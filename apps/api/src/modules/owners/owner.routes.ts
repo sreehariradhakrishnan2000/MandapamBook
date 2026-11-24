@@ -9,6 +9,7 @@ import type { InvoiceService } from '../invoices/invoice.service.js';
 import { bookingsInboxRouter } from './bookings-inbox.routes.js';
 import { calendarRouter } from './calendar.routes.js';
 import { listingsRouter } from './listings.routes.js';
+import { offlineBookingsRouter } from './offline-bookings.routes.js';
 import { mediaRouter } from './media.routes.js';
 import { profileRouter } from './profile.routes.js';
 import { ScopedResources } from './scoped.js';
@@ -37,6 +38,7 @@ export function ownerRouter(deps: OwnerRouterDeps): Router {
   r.use(profileRouter({ db, crypto, audit }));
   r.use(listingsRouter({ db, scoped, audit, storage }));
   r.use(calendarRouter({ db, scoped, audit }));
+  r.use(offlineBookingsRouter({ db, scoped, audit }));
   r.use(mediaRouter({ db, scoped, storage, audit }));
   r.use(staffRouter({ db, scoped, auth, audit }));
   r.use(

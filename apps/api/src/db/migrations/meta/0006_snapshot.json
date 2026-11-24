@@ -1,5 +1,5 @@
 {
-  "id": "165587b3-7a7f-4a21-8f40-698dd9fe2715",
+  "id": "36ba0966-0f59-45db-a990-83485959e658",
   "prevId": "9d2bf486-2073-4e53-b44a-420f9c14e5a9",
   "version": "7",
   "dialect": "postgresql",
@@ -772,125 +772,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.user_identities": {
-      "name": "user_identities",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject": {
-          "name": "subject",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "email": {
-          "name": "email",
-          "type": "citext",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "user_identities_provider_subject_key": {
-          "name": "user_identities_provider_subject_key",
-          "columns": [
-            {
-              "expression": "provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "subject",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "user_identities_user_provider_key": {
-          "name": "user_identities_user_provider_key",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "user_identities_user_id_users_id_fk": {
-          "name": "user_identities_user_id_users_id_fk",
-          "tableFrom": "user_identities",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "user_identities_provider": {
-          "name": "user_identities_provider",
-          "value": "\"user_identities\".\"provider\" IN ('google')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -1497,6 +1378,20 @@
           "notNull": true,
           "default": false
         },
+        "sadya_prep_area": {
+          "name": "sadya_prep_area",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "cooking_equipment": {
+          "name": "cooking_equipment",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "advance_percent": {
           "name": "advance_percent",
           "type": "smallint",
@@ -1978,6 +1873,13 @@
         },
         "is_ac": {
           "name": "is_ac",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "dining_is_ac": {
+          "name": "dining_is_ac",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

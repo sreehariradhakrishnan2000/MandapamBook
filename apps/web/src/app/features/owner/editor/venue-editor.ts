@@ -12,6 +12,7 @@ import { AuthService, errorMessage } from '../../../core/auth/auth.service';
 import { OwnerApi, type VenueDetail } from '../../../core/owner-api.service';
 import { StatusChip } from '../status-chip';
 import { VenueCalendar } from './calendar';
+import { OfflineBookings } from './offline-bookings';
 import { HallsPricing } from './halls-pricing';
 import { VenuePhotos } from './photos';
 import { VenuePolicies } from './policies';
@@ -29,6 +30,7 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
     VenuePhotos,
     VenuePolicies,
     VenueCalendar,
+    OfflineBookings,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -113,7 +115,14 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
               <app-venue-policies [venue]="v" (changed)="reload()" />
             }
             @case ('calendar') {
-              <app-venue-calendar [halls]="v.halls" />
+              <div class="flex flex-col gap-8">
+                <app-venue-calendar #cal [halls]="v.halls" />
+                <app-offline-bookings
+                  [venueId]="v.id"
+                  [halls]="v.halls"
+                  (changed)="cal.refresh()"
+                />
+              </div>
             }
           }
         </div>
