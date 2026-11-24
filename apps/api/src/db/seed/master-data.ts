@@ -80,6 +80,34 @@ export const CITIES: CitySeed[] = [
     state: 'Kerala',
     nameI18n: { ml: 'കണ്ണൂർ', hi: 'कन्नूर' },
   },
+  {
+    name: 'Pathanamthitta',
+    slug: 'pathanamthitta',
+    district: 'Pathanamthitta',
+    state: 'Kerala',
+    nameI18n: { ml: 'പത്തനംതിട്ട', hi: 'पतनमतिट्टा' },
+  },
+  {
+    name: 'Idukki',
+    slug: 'idukki',
+    district: 'Idukki',
+    state: 'Kerala',
+    nameI18n: { ml: 'ഇടുക്കി', hi: 'इडुक्की' },
+  },
+  {
+    name: 'Wayanad',
+    slug: 'wayanad',
+    district: 'Wayanad',
+    state: 'Kerala',
+    nameI18n: { ml: 'വയനാട്', hi: 'वायनाड' },
+  },
+  {
+    name: 'Kasaragod',
+    slug: 'kasaragod',
+    district: 'Kasaragod',
+    state: 'Kerala',
+    nameI18n: { ml: 'കാസർഗോഡ്', hi: 'कासरगोड' },
+  },
   // Tamil Nadu
   {
     name: 'Chennai',

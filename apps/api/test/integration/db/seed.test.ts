@@ -14,6 +14,10 @@ import {
 } from '../../../src/db/schema/index.js';
 import { AMENITIES, CITIES } from '../../../src/db/seed/master-data.js';
 import { SAMPLE_AUDITORIUMS } from '../../../src/db/seed/sample-data.js';
+import {
+  KERALA_TEST_AUDITORIUMS,
+  KERALA_TEST_OWNERS,
+} from '../../../src/db/seed/kerala-test-venues.js';
 import { DEMO_USERS, seedDemoUsers } from '../../../src/db/seed/demo-users.js';
 import { seedSamplePhotos } from '../../../src/db/seed/sample-photos.js';
 import { seedMasterData, seedSampleData } from '../../../src/db/seed/seed.js';
@@ -152,4 +156,34 @@ describe.skipIf(!hasTestDb)('seed', () => {
       server.close();
     }
   });
+
+  it(
+    'loads the 140 Kerala test venues, 10 per district, idempotently',
+    { timeout: 600_000 },
+    async () => {
+      await seedMasterData(db);
+      const set = { owners: KERALA_TEST_OWNERS, auditoriums: KERALA_TEST_AUDITORIUMS };
+      const first = await seedSampleData(db, set);
+      expect(first.auditoriumsCreated + first.auditoriumsSkipped).toBe(140);
+
+      const perCity = await db
+        .select({ slug: cities.slug, n: count() })
+        .from(auditoriums)
+        .innerJoin(cities, eq(cities.id, auditoriums.cityId))
+        .where(
+          inArray(
+            auditoriums.slug,
+            KERALA_TEST_AUDITORIUMS.map((v) => v.slug),
+          ),
+        )
+        .groupBy(cities.slug);
+      expect(perCity).toHaveLength(14);
+      for (const row of perCity) expect(row.n, row.slug).toBe(10);
+
+      expect(await seedSampleData(db, set)).toEqual({
+        auditoriumsCreated: 0,
+        auditoriumsSkipped: 140,
+      });
+    },
+  );
 });
