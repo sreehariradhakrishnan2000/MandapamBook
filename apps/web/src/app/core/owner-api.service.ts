@@ -95,6 +95,7 @@ export interface OfflineBooking {
   hallName: string;
   customerName: string;
   customerPhone: string;
+  customerEmail: string | null;
   eventType: string | null;
   amountPaise: number | null;
   advancePaise: number | null;
