@@ -10,6 +10,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { RouterLink } from '@angular/router';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
 import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
+import { PasswordToggle } from '../../shared/password-toggle';
 
 @Component({
   selector: 'app-verify-email',
@@ -123,7 +124,7 @@ export class ForgotPassword {
 
 @Component({
   selector: 'app-reset-password',
-  imports: [ReactiveFormsModule, RouterLink, FormField],
+  imports: [ReactiveFormsModule, RouterLink, FormField, PasswordToggle],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="auth-card">
@@ -143,13 +144,17 @@ export class ForgotPassword {
             </p>
           }
           <app-form-field for="password" label="New password" hint="At least 10 characters.">
-            <input
-              id="password"
-              type="password"
-              formControlName="password"
-              autocomplete="new-password"
-              [class]="inputClass"
-            />
+            <div class="relative">
+              <input
+                #pw
+                id="password"
+                type="password"
+                formControlName="password"
+                autocomplete="new-password"
+                [class]="inputClass + ' pr-12'"
+              />
+              <app-password-toggle [input]="pw" />
+            </div>
           </app-form-field>
           <button type="submit" [class]="buttonClass" [disabled]="busy()">Change password</button>
         </form>
