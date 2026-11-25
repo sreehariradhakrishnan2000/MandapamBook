@@ -91,7 +91,9 @@ export class MyBookings implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-4 py-4">
-      <a routerLink="/account/bookings" class="text-sm text-brand-700 underline">← My bookings</a>
+      <a routerLink="/account/bookings" class="tap w-fit text-sm text-brand-700 underline"
+        >← My bookings</a
+      >
       @if (b(); as b) {
         <header>
           <h1 class="font-display text-3xl font-medium">{{ b.venueName }} · {{ b.hallName }}</h1>

@@ -145,7 +145,8 @@ export class SearchForm implements OnInit {
     ' lg:relative lg:before:absolute lg:before:inset-y-3 lg:before:left-0 lg:before:w-px lg:before:bg-slate-200';
   protected readonly caption = 'text-xs font-medium text-slate-500';
   protected readonly control =
-    'w-full min-w-0 border-0 bg-transparent p-0 text-sm font-medium text-ink outline-none focus:ring-0';
+    // At least 36px tall on phones (where it's tapped directly); slim inside the desktop pill.
+    'min-h-9 w-full min-w-0 border-0 bg-transparent p-0 text-base font-medium text-ink outline-none focus:ring-0 sm:text-sm lg:min-h-0';
   protected readonly slots = SLOTS;
   protected readonly slotLabels = SLOT_LABELS;
   protected readonly today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(

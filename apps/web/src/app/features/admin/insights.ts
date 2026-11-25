@@ -183,7 +183,7 @@ export class AdminReports implements OnInit {
           </select>
         </label>
       </header>
-      <div class="overflow-x-auto">
+      <div class="relative overflow-x-auto">
         <table class="w-full min-w-[40rem] text-left text-sm">
           <caption class="sr-only">
             Payouts
