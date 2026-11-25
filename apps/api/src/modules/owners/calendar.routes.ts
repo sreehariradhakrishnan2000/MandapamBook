@@ -3,7 +3,12 @@ import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { DEFAULT_RULE_PRIORITY, blockSchema, pricingRuleSchema } from '@mandapambook/shared';
 import { z } from 'zod';
 import { type Db, PG_ERROR, lockHallDate, pgErrorCode } from '../../db/client.js';
-import { availabilityBlocks, hallOccupancy, pricingRules } from '../../db/schema/index.js';
+import {
+  availabilityBlocks,
+  hallOccupancy,
+  offlineBookings,
+  pricingRules,
+} from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
 import { todayInIst } from '../../lib/time.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
@@ -124,9 +129,12 @@ export function calendarRouter(deps: {
         bookingId: hallOccupancy.bookingId,
         blockId: hallOccupancy.blockId,
         reason: availabilityBlocks.reason,
+        offlineBookingId: availabilityBlocks.offlineBookingId,
+        customerName: offlineBookings.customerName,
       })
       .from(hallOccupancy)
       .leftJoin(availabilityBlocks, eq(availabilityBlocks.id, hallOccupancy.blockId))
+      .leftJoin(offlineBookings, eq(offlineBookings.id, availabilityBlocks.offlineBookingId))
       .where(
         and(
           eq(hallOccupancy.hallId, hall.id),
@@ -140,9 +148,11 @@ export function calendarRouter(deps: {
       items: rows.map((r) => ({
         eventDate: r.eventDate,
         slot: r.slot,
-        kind: r.blockId ? 'BLOCK' : 'BOOKING',
+        kind: r.offlineBookingId ? 'OFFLINE' : r.blockId ? 'BLOCK' : 'BOOKING',
         blockId: r.blockId,
         reason: r.reason,
+        offlineBookingId: r.offlineBookingId,
+        customerName: r.customerName,
       })),
     });
   });
@@ -196,6 +206,13 @@ export function calendarRouter(deps: {
     const me = currentUser(req);
     const scope = await scoped.scope(req);
     const block = await scoped.block(scope, req.params['blockId']);
+    if (block.offlineBookingId) {
+      // Otherwise the booking would stay "active" with a date it no longer holds.
+      throw errors.conflict(
+        'PART_OF_OFFLINE_BOOKING',
+        'This date belongs to an offline booking. Cancel that booking instead.',
+      );
+    }
     await db.delete(availabilityBlocks).where(eq(availabilityBlocks.id, block.id));
     await audit.record(
       {

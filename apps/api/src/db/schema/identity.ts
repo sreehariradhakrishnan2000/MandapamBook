@@ -145,6 +145,31 @@ export const emailTokens = pgTable(
   (t) => [uniqueIndex('email_tokens_hash_key').on(t.tokenHash)],
 );
 
+/**
+ * External sign-in accounts linked to a user (e.g. Google). Matched by the provider's
+ * stable subject id, never by email, which a person can change at the provider.
+ */
+export const userIdentities = pgTable(
+  'user_identities',
+  {
+    id: id(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    subject: text('subject').notNull(),
+    /** The email the provider reported when last used, for support and audit only. */
+    email: citext('email').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('user_identities_provider_subject_key').on(t.provider, t.subject),
+    uniqueIndex('user_identities_user_provider_key').on(t.userId, t.provider),
+    check('user_identities_provider', sql`${t.provider} IN ('google')`),
+  ],
+);
+
 export const otpChallenges = pgTable(
   'otp_challenges',
   {

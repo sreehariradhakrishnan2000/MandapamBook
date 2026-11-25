@@ -18,6 +18,7 @@ import {
 import { MemoryObjectStorage } from '../src/infra/storage.js';
 import { hashPassword } from '../src/modules/auth/password.js';
 import { MockPaymentProvider } from '../src/modules/payments/mock/mock-provider.js';
+import type { GoogleProvider } from '../src/modules/auth/google.js';
 import { MemoryEmailSender, MemorySmsSender } from '../src/modules/notifications/senders.js';
 import { createTestPool, testDb } from './db-helpers.js';
 import { silentLogger } from './helpers.js';
@@ -75,7 +76,11 @@ export interface Harness {
  * (CI, or Upstash locally); otherwise the in-memory stores with identical semantics.
  */
 export async function createHarness(
-  opts: { limitOverrides?: Partial<Record<LimitName, LimitSpec>>; env?: Partial<AuthEnv> } = {},
+  opts: {
+    limitOverrides?: Partial<Record<LimitName, LimitSpec>>;
+    env?: Partial<AuthEnv>;
+    googleProvider?: GoogleProvider;
+  } = {},
 ): Promise<Harness> {
   const pool = createTestPool(10);
   const db = testDb(pool);
@@ -109,6 +114,7 @@ export async function createHarness(
     sms,
     storage,
     paymentProvider: gateway,
+    ...(opts.googleProvider ? { googleProvider: opts.googleProvider } : {}),
     limitOverrides: {
       apiPerIp: generous,
       loginPerIp: generous,

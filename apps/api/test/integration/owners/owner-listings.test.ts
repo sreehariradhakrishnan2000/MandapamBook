@@ -198,6 +198,55 @@ describe.skipIf(!hasTestDb)('owner listings', () => {
       expect(moved.body).toMatchObject({ latitude: 9.93, longitude: 78.12 });
     });
 
+    it('saves dining AC per hall and sadya facilities per venue', async () => {
+      const { c } = await owner();
+      const venue = await createVenue(c);
+      expect(venue).toMatchObject({ sadyaPrepArea: false, cookingEquipment: false });
+      const sadya = await c.send('patch', `/api/v1/owner/auditoriums/${venue.id}`, {
+        sadyaPrepArea: true,
+        cookingEquipment: true,
+      });
+      expect(sadya.body).toMatchObject({ sadyaPrepArea: true, cookingEquipment: true });
+
+      const hall = await c.send('post', `/api/v1/owner/auditoriums/${venue.id}/halls`, {
+        name: 'Main Hall',
+        seatingCapacity: 800,
+        diningCapacity: 300,
+        isAc: true,
+        diningIsAc: false,
+      });
+      expect(hall.body).toMatchObject({ isAc: true, diningIsAc: false });
+      const changed = await c.send('patch', `/api/v1/owner/halls/${hall.body.id}`, {
+        diningIsAc: true,
+      });
+      // Only the field sent changes; nothing else is reset to a default.
+      expect(changed.body).toMatchObject({
+        isAc: true,
+        diningIsAc: true,
+        diningCapacity: 300,
+        seatingCapacity: 800,
+      });
+    });
+
+    it('changes only the fields sent when a venue is edited', async () => {
+      const { c } = await owner();
+      const venue = await createVenue(c);
+      await c.send('patch', `/api/v1/owner/auditoriums/${venue.id}`, {
+        description: 'Carved wooden stage.',
+        instantBook: false,
+        advancePercent: 40,
+        parkingCars: 90,
+      });
+      const res = await c.send('patch', `/api/v1/owner/auditoriums/${venue.id}`, { guestRooms: 6 });
+      expect(res.body).toMatchObject({
+        guestRooms: 6,
+        description: 'Carved wooden stage.',
+        instantBook: false,
+        advancePercent: 40,
+        parkingCars: 90,
+      });
+    });
+
     it('lists what is missing, then submits a complete listing for review', async () => {
       const { c } = await owner();
       const venue = await createVenue(c);

@@ -1,6 +1,11 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import type { OwnerEarnings, PublicReview, ReportSummary } from '@mandapambook/shared';
+import type {
+  OwnerEarnings,
+  PublicReview,
+  ReportSummary,
+  ReviewableOfflineBooking,
+} from '@mandapambook/shared';
 import { firstValueFrom } from 'rxjs';
 import { API } from './auth/auth.service';
 
@@ -23,6 +28,11 @@ export interface OwnerReview {
 
 export interface AdminReview extends Omit<OwnerReview, 'author'> {
   customerName: string;
+  customerEmail: string;
+  /** Null only on reviews written before a phone number was required. */
+  customerPhone: string | null;
+  source: 'APP' | 'OFFLINE';
+  eventDate: string;
 }
 
 export type PayoutStatus = 'PENDING' | 'SCHEDULED' | 'PAID' | 'ON_HOLD';
@@ -66,6 +76,19 @@ export class InsightsApi {
   createReview = (bookingId: string, rating: number, body: string) =>
     firstValueFrom(
       this.http.post<{ id: string }>(`${API}/bookings/${bookingId}/review`, { rating, body }),
+    );
+
+  /** Bookings venues took for me offline, matched on my verified mobile number. */
+  myOfflineBookings = () =>
+    firstValueFrom(
+      this.http.get<{ items: ReviewableOfflineBooking[] }>(`${API}/me/offline-bookings`),
+    );
+  reviewOfflineBooking = (offlineBookingId: string, rating: number, body: string) =>
+    firstValueFrom(
+      this.http.post<{ id: string }>(`${API}/offline-bookings/${offlineBookingId}/review`, {
+        rating,
+        body,
+      }),
     );
 
   ownerReviews = () =>

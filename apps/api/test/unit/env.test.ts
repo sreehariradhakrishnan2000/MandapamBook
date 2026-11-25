@@ -26,6 +26,25 @@ describe('loadEnv', () => {
     expect(env.ENABLE_API_DOCS).toBe(false);
   });
 
+  it('treats blank Google settings as unset, and needs both or neither', () => {
+    const blank = loadEnv({ ...valid, GOOGLE_CLIENT_ID: '', GOOGLE_CLIENT_SECRET: '' });
+    expect(blank.GOOGLE_CLIENT_ID).toBeUndefined();
+    expect(blank.GOOGLE_CLIENT_SECRET).toBeUndefined();
+
+    const id = '1234-abc.apps.googleusercontent.com';
+    expect(
+      loadEnv({ ...valid, GOOGLE_CLIENT_ID: id, GOOGLE_CLIENT_SECRET: 'GOCSPX-secret' }),
+    ).toMatchObject({ GOOGLE_CLIENT_ID: id });
+    expect(() => loadEnv({ ...valid, GOOGLE_CLIENT_ID: id })).toThrow(/GOOGLE_CLIENT_ID/);
+    expect(() =>
+      loadEnv({
+        ...valid,
+        GOOGLE_CLIENT_ID: 'not-a-client-id',
+        GOOGLE_CLIENT_SECRET: 'GOCSPX-secret',
+      }),
+    ).toThrow(/GOOGLE_CLIENT_ID/);
+  });
+
   it('fails fast listing every problem without echoing values', () => {
     let caught: unknown;
     try {

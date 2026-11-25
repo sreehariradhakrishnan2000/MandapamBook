@@ -46,9 +46,15 @@ import { InrPipe } from './inr.pipe';
           }
         </p>
         <p class="text-sm text-slate-600">
-          Up to {{ v.maxCapacity }} guests · {{ v.hasAc ? 'AC' : 'Non-AC' }} ·
-          {{ v.parkingCars }} car parking
+          Up to {{ v.maxCapacity }} guests · {{ v.parkingCars }} car parking
         </p>
+        <ul class="flex flex-wrap gap-1.5 pt-1 text-xs font-medium" aria-label="Facilities">
+          <li [class]="v.hasAc ? on : off">Hall {{ v.hasAc ? 'AC' : 'non-AC' }}</li>
+          <li [class]="v.diningAc ? on : off">Dining {{ v.diningAc ? 'AC' : 'non-AC' }}</li>
+          @if (v.sadyaPrepArea) {
+            <li [class]="on">Sadya kitchen{{ v.cookingEquipment ? ' + equipment' : '' }}</li>
+          }
+        </ul>
         @if (v.fromPricePaise !== null) {
           <p class="mt-auto pt-2">
             <span class="text-xs text-slate-500">from </span
@@ -62,6 +68,10 @@ import { InrPipe } from './inr.pipe';
 export class HallCard {
   readonly venue = input.required<SearchResult>();
   readonly queryParams = input<Record<string, string | null>>({});
+
+  protected readonly on =
+    'rounded-full bg-forest-50 px-2 py-0.5 text-forest-800 ring-1 ring-forest-200';
+  protected readonly off = 'rounded-full bg-slate-100 px-2 py-0.5 text-slate-600';
 
   protected distance(km: number): string {
     return km < 1 ? `${Math.max(100, Math.round(km * 10) * 100)} m` : `${km.toFixed(1)} km`;

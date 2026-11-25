@@ -45,6 +45,10 @@ const keyRing = csv.transform((entries, ctx): KeyRingEntry[] => {
   return ring;
 });
 
+/** An optional setting where an empty value (e.g. `GOOGLE_CLIENT_ID=` in .env) means "not set". */
+const blankIsUnset = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
+
 const secret32 = z
   .string()
   .transform((v) => Buffer.from(v, 'base64url'))
@@ -123,6 +127,19 @@ export const envSchema = z.object({
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   /** Check new passwords against Have I Been Pwned (k-anonymity; only a hash prefix is sent). */
   HIBP_ENABLED: booleanString.default(false),
+  /**
+   * "Continue with Google" (OAuth web client from Google Cloud Console). Set both to enable;
+   * the authorised redirect URI is APP_BASE_URL + /api/v1/auth/google/callback.
+   */
+  GOOGLE_CLIENT_ID: blankIsUnset(
+    z
+      .string()
+      .regex(
+        /^[\w-]+\.apps\.googleusercontent\.com$/,
+        'an OAuth client id ending .apps.googleusercontent.com',
+      ),
+  ),
+  GOOGLE_CLIENT_SECRET: blankIsUnset(z.string().min(10)),
   /** console: log (dev). file: one JSON file per message in EMAIL_FILE_DIR (e2e tests). smtp: real delivery. */
   EMAIL_PROVIDER: z.enum(['console', 'file', 'smtp']).default('console'),
   EMAIL_FILE_DIR: z.string().min(1).optional(),
@@ -224,6 +241,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   ) {
     problems.push(
       'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET / RAZORPAY_WEBHOOK_SECRET: required when PAYMENT_PROVIDER=razorpay',
+    );
+  }
+  if (!env.GOOGLE_CLIENT_ID !== !env.GOOGLE_CLIENT_SECRET) {
+    problems.push(
+      'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET: set both to enable Google sign-in, or neither',
     );
   }
   if (env.EMAIL_PROVIDER === 'file' && !env.EMAIL_FILE_DIR) {
