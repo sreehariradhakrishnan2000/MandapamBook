@@ -93,6 +93,11 @@ next to Neon us-east-1).
   `CNAME www <service>.onrender.com`, with no AAAA records. Render adds the www redirect and
   the TLS certificate. Add the domain to the API's `CORS_ORIGINS` and to the bucket's CORS
   rules, and set `APP_BASE_URL` once the domain serves the site.
+- **Email on free services:** Render's free instances block outbound SMTP on ports 25, 465
+  and 587, so sends time out. Use the provider's alternative port; staging uses Brevo on
+  `smtp://<login>:<key>@smtp-relay.brevo.com:2525` (URL-encode the `@` in the login as `%40`),
+  sending from `noreply@mandapambooking.in`, a domain authenticated in Brevo. Brevo SMTP keys
+  expire on their set date or after 90 days without sending.
 
 ## Health checks
 
