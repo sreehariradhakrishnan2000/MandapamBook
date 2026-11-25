@@ -5,7 +5,7 @@
 ```
 web PaymentAdapter ──POST /payments/orders──▶ PaymentService ──▶ PaymentProvider (interface)
         │                                          ▲                    ├─ MockPaymentProvider   (PAYMENT_PROVIDER=mock)
-        └─ gateway checkout ─▶ /payments/return ───┤                    └─ RazorpayProvider      (PAYMENT_PROVIDER=razorpay, stub)
+        └─ gateway checkout ─▶ /payments/return ───┤                    └─ RazorpayProvider      (PAYMENT_PROVIDER=razorpay)
                                 POST /payments/verify
 gateway ──signed webhook──▶ POST /payments/webhooks/:provider (raw body) ─▶ PaymentService.handleWebhook
 ```
@@ -36,6 +36,19 @@ Booking effects: capture moves `PENDING_PAYMENT → CONFIRMED` (instant-book ven
 - Webhook signature: header `x-mock-signature = HMAC_SHA256(MOCK_PAYMENT_WEBHOOK_SECRET, "<x-mock-timestamp>.<raw body>")`, with a ±5-minute timestamp window.
 - Hosted checkout page `GET /api/v1/payments/mock/checkout/:orderId` (only mounted in mock mode) with **Pay success**, **Pay fail**, **Leave pending** (no webhook) and **Pay success, webhook after 30 s**. It then redirects to `APP_BASE_URL/payments/return?orderId&paymentId&signature&status`.
 - Production refuses `PAYMENT_PROVIDER=mock` at startup.
+
+## Razorpay (implemented)
+
+Steps 2–3 below are done: `RazorpayProvider` calls the REST API with `fetch` (15 s timeout, no SDK), and the web adapter opens Razorpay Standard Checkout, then sends its ids and signature to `/payments/return`, which verifies them with the API.
+
+**Switching modes is configuration only.** `.env.example` has three blocks (mock, Razorpay test, Razorpay live); keep exactly one active. The key prefix decides the mode:
+
+| Key          | Mode                         | TEST MODE banner | Allowed in        |
+| ------------ | ---------------------------- | ---------------- | ----------------- |
+| `rzp_test_…` | Razorpay test, no real money | shown            | local, staging    |
+| `rzp_live_…` | real payments                | hidden           | local, production |
+
+Test and live mode each have their **own** keys and **own** webhook (with its own secret) in the Razorpay dashboard. Set **Account & Settings → Payment capture** to **Automatic**: we treat only `captured` payments as paid.
 
 ## Migrating to Razorpay
 
