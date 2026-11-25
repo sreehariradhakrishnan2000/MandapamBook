@@ -46,6 +46,11 @@ import { ScopedResources } from './modules/owners/scoped.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
+import {
+  MaintenanceService,
+  maintenanceGate,
+  maintenanceRouter,
+} from './modules/settings/maintenance.js';
 
 export type AuthEnv = Pick<
   Env,
@@ -134,6 +139,10 @@ export function buildContainer(deps: ContainerDeps): Container {
 
   const api = Router();
   api.use(limiters.middleware('apiPerIp', byIp));
+  // Maintenance: the switch and status come first, then the gate that closes the rest.
+  const maintenance = new MaintenanceService(db);
+  api.use(maintenanceRouter({ maintenance, audit, authenticate }));
+  api.use(maintenanceGate(maintenance, accessTokens, deps.revocations));
   const settings = new SettingsService(db);
   const quotes = new QuoteService(db, settings);
   const bookingService = new BookingService(db, quotes, settings, audit);

@@ -109,6 +109,19 @@ export const platformSettingsSchema = z.strictObject({
   owner_response_hours: z.number().int().min(1).max(72),
 });
 export type PlatformSettings = z.infer<typeof platformSettingsSchema>;
+/**
+ * Maintenance mode: while enabled, customers and owners see the maintenance page and the
+ * API answers 503 MAINTENANCE; admins, sign-in and payment webhooks keep working.
+ */
+export const maintenanceSchema = z.strictObject({
+  enabled: z.boolean(),
+  /** Shown on the maintenance page; blank uses the default wording. */
+  message: z.string().trim().max(300).default(''),
+  /** When we expect to be back (ISO date-time), or null when unknown. */
+  until: z.iso.datetime({ offset: true }).nullable().default(null),
+});
+export type Maintenance = z.infer<typeof maintenanceSchema>;
+
 export const platformSettingsUpdateSchema = platformSettingsSchema
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Change at least one setting');

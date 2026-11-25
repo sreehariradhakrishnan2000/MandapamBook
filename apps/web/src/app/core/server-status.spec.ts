@@ -85,3 +85,38 @@ describe('while the API wakes up', () => {
     status.markUp();
   });
 });
+
+describe('planned maintenance', () => {
+  let http: HttpTestingController;
+  let client: HttpClient;
+  let status: ServerStatus;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([serverWakeInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
+    http = TestBed.inject(HttpTestingController);
+    client = TestBed.inject(HttpClient);
+    status = TestBed.inject(ServerStatus);
+  });
+  afterEach(() => http.verify());
+
+  it('switches to the maintenance page at once, without retrying or a waking banner', async () => {
+    const until = '2030-01-09T10:00:00.000Z';
+    const result = firstValueFrom(client.get('/api/v1/cities'));
+    http
+      .expectOne('/api/v1/cities')
+      .flush(
+        { error: { code: 'MAINTENANCE', message: 'Upgrading payments', details: { until } } },
+        { status: 503, statusText: 'Service Unavailable' },
+      );
+    await expect(result).rejects.toMatchObject({ status: 503 });
+    http.expectNone('/api/v1/cities');
+    expect(status.waking()).toBe(false);
+    expect(status.maintenance()).toEqual({ message: 'Upgrading payments', until });
+    expect(errorMessage(await result.catch((e: unknown) => e))).toContain('planned maintenance');
+  });
+});

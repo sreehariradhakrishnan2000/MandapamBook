@@ -9,4 +9,9 @@ export class BrowserNavigation {
   assign(url: string): void {
     this.document.location.assign(url);
   }
+
+  /** Reloads the current page, e.g. when maintenance ends, so every view fetches afresh. */
+  reload(): void {
+    this.document.location.reload();
+  }
 }

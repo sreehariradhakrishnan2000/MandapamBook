@@ -17,7 +17,29 @@ import { API } from './auth/auth.service';
 export class ServerStatus {
   /** True while the API is not answering yet; drives the banner in the app shell. */
   readonly waking = signal(false);
+  /**
+   * Set while planned maintenance is on (the API answered 503 MAINTENANCE, or /status says
+   * so). Customers then see the maintenance page; admins see a reminder bar.
+   */
+  readonly maintenance = signal<MaintenanceInfo | null>(null);
   private probing = false;
+
+  /** Asks the API whether maintenance is on. Never throws: unknown means "not on". */
+  async checkMaintenance(): Promise<boolean> {
+    if (typeof fetch === 'undefined') return false;
+    try {
+      const res = await fetch(`${API}/status`, { cache: 'no-store' });
+      if (!res.ok) return this.maintenance() !== null;
+      const body = (await res.json()) as {
+        maintenance?: { enabled: boolean; message: string; until: string | null };
+      };
+      const m = body.maintenance;
+      this.maintenance.set(m?.enabled ? { message: m.message, until: m.until } : null);
+      return Boolean(m?.enabled);
+    } catch {
+      return this.maintenance() !== null;
+    }
+  }
 
   markWaking(): void {
     this.waking.set(true);
@@ -58,8 +80,25 @@ const WAKING_STATUSES = new Set([502, 503, 504]);
 /** Delays between retries: quick at first, then every 5 seconds. */
 const RETRY_DELAYS_MS = [1_000, 2_000, 3_000, 5_000];
 
+export interface MaintenanceInfo {
+  message: string;
+  until: string | null;
+}
+
+/** The API's planned-maintenance answer (503 with code MAINTENANCE). */
+export function maintenanceFrom(err: unknown): MaintenanceInfo | null {
+  if (!(err instanceof HttpErrorResponse) || err.status !== 503) return null;
+  const body = err.error as {
+    error?: { code?: string; message?: string; details?: { until?: string | null } };
+  } | null;
+  if (body?.error?.code !== 'MAINTENANCE') return null;
+  return { message: body.error.message ?? '', until: body.error.details?.until ?? null };
+}
+
 export function isWakingError(err: unknown): err is HttpErrorResponse {
-  return err instanceof HttpErrorResponse && WAKING_STATUSES.has(err.status);
+  return (
+    err instanceof HttpErrorResponse && WAKING_STATUSES.has(err.status) && !maintenanceFrom(err)
+  );
 }
 
 /**
@@ -83,6 +122,13 @@ export const serverWakeInterceptor: HttpInterceptorFn = (req, next) => {
         if (status.waking()) status.markUp();
       }),
       catchError((err: unknown) => {
+        const planned = maintenanceFrom(err);
+        if (planned) {
+          // Planned maintenance: no retrying; the app shows the maintenance page.
+          status.markUp();
+          status.maintenance.set(planned);
+          return throwError(() => err);
+        }
         if (!isWakingError(err)) return throwError(() => err);
         if (!retryable(req, err)) {
           status.markWaking();
