@@ -198,11 +198,33 @@ describe('booking flow', () => {
     http.expectNone('/api/v1/bookings');
 
     (await find(el, 'Resend verification email')).click();
-    (await pending('/api/v1/auth/verify-email/resend')).flush(
-      { message: 'sent' },
-      { status: 202, statusText: 'Accepted' },
-    );
+    const resend = await pending('/api/v1/auth/verify-email/resend');
+    // The link will bring the customer back to this hall with the same choices.
+    expect(resend.request.body).toEqual({
+      returnTo: '/book/h1?slug=sundaram-mahal&date=2030-01-09&slot=MORNING&guests=500',
+    });
+    resend.flush({ message: 'sent' }, { status: 202, statusText: 'Accepted' });
     await vi.waitFor(() => expect(el.textContent).toContain('Open the newest email'));
+
+    // The link was opened in another tab: the session refreshes and this page updates.
+    void TestBed.inject(AuthService).refresh();
+    (await pending('/api/v1/auth/csrf')).flush({ csrfToken: 'c' });
+    (await pending('/api/v1/auth/refresh')).flush({
+      accessToken: 't2',
+      expiresIn: 900,
+      user: {
+        id: 'u1',
+        email: 'u@example.test',
+        fullName: 'Unverified',
+        phone: null,
+        role: 'CUSTOMER',
+        emailVerified: true,
+        phoneVerified: false,
+        permissions: permissionsFor('CUSTOMER'),
+      },
+    } satisfies AuthSession);
+    await vi.waitFor(() => expect(el.textContent).toContain('Email verified. You can hold'));
+    expect(el.textContent).not.toContain('Verify your email to book');
   });
 });
 

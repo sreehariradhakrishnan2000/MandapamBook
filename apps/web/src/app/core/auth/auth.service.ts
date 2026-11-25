@@ -35,6 +35,24 @@ export class AuthService {
   readonly user = computed<AuthUser | null>(() => this.session()?.user ?? null);
   readonly isSignedIn = computed(() => this.session() !== null);
 
+  /**
+   * Tells other open tabs of this site that the email was just verified (the link usually
+   * opens in a new tab), so a waiting booking page updates itself. Carries no data.
+   */
+  private readonly tabs =
+    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('mandapambook-auth');
+
+  constructor() {
+    this.tabs?.addEventListener('message', (e: MessageEvent) => {
+      if (e.data === 'email-verified' && this.user()?.emailVerified === false) void this.refresh();
+    });
+  }
+
+  /** Called by the verify-email page after a successful verification. */
+  announceEmailVerified(): void {
+    this.tabs?.postMessage('email-verified');
+  }
+
   get accessToken(): string | null {
     return this.session()?.accessToken ?? null;
   }
@@ -133,8 +151,10 @@ export class AuthService {
   }
 
   /** Emails a fresh verification link to the signed-in user; earlier links stop working. */
-  async resendVerificationEmail(): Promise<void> {
-    await firstValueFrom(this.http.post(`${API}/auth/verify-email/resend`, null));
+  async resendVerificationEmail(returnTo?: string): Promise<void> {
+    await firstValueFrom(
+      this.http.post(`${API}/auth/verify-email/resend`, returnTo ? { returnTo } : {}),
+    );
   }
 
   async forgotPassword(email: string): Promise<void> {

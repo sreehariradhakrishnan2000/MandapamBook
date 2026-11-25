@@ -583,8 +583,14 @@ export class AuthService {
   /**
    * Sends a fresh verification link to a signed-in user whose email is not verified yet,
    * for when the first email went astray or its link expired. Earlier links stop working.
+   * `returnTo` (a path on our site, validated by the route) is carried in the link so the
+   * customer lands back where they were, e.g. the booking page.
    */
-  async resendVerificationEmail(userId: string, ctx: ClientContext): Promise<void> {
+  async resendVerificationEmail(
+    userId: string,
+    ctx: ClientContext,
+    returnTo?: string,
+  ): Promise<void> {
     const [user] = await this.db.select().from(users).where(eq(users.id, userId));
     if (!user) throw errors.notFound('User not found');
     if (user.emailVerifiedAt)
@@ -600,7 +606,7 @@ export class AuthService {
           isNull(emailTokens.usedAt),
         ),
       );
-    await this.sendEmailToken(user, 'VERIFY_EMAIL');
+    await this.sendEmailToken(user, 'VERIFY_EMAIL', returnTo);
     await this.audit.record(
       {
         action: 'auth.verification_email_resent',
@@ -666,6 +672,7 @@ export class AuthService {
   private async sendEmailToken(
     user: UserRow,
     purpose: 'VERIFY_EMAIL' | 'PASSWORD_RESET',
+    returnTo?: string,
   ): Promise<void> {
     const token = randomToken(32);
     await this.db.insert(emailTokens).values({
@@ -675,7 +682,8 @@ export class AuthService {
       expiresAt: new Date(Date.now() + EMAIL_TOKEN_TTL[purpose] * 1000),
     });
     const verify = purpose === 'VERIFY_EMAIL';
-    const link = `${this.config.appBaseUrl}/${verify ? 'verify-email' : 'reset-password'}?token=${token}`;
+    const next = returnTo ? `&next=${encodeURIComponent(returnTo)}` : '';
+    const link = `${this.config.appBaseUrl}/${verify ? 'verify-email' : 'reset-password'}?token=${token}${next}`;
     const firstName = user.fullName.trim().split(/\s+/)[0] ?? user.fullName;
     await this.email.send({
       to: user.email,

@@ -5,9 +5,11 @@ import {
   DestroyRef,
   type OnInit,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -141,6 +143,14 @@ import { PaymentAdapter } from '../payments/payment-adapter';
           }
         </form>
 
+        @if (justVerified()) {
+          <p
+            class="rounded-xl bg-forest-50 px-4 py-3 text-sm font-semibold text-forest-800 ring-1 ring-forest-200"
+            role="status"
+          >
+            ✓ Email verified. You can hold this date now.
+          </p>
+        }
         @if (auth.user(); as user) {
           @if (!user.emailVerified) {
             <section
@@ -245,6 +255,23 @@ export class Book implements OnInit {
   readonly date = input<string>();
   readonly slot = input<Slot>();
   readonly guests = input<string>();
+  /** Set by the verify-email page when it sends the customer back here. */
+  readonly verified = input<string>();
+  /** Shown once the email turns verified while (or just before) this page is open. */
+  protected readonly justVerified = signal(false);
+  private sawUnverified = false;
+  private readonly watchVerification = effect(() => {
+    const user = this.auth.user();
+    if (user?.emailVerified === false) this.sawUnverified = true;
+    else if (user?.emailVerified && this.sawUnverified) {
+      this.sawUnverified = false;
+      untracked(() => {
+        this.justVerified.set(true);
+        this.verifyMessage.set(null);
+        if (this.error()?.startsWith('Verify your email')) this.error.set(null);
+      });
+    }
+  });
 
   protected readonly slots = SLOTS;
   protected readonly slotLabels = SLOT_LABELS;
@@ -280,6 +307,7 @@ export class Book implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
+    if (this.verified() === '1' && this.auth.user()?.emailVerified) this.justVerified.set(true);
     this.form = {
       date: this.date() ?? '',
       slot: this.slot() ?? 'MORNING',
@@ -357,6 +385,17 @@ export class Book implements OnInit {
     }
   }
 
+  /** This page with the current choices, so the verification link brings them back. */
+  private returnPath(): string {
+    const params = new URLSearchParams();
+    const slug = this.slug();
+    if (slug) params.set('slug', slug);
+    if (this.form.date) params.set('date', this.form.date);
+    params.set('slot', this.form.slot);
+    params.set('guests', String(this.form.guests));
+    return `/book/${encodeURIComponent(this.hallId())}?${params.toString()}`;
+  }
+
   protected readonly verifyBusy = signal(false);
   protected readonly verifyMessage = signal<{ text: string; error: boolean } | null>(null);
 
@@ -364,7 +403,7 @@ export class Book implements OnInit {
   protected async resendVerification(): Promise<void> {
     this.verifyBusy.set(true);
     try {
-      await this.auth.resendVerificationEmail();
+      await this.auth.resendVerificationEmail(this.returnPath());
       this.verifyMessage.set({
         text: 'Sent. Open the newest email from MandapamBook; earlier links no longer work.',
         error: false,

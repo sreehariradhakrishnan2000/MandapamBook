@@ -72,6 +72,16 @@ export interface AuthRouterDeps {
   google?: { provider: GoogleProvider; stateKey: Buffer };
 }
 
+/**
+ * A path on our own site to return to after verifying, e.g. the booking page the customer
+ * was on. Path only: no scheme, no host, no "//" or backslash, so it can't send anyone away.
+ */
+export const SAFE_RETURN_PATH = /^\/(?![/\\])[A-Za-z0-9\-._~/?&=%+]*$/;
+
+const resendVerificationSchema = z.strictObject({
+  returnTo: z.string().max(300).regex(SAFE_RETURN_PATH).optional(),
+});
+
 /** Carries the OAuth state, PKCE verifier and nonce from /google/start to the callback. */
 export const GOOGLE_STATE_COOKIE = '__Host-mb_oauth';
 const GOOGLE_STATE_TTL_MS = 10 * 60_000;
@@ -258,7 +268,8 @@ export function authRouter({
   });
 
   r.post('/verify-email/resend', authenticate, async (req, res) => {
-    await auth.resendVerificationEmail(currentUser(req).userId, clientContext(req));
+    const { returnTo } = resendVerificationSchema.parse(req.body ?? {});
+    await auth.resendVerificationEmail(currentUser(req).userId, clientContext(req), returnTo);
     res.status(202).json({ message: 'We sent a new verification link to your email.' });
   });
 
