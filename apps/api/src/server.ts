@@ -8,7 +8,11 @@ import { createPgPool, createRedis } from './infra/connections.js';
 import { RedisRevocationStore } from './infra/revocation-store.js';
 import { createObjectStorage } from './infra/storage.js';
 import { type Sweeps, startSweeps } from './jobs/scheduler.js';
-import { createEmailSender, ConsoleSmsSender } from './modules/notifications/senders.js';
+import {
+  ConsoleSmsSender,
+  SmtpEmailSender,
+  createEmailSender,
+} from './modules/notifications/senders.js';
 
 async function main(): Promise<void> {
   const env = loadEnv(); // fail fast on bad config
@@ -23,13 +27,16 @@ async function main(): Promise<void> {
   const storage = createObjectStorage(env);
 
   // loadEnv refuses EMAIL_PROVIDER=console in production.
+  const email = createEmailSender(env, logger.child({ component: 'email' }));
+  // A wrong SMTP host or password shows up in the logs at startup, not at the first reset.
+  if (email instanceof SmtpEmailSender) void email.verify();
   const container = buildContainer({
     env,
     logger,
     db: createDb(pool),
     redis,
     revocations: new RedisRevocationStore(redis),
-    email: createEmailSender(env, logger),
+    email,
     sms: new ConsoleSmsSender(logger),
     storage,
   });
@@ -67,7 +74,7 @@ async function main(): Promise<void> {
   const shutdown = (signal: string): void => {
     logger.info({ signal }, 'shutting down');
     server.close(() => {
-      void (sweeps?.stop() ?? Promise.resolve())
+      void Promise.all([sweeps?.stop(), container.directEmail.drain()])
         .then(() => Promise.allSettled([pool.end(), redis.quit()]))
         .then(() => process.exit(0));
     });
