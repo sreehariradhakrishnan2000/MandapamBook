@@ -4,6 +4,23 @@
   >Skip to content</a
 >
 
+@if (server.waking()) {
+  <div
+    class="flex items-center justify-center gap-2 bg-marigold-100 px-4 py-2 text-center text-sm text-ink"
+    role="status"
+    aria-live="polite"
+  >
+    <span
+      class="size-4 shrink-0 rounded-full border-2 border-brand-600 border-t-transparent motion-safe:animate-spin"
+      aria-hidden="true"
+    ></span>
+    <span
+      ><strong class="font-semibold">Starting up the server…</strong> This takes up to a minute. The
+      page will load by itself.</span
+    >
+  </div>
+}
+
 @if (payments.config()?.testMode) {
   <div
     class="bg-red-700 px-4 py-1.5 text-center text-sm font-bold tracking-wide text-white"
