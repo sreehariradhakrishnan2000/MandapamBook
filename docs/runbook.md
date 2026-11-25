@@ -83,6 +83,21 @@ next to Neon us-east-1).
 - **Free services sleep** after 15 minutes idle and take about a minute to wake; sweeps pause
   while asleep. Expired holds still free their slot on the next request, and queued email is
   sent after waking. Fine for staging; production needs paid instances.
+- **Changing an environment variable needs a deploy, and the deploy must name the image.**
+  A restart keeps the old variables. A plain "deploy latest" uses the image saved on the
+  service, which the pipeline's deploy hooks do not update, so it can roll back to an old
+  release. Deploy with the running version's image instead (Render API:
+  `POST /v1/services/<id>/deploys` with `{"imageUrl": "ghcr.io/<owner>/mandapambook-api:<sha>"}`),
+  then check `/health` reports that version.
+- **Custom domains:** a GoDaddy-style registrar needs `A @ 216.24.57.1` and
+  `CNAME www <service>.onrender.com`, with no AAAA records. Render adds the www redirect and
+  the TLS certificate. Add the domain to the API's `CORS_ORIGINS` and to the bucket's CORS
+  rules, and set `APP_BASE_URL` once the domain serves the site.
+- **Email on free services:** Render's free instances block outbound SMTP on ports 25, 465
+  and 587, so sends time out. Use the provider's alternative port; staging uses Brevo on
+  `smtp://<login>:<key>@smtp-relay.brevo.com:2525` (URL-encode the `@` in the login as `%40`),
+  sending from `noreply@mandapambooking.in`, a domain authenticated in Brevo. Brevo SMTP keys
+  expire on their set date or after 90 days without sending.
 
 ## Health checks
 
