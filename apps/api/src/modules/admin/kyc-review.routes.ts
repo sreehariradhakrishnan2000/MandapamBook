@@ -6,6 +6,7 @@ import { ownerProfiles, users } from '../../db/schema/index.js';
 import { errors } from '../../http/errors.js';
 import type { FieldCrypto } from '../../lib/field-crypto.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
+import { renderEmail } from '../notifications/email-layout.js';
 import type { EmailSender } from '../notifications/senders.js';
 import { profileView } from '../owners/profile.routes.js';
 import { parseId } from '../owners/scoped.js';
@@ -146,14 +147,27 @@ export function kycReviewRouter(deps: {
     await email.send({
       to: owner.email,
       template: 'kyc_decision',
-      subject:
+      ...renderEmail(
         to === 'VERIFIED'
-          ? 'Your payout details are verified'
-          : 'Please update your payout details',
-      text:
-        to === 'VERIFIED'
-          ? `Hi ${owner.fullName}, your business and payout details are verified.`
-          : `Hi ${owner.fullName}, we could not verify your payout details: ${reason}. Update them at ${appBaseUrl}/owner/profile.`,
+          ? {
+              subject: 'Your payout details are verified',
+              heading: 'Your payout details are verified',
+              greetingName: owner.fullName,
+              paragraphs: [
+                'Your business and payout details are verified. Once your venue is approved, booking advances are paid out to this account.',
+              ],
+              action: { label: 'Open your dashboard', url: `${appBaseUrl}/owner` },
+            }
+          : {
+              subject: 'Please update your payout details',
+              heading: 'Please update your payout details',
+              greetingName: owner.fullName,
+              paragraphs: ['We could not verify your business and payout details.'],
+              details: [{ label: 'Reason', value: reason ?? '' }],
+              action: { label: 'Update your details', url: `${appBaseUrl}/owner/profile` },
+            },
+        appBaseUrl,
+      ),
     });
     res.json(profileView(updated, crypto));
   });
