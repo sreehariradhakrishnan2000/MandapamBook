@@ -153,6 +153,11 @@ export const envSchema = z.object({
     )
     .optional(),
   EMAIL_FROM: z.string().min(3).default('MandapamBook <no-reply@mandapambook.example>'),
+  /**
+   * Gets a copy of every booking confirmation, request, cancellation and refund, so the
+   * platform team sees bookings as they happen. Blank = no copies.
+   */
+  ADMIN_NOTIFY_EMAIL: blankIsUnset(z.email()),
 
   // --- Data protection ---
   /** AES-256-GCM keys for PAN and bank details ("kid:base64url", exactly 32 bytes each). */

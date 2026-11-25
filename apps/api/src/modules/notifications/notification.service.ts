@@ -29,6 +29,13 @@ interface Recipient {
   template: BookingTemplate;
 }
 
+/** Transitions the platform admin gets a copy of: new bookings, cancellations, refunds. */
+const ADMIN_ALERT_STATUSES = new Set(['CONFIRMED', 'AWAITING_OWNER', 'CANCELLED', 'REFUNDED']);
+
+export function adminAlertFor(h: Pick<HistoryRow, 'toStatus'>): boolean {
+  return ADMIN_ALERT_STATUSES.has(h.toStatus);
+}
+
 /** Which messages a booking transition produces. Pure, so the rules are unit-tested. */
 export function notificationsFor(
   h: Pick<HistoryRow, 'fromStatus' | 'toStatus' | 'reason'>,
@@ -87,6 +94,8 @@ export class NotificationService {
     private readonly invoices: InvoiceService,
     private readonly appBaseUrl: string,
     private readonly logger: Logger,
+    /** ADMIN_NOTIFY_EMAIL: gets a copy of booking events (see adminAlertFor). */
+    private readonly adminEmail?: string,
   ) {}
 
   async processOutbox(limit = 200): Promise<number> {
@@ -110,7 +119,8 @@ export class NotificationService {
       let queued = 0;
       for (const { h, b, ownerId, venueName, hallName } of rows) {
         const recipients = notificationsFor(h, b.customerId, ownerId);
-        if (recipients.length) {
+        const alertAdmin = Boolean(this.adminEmail) && adminAlertFor(h);
+        if (recipients.length || alertAdmin) {
           const paid = await this.paid(tx, b.id);
           const base = {
             bookingId: b.id,
@@ -123,17 +133,25 @@ export class NotificationService {
             paidPaise: paid.captured,
             refundPaise: h.toStatus === 'REFUNDED' ? paid.refunded : (b.refundDuePaise ?? 0),
           };
+          const rows = recipients.map((r) => ({
+            userId: r.userId as string | null,
+            channel: 'EMAIL' as const,
+            template: r.template as BookingTemplate,
+            data: base as Record<string, unknown>,
+            dedupeKey: `${r.template}:${h.id}:${r.userId}`,
+          }));
+          // The admin copy has no user row: the address travels in its data.
+          if (alertAdmin)
+            rows.push({
+              userId: null,
+              channel: 'EMAIL',
+              template: 'admin_booking_alert',
+              data: { ...base, toStatus: h.toStatus, reason: h.reason, toEmail: this.adminEmail },
+              dedupeKey: `admin_booking_alert:${h.id}`,
+            });
           const inserted = await tx
             .insert(notifications)
-            .values(
-              recipients.map((r) => ({
-                userId: r.userId,
-                channel: 'EMAIL' as const,
-                template: r.template,
-                data: base,
-                dedupeKey: `${r.template}:${h.id}:${r.userId}`,
-              })),
-            )
+            .values(rows)
             .onConflictDoNothing()
             .returning({ id: notifications.id });
           queued += inserted.length;
@@ -166,15 +184,26 @@ export class NotificationService {
   /** Sends queued notifications that are due. Failures back off and give up after 5 tries. */
   async deliverDue(limit = 50): Promise<{ sent: number; failed: number }> {
     const due = await this.db
-      .select({ n: notifications, email: users.email, name: users.fullName })
+      .select({ n: notifications, userEmail: users.email, userName: users.fullName })
       .from(notifications)
-      .innerJoin(users, eq(users.id, notifications.userId))
+      .leftJoin(users, eq(users.id, notifications.userId))
       .where(and(eq(notifications.status, 'QUEUED'), lte(notifications.nextAttemptAt, new Date())))
       .orderBy(asc(notifications.nextAttemptAt))
       .limit(limit);
     let sent = 0;
     let failed = 0;
-    for (const { n, email, name } of due) {
+    for (const { n, userEmail, userName } of due) {
+      // A user's message goes to their current address; the admin copy carries its own.
+      const email = userEmail ?? (n.data as { toEmail?: string }).toEmail;
+      const name = userName ?? 'there';
+      if (!email) {
+        await this.db
+          .update(notifications)
+          .set({ status: 'FAILED', lastError: 'no recipient (user deleted?)' })
+          .where(eq(notifications.id, n.id));
+        failed++;
+        continue;
+      }
       // Claim the row so two workers never send the same message.
       const claimed = await this.db
         .update(notifications)
