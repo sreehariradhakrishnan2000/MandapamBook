@@ -33,9 +33,38 @@ import { SearchForm } from './search-form';
       <app-search-form [initial]="formInitial()" />
 
       <div class="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <!-- Below laptop width the filters fold away, so results come first. -->
+        <button
+          type="button"
+          class="inline-flex min-h-11 w-fit items-center gap-2 rounded-full border border-slate-300 bg-white px-4 text-sm font-medium hover:border-slate-400 lg:hidden"
+          [attr.aria-expanded]="filtersOpen()"
+          aria-controls="filters-panel"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            class="size-4"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          {{ filtersOpen() ? 'Hide filters' : 'Filters' }}
+          @if (activeFilters() > 0) {
+            <span class="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">{{
+              activeFilters()
+            }}</span>
+          }
+        </button>
         <aside
+          id="filters-panel"
           aria-label="Filters"
-          class="flex h-fit flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm"
+          class="h-fit flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm lg:flex"
+          [class.flex]="filtersOpen()"
+          [class.hidden]="!filtersOpen()"
         >
           <h2 class="font-display text-xl">Filters</h2>
           <label class="flex items-center gap-2"
@@ -59,7 +88,7 @@ import { SearchForm } from './search-form';
           <label class="flex flex-col gap-1"
             >Catering
             <select
-              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-base sm:text-sm"
               [(ngModel)]="filters.catering"
               (ngModelChange)="apply()"
             >
@@ -71,7 +100,7 @@ import { SearchForm } from './search-form';
           <label class="flex flex-col gap-1"
             >Decoration
             <select
-              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-base sm:text-sm"
               [(ngModel)]="filters.decoration"
               (ngModelChange)="apply()"
             >
@@ -85,7 +114,7 @@ import { SearchForm } from './search-form';
             <input
               type="number"
               min="0"
-              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-base sm:text-sm"
               [(ngModel)]="filters.minParking"
               (change)="apply()"
             />
@@ -95,7 +124,7 @@ import { SearchForm } from './search-form';
             <input
               type="number"
               min="0"
-              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-base sm:text-sm"
               [(ngModel)]="filters.minRooms"
               (change)="apply()"
             />
@@ -103,7 +132,7 @@ import { SearchForm } from './search-form';
           <label class="flex flex-col gap-1"
             >Rating at least
             <select
-              class="rounded-xl border border-slate-300 bg-white px-3 py-2"
+              class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-base sm:text-sm"
               [(ngModel)]="filters.minRating"
               (ngModelChange)="apply()"
             >
@@ -151,13 +180,13 @@ import { SearchForm } from './search-form';
                 [href]="placeUrl(here)"
                 target="_blank"
                 rel="noopener"
-                class="text-forest-800 underline"
+                class="tap text-forest-800 underline"
                 >See on Google Maps</a
               >
               <a
                 routerLink="/search"
                 [queryParams]="withoutLocation()"
-                class="ml-auto font-medium text-forest-800 underline"
+                class="tap ml-auto font-medium text-forest-800 underline"
                 >Clear location</a
               >
             </div>
@@ -259,6 +288,9 @@ export class Search {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly allAmenities = signal<{ code: string; name: string }[]>([]);
+  /** The filter panel on screens below laptop width; it is always open on wider ones. */
+  protected readonly filtersOpen = signal(false);
+  protected readonly activeFilters = signal(0);
   protected filters = {
     ac: false,
     sadya: false,
@@ -366,6 +398,12 @@ export class Search {
   }
 
   protected apply(): void {
+    const f = this.filters;
+    this.activeFilters.set(
+      [f.ac, f.sadya, f.catering, f.decoration, f.minParking, f.minRooms, f.minRating].filter(
+        (v) => v !== false && v !== '' && v !== null,
+      ).length + f.amenities.length,
+    );
     this.page.set(1);
     void this.load(false);
   }
