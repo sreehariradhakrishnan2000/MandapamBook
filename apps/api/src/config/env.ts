@@ -158,6 +158,17 @@ export const envSchema = z.object({
    * platform team sees bookings as they happen. Blank = no copies.
    */
   ADMIN_NOTIFY_EMAIL: blankIsUnset(z.email()),
+  /**
+   * When the SMTP key stops working (YYYY-MM-DD; Brevo shows it when the key is made).
+   * From 30 days before, ADMIN_NOTIFY_EMAIL gets a weekly reminder to replace it.
+   */
+  SMTP_KEY_EXPIRES_AT: blankIsUnset(z.iso.date()),
+
+  // --- Error tracking (optional) ---
+  /** Sentry DSN for API errors. Blank = off. */
+  SENTRY_DSN: blankIsUnset(z.url()),
+  /** Sentry DSN for browser errors (a separate Sentry project). Blank = off. Public by design. */
+  SENTRY_WEB_DSN: blankIsUnset(z.url()),
 
   // --- Data protection ---
   /** AES-256-GCM keys for PAN and bank details ("kid:base64url", exactly 32 bytes each). */

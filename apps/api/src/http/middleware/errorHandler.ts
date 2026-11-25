@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express';
 import { ZodError } from 'zod';
+import { captureError } from '../../infra/error-tracking.js';
 import { HttpError, type ErrorBody } from '../errors.js';
 
 export const notFound: RequestHandler = (_req, _res, next) => {
@@ -45,7 +46,10 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next)
   // Planned maintenance and a bookings pause answer with 503 on purpose: not errors to log.
   const planned =
     err instanceof HttpError && (err.code === 'MAINTENANCE' || err.code === 'BOOKINGS_PAUSED');
-  if (status >= 500 && !planned) req.log.error({ err }, 'unhandled error');
+  if (status >= 500 && !planned) {
+    req.log.error({ err }, 'unhandled error');
+    captureError(err, { correlationId, path: req.route?.path ?? req.path });
+  }
 
   res.status(status).json({ error: body } satisfies ErrorBody);
 };

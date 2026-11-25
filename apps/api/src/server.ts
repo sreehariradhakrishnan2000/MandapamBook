@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { loadEnv } from './config/env.js';
 import { createLogger } from './config/logger.js';
+import { initErrorTracking } from './infra/error-tracking.js';
 import { buildContainer } from './container.js';
 import { createDb } from './db/client.js';
 import { createApp } from './http/app.js';
@@ -17,6 +18,12 @@ import {
 async function main(): Promise<void> {
   const env = loadEnv(); // fail fast on bad config
   const logger = createLogger(env);
+  await initErrorTracking({
+    dsn: env.SENTRY_DSN,
+    environment: env.APP_ENV ?? env.NODE_ENV,
+    release: (process.env['APP_VERSION'] ?? 'dev').slice(0, 12),
+    logger,
+  });
   const pool = createPgPool(env, logger);
   const redis = createRedis(env);
   redis.on('error', (err) => logger.warn({ err }, 'redis error'));

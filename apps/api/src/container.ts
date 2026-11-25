@@ -46,6 +46,7 @@ import { ScopedResources } from './modules/owners/scoped.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
+import { SystemHealth } from './modules/admin/system-health.js';
 import {
   bookingsPauseGate,
   createBookingsPauseService,
@@ -72,7 +73,18 @@ export type AuthEnv = Pick<
   | 'GOOGLE_CLIENT_ID'
   | 'GOOGLE_CLIENT_SECRET'
 > &
-  PaymentEnv;
+  PaymentEnv &
+  // Operational settings, optional so tests need not set them.
+  Partial<
+    Pick<
+      Env,
+      | 'EMAIL_PROVIDER'
+      | 'SMTP_KEY_EXPIRES_AT'
+      | 'ADMIN_NOTIFY_EMAIL'
+      | 'SENTRY_DSN'
+      | 'SENTRY_WEB_DSN'
+    >
+  >;
 
 export interface ContainerDeps {
   env: AuthEnv;
@@ -231,6 +243,13 @@ export function buildContainer(deps: ContainerDeps): Container {
       settings,
       payments: paymentService,
       appBaseUrl: env.APP_BASE_URL,
+      health: new SystemHealth(db, {
+        emailProvider: env.EMAIL_PROVIDER ?? 'console',
+        smtpKeyExpiresAt: env.SMTP_KEY_EXPIRES_AT,
+        adminEmail: env.ADMIN_NOTIFY_EMAIL,
+        appBaseUrl: env.APP_BASE_URL,
+      }),
+      errorTracking: { api: Boolean(env.SENTRY_DSN), web: Boolean(env.SENTRY_WEB_DSN) },
     }),
   );
 
