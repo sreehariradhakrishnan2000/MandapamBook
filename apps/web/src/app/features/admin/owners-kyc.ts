@@ -10,7 +10,7 @@ import { errorMessage } from '../../core/auth/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
+      <a routerLink="/admin" class="tap w-fit text-sm text-brand-700 underline">← Admin</a>
       <h1 class="font-display text-3xl font-medium">Owner KYC</h1>
       <label class="text-sm"
         >Show

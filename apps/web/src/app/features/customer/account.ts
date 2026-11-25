@@ -91,7 +91,7 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
               @if (codeSent()) {
                 <button
                   type="button"
-                  class="pb-2 text-slate-600 underline"
+                  class="tap text-slate-600 underline"
                   (click)="codeSent.set(false)"
                 >
                   Change number
@@ -101,7 +101,7 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
           } @else {
             <button
               type="button"
-              class="w-fit text-sm text-brand-700 underline"
+              class="tap w-fit text-sm text-brand-700 underline"
               (click)="changingPhone.set(true); phone.set('')"
             >
               Change number

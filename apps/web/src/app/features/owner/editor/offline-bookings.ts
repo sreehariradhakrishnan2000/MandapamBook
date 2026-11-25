@@ -338,7 +338,9 @@ export class OfflineBookings {
   /** Fired after any change, so the calendar can reload. */
   readonly changed = output();
 
-  protected readonly input = 'rounded-xl border border-slate-300 bg-white px-3 py-2';
+  // 16px text on phones so iOS doesn't zoom in when a field is focused.
+  protected readonly input =
+    'rounded-xl border border-slate-300 bg-white px-3 py-2 text-base sm:text-sm';
   protected readonly slotList = SLOTS;
   protected readonly slotLabels = SLOT_LABELS;
   protected readonly eventTypes = EVENT_TYPES;

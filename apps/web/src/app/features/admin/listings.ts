@@ -22,7 +22,7 @@ import { StatusChip } from '../owner/status-chip';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
+      <a routerLink="/admin" class="tap w-fit text-sm text-brand-700 underline">← Admin</a>
       <h1 class="font-display text-3xl font-medium">Listing approvals</h1>
       <form class="flex flex-wrap items-end gap-2 text-sm" (ngSubmit)="load()">
         <label class="flex flex-col gap-1"
@@ -100,7 +100,7 @@ export class AdminListings implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-5 py-4">
-      <a routerLink="/admin/listings" class="text-sm text-brand-700 underline"
+      <a routerLink="/admin/listings" class="tap w-fit text-sm text-brand-700 underline"
         >← Listing approvals</a
       >
       @if (detail(); as d) {
