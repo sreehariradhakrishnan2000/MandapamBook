@@ -18,7 +18,7 @@ import { InrPipe } from '../../shared/inr.pipe';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <h1 class="font-display text-3xl font-medium">Bookings</h1>
       <label class="text-sm"
         >Show

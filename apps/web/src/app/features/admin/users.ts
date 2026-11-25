@@ -12,7 +12,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
+      <a routerLink="/admin" class="tap w-fit text-sm text-brand-700 underline">← Admin</a>
       <h1 class="font-display text-3xl font-medium">Users</h1>
       <form class="flex flex-wrap items-end gap-2 text-sm" (ngSubmit)="load()">
         <label class="flex flex-col gap-1"
@@ -46,7 +46,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
           {{ error() }}
         </p>
       }
-      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div class="relative overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table class="w-full min-w-[40rem] text-sm">
           <caption class="sr-only">
             Users

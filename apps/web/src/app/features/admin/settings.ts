@@ -17,7 +17,7 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto flex max-w-lg flex-col gap-4 py-4">
-      <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
+      <a routerLink="/admin" class="tap w-fit text-sm text-brand-700 underline">← Admin</a>
       <h1 class="font-display text-3xl font-medium">Platform settings</h1>
       <p class="text-sm text-slate-600">
         Changes apply to new quotes. Existing bookings keep the price they were quoted.
@@ -165,7 +165,7 @@ export class AdminSettings implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-6 py-4">
-      <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
+      <a routerLink="/admin" class="tap w-fit text-sm text-brand-700 underline">← Admin</a>
       <h1 class="font-display text-3xl font-medium">Reference data</h1>
       @if (error()) {
         <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
@@ -353,7 +353,7 @@ export class AdminMasterData implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/admin" class="text-sm text-brand-700 underline">← Admin</a>
+      <a routerLink="/admin" class="tap w-fit text-sm text-brand-700 underline">← Admin</a>
       <h1 class="font-display text-3xl font-medium">Audit log</h1>
       <form class="flex flex-wrap items-end gap-2 text-sm" (ngSubmit)="load(true)">
         <label class="flex flex-col gap-1"

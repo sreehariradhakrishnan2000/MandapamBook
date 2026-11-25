@@ -139,7 +139,7 @@ function locationValidator(control: AbstractControl<string>): ValidationErrors |
               [href]="previewUrl(p)"
               target="_blank"
               rel="noopener"
-              class="text-brand-700 underline"
+              class="tap text-brand-700 underline"
               >Check the pin on Google Maps</a
             >
           }

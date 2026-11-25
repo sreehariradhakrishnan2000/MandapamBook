@@ -94,6 +94,22 @@ body {
   @apply font-display text-3xl font-normal text-ink sm:text-4xl;
 }
 
+/*
+ * A text link or small button that stays easy to tap on a phone: at least 44px tall
+ * (Apple's and Google's guidance) without looking any bigger.
+ */
+.tap {
+  @apply inline-flex min-h-11 items-center;
+}
+
+/* On touch screens, a checkbox or radio's whole label row is a comfortable tap target. */
+@media (pointer: coarse) {
+  label:has(> input[type='checkbox']),
+  label:has(> input[type='radio']) {
+    min-height: 2.75rem;
+  }
+}
+
 /* Filter chips, as in "Popular · Morning · Evening". */
 .chip {
   @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300;

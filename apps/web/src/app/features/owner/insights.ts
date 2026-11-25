@@ -42,7 +42,7 @@ const PAYOUT_LABELS: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <header class="flex flex-wrap items-end justify-between gap-3">
         <h1 class="font-display text-3xl font-medium">Earnings</h1>
         <label class="flex flex-col text-sm"
@@ -85,7 +85,7 @@ const PAYOUT_LABELS: Record<string, string> = {
         </p>
       }
 
-      <div class="overflow-x-auto">
+      <div class="relative overflow-x-auto">
         <table class="w-full min-w-[36rem] text-left text-sm">
           <caption class="sr-only">
             Payouts by booking
@@ -170,7 +170,7 @@ export class OwnerEarningsPage implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <h1 class="font-display text-3xl font-medium">Reviews</h1>
       <ul class="flex flex-col gap-3">
         @for (r of items(); track r.id) {
@@ -228,7 +228,7 @@ export class OwnerEarningsPage implements OnInit {
               } @else {
                 <button
                   type="button"
-                  class="w-fit text-brand-700 underline"
+                  class="tap w-fit text-brand-700 underline"
                   (click)="startReply(r)"
                 >
                   {{ r.ownerReply ? 'Edit reply' : 'Reply' }}

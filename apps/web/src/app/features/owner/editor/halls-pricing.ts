@@ -55,7 +55,7 @@ const KIND_LABELS: Record<Kind, string> = {
               }
             </p>
           </div>
-          <div class="mt-3 overflow-x-auto">
+          <div class="relative mt-3 overflow-x-auto">
             <table class="w-full min-w-[28rem] text-sm">
               <caption class="sr-only">
                 Prices for

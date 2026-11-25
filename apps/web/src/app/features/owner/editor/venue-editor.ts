@@ -35,7 +35,7 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-5 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       @if (venue(); as v) {
         <header class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
@@ -193,7 +193,7 @@ export class VenueEditor implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <h1 class="font-display text-3xl font-medium">Add a venue</h1>
       <p class="text-slate-600">Start with the basics. You'll add halls, prices and photos next.</p>
       <app-venue-form (saved)="open($event.id)" />

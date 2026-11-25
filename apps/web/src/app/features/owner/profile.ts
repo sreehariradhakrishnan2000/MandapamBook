@@ -12,7 +12,7 @@ import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto max-w-lg py-4">
-      <a routerLink=".." class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink=".." class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <h1 class="mt-2 font-display text-3xl font-medium">Business & payout details</h1>
       <p class="mt-1 text-sm text-slate-600">
         Needed to receive payouts. PAN and account numbers are encrypted and only the last four

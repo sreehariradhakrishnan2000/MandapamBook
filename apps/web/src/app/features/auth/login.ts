@@ -61,8 +61,8 @@ import { PasswordToggle } from '../../shared/password-toggle';
       </form>
 
       <div class="mt-6 flex justify-between text-sm">
-        <a routerLink="/forgot-password" class="text-brand-700 underline">Forgot password?</a>
-        <a routerLink="/register" class="text-brand-700 underline">Create an account</a>
+        <a routerLink="/forgot-password" class="tap text-brand-700 underline">Forgot password?</a>
+        <a routerLink="/register" class="tap text-brand-700 underline">Create an account</a>
       </div>
     </section>
   `,
