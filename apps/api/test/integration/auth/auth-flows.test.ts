@@ -115,6 +115,31 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
       expect(statuses).toEqual([202, 202, 202, 429]);
     });
 
+    it('carries a safe return path in the link, and refuses anything else', async () => {
+      const u = await createUser(h.db, 'CUSTOMER', {
+        status: 'PENDING_VERIFICATION',
+        emailVerifiedAt: null,
+      });
+      const c = new Client(h.app);
+      expect((await c.login(u.email)).status).toBe(200);
+
+      // Off-site or protocol-relative targets are rejected before anything is sent.
+      for (const returnTo of ['https://evil.example/', '//evil.example', '/\\evil', 'book']) {
+        const bad = await c.send('post', '/api/v1/auth/verify-email/resend', { returnTo });
+        expect(bad.status).toBe(400);
+      }
+
+      const path = '/book/h1?slug=ivory-hall&date=2030-01-09&slot=EVENING&guests=150';
+      expect(
+        (await c.send('post', '/api/v1/auth/verify-email/resend', { returnTo: path })).status,
+      ).toBe(202);
+      const text = h.email.lastTo(u.email)!.text;
+      expect(text).toContain(`&next=${encodeURIComponent(path)}`);
+      // The token is still read correctly from a link with a return path.
+      const token = tokenFromEmail(h.email, u.email);
+      expect((await c.send('post', '/api/v1/auth/verify-email', { token })).status).toBe(200);
+    });
+
     it('creates an owner profile for owner sign-ups', async () => {
       const email = uniqueEmail('owner-signup');
       await new Client(h.app).send('post', '/api/v1/auth/register', {
