@@ -168,6 +168,42 @@ describe('booking flow', () => {
     );
     expect((fixture.nativeElement as HTMLElement).textContent).toMatch(/(9|10):\d\d/);
   });
+
+  it('lets an unverified customer resend the link from the booking page', async () => {
+    const login = TestBed.inject(AuthService).login('u@example.test', 'pw', false);
+    http.expectOne('/api/v1/auth/login').flush({
+      accessToken: 't',
+      expiresIn: 900,
+      user: {
+        id: 'u1',
+        email: 'u@example.test',
+        fullName: 'Unverified',
+        phone: null,
+        role: 'CUSTOMER',
+        emailVerified: false,
+        phoneVerified: false,
+        permissions: permissionsFor('CUSTOMER'),
+      },
+    } satisfies AuthSession);
+    await login;
+
+    const fixture = await bookPage();
+    const el = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => expect(el.textContent).toContain('Verify your email to book'));
+    expect(el.textContent).toContain('u@example.test');
+
+    // Holding is not attempted; the customer is pointed at the resend button instead.
+    (await find(el, 'Hold this date')).click();
+    await vi.waitFor(() => expect(el.textContent).toContain('Verify your email first'));
+    http.expectNone('/api/v1/bookings');
+
+    (await find(el, 'Resend verification email')).click();
+    (await pending('/api/v1/auth/verify-email/resend')).flush(
+      { message: 'sent' },
+      { status: 202, statusText: 'Accepted' },
+    );
+    await vi.waitFor(() => expect(el.textContent).toContain('Open the newest email'));
+  });
 });
 
 describe('search page', () => {
