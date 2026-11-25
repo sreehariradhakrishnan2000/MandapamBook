@@ -537,6 +537,38 @@ export class AuthService {
     );
   }
 
+  /**
+   * Sends a fresh verification link to a signed-in user whose email is not verified yet,
+   * for when the first email went astray or its link expired. Earlier links stop working.
+   */
+  async resendVerificationEmail(userId: string, ctx: ClientContext): Promise<void> {
+    const [user] = await this.db.select().from(users).where(eq(users.id, userId));
+    if (!user) throw errors.notFound('User not found');
+    if (user.emailVerifiedAt)
+      throw errors.conflict('EMAIL_ALREADY_VERIFIED', 'Your email is already verified.');
+    await this.limiters.consume('verifyEmailResendPerUser', userId);
+    await this.db
+      .update(emailTokens)
+      .set({ usedAt: new Date() })
+      .where(
+        and(
+          eq(emailTokens.userId, userId),
+          eq(emailTokens.purpose, 'VERIFY_EMAIL'),
+          isNull(emailTokens.usedAt),
+        ),
+      );
+    await this.sendEmailToken(user, 'VERIFY_EMAIL');
+    await this.audit.record(
+      {
+        action: 'auth.verification_email_resent',
+        entityType: 'user',
+        entityId: userId,
+        actorId: userId,
+      },
+      ctx,
+    );
+  }
+
   /** Always succeeds from the caller's view; only sends mail if the account exists. */
   async requestPasswordReset(email: string, ctx: ClientContext): Promise<void> {
     await this.limiters.consume('passwordResetPerEmail', email);
