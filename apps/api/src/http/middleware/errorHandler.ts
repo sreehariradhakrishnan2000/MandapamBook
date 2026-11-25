@@ -42,7 +42,9 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next)
     };
   }
 
-  if (status >= 500) req.log.error({ err }, 'unhandled error');
+  // Planned maintenance answers every request with 503; that is not an error to log.
+  const planned = err instanceof HttpError && err.code === 'MAINTENANCE';
+  if (status >= 500 && !planned) req.log.error({ err }, 'unhandled error');
 
   res.status(status).json({ error: body } satisfies ErrorBody);
 };

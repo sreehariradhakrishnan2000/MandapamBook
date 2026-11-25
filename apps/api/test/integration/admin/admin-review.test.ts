@@ -440,4 +440,41 @@ describe.skipIf(!hasTestDb)('admin review', { timeout: 120_000 }, () => {
       });
     });
   });
+  describe('maintenance switch', () => {
+    // Only ever saved as OFF here: the test database is shared by test files running at
+    // the same time, and turning maintenance on would close it for them. The gate itself
+    // is covered by test/unit/maintenance.test.ts.
+    it('lets only super admins change it, validates it, audits it, and reports it publicly', async () => {
+      const body = { enabled: false, message: '  Back soon  ', until: null };
+      const customer = await signIn('CUSTOMER');
+      expect((await customer.c.send('put', '/api/v1/admin/maintenance', body)).status).toBe(403);
+      expect((await admin.send('put', '/api/v1/admin/maintenance', body)).status).toBe(403);
+      expect(
+        (await superAdmin.send('put', '/api/v1/admin/maintenance', { enabled: 'yes' })).status,
+      ).toBe(400);
+      expect(
+        (await superAdmin.send('put', '/api/v1/admin/maintenance', { ...body, until: 'soon' }))
+          .status,
+      ).toBe(400);
+
+      const saved = await superAdmin.send('put', '/api/v1/admin/maintenance', body);
+      expect(saved.status).toBe(200);
+      expect(saved.body).toEqual({ enabled: false, message: 'Back soon', until: null });
+
+      const status = await new Client(h.app).send('get', '/api/v1/status');
+      expect(status.status).toBe(200);
+      expect(status.headers['cache-control']).toBe('no-store');
+      expect(status.body.maintenance).toEqual({
+        enabled: false,
+        message: 'Back soon',
+        until: null,
+      });
+
+      const logs = await h.db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.action, 'settings.maintenance_changed'));
+      expect(logs.length).toBeGreaterThan(0);
+    });
+  });
 });
