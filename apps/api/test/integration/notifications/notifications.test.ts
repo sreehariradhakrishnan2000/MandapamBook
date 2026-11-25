@@ -158,6 +158,48 @@ describe.skipIf(!hasTestDb)('notifications and invoices', { timeout: 120_000 }, 
     expect(JSON.stringify(rows[0]!.data)).not.toContain(cust.email);
   });
 
+  it('sends the platform admin one copy per booking event when ADMIN_NOTIFY_EMAIL is set', async () => {
+    const adminEmail = `ops-${randomBytes(3).toString('hex')}@example.test`;
+    const withAdmin = new NotificationService(
+      h.db,
+      h.email,
+      new InvoiceService(h.db),
+      'http://localhost:4200',
+      logger,
+      adminEmail,
+    );
+    const { cust, bookingId } = await paidBooking();
+    await withAdmin.processOutbox();
+    await withAdmin.processOutbox(); // a second pass queues nothing new
+    await withAdmin.deliverDue();
+    await withAdmin.deliverDue();
+
+    const [b] = await h.db.select().from(bookings).where(eq(bookings.id, bookingId));
+    const toAdmin = mine([adminEmail]);
+    expect(toAdmin.map((m) => m.template)).toEqual(['admin_booking_alert']);
+    expect(toAdmin[0]!.subject).toBe(
+      `New booking: Vadakkumnathan Convention Centre, ${b!.eventDate} (${b!.refCode})`,
+    );
+    expect(toAdmin[0]!.html).toContain('New booking confirmed');
+    expect(toAdmin[0]!.attachments).toBeUndefined(); // the invoice goes to the customer only
+    // The customer and owner still get theirs.
+    expect(mine([cust.email]).map((m) => m.template)).toEqual(['booking_confirmed']);
+
+    // Cancelling sends the admin a second copy, and the refund a third.
+    expect(
+      (
+        await cust.c.send('post', `/api/v1/bookings/${bookingId}/cancel`, {
+          reason: 'Plans changed',
+        })
+      ).status,
+    ).toBe(200);
+    await withAdmin.processOutbox();
+    await withAdmin.deliverDue();
+    const subjects = mine([adminEmail]).map((m) => m.subject.split(':')[0]);
+    expect(subjects).toEqual(expect.arrayContaining(['New booking', 'Booking cancelled']));
+    expect(new Set(mine([adminEmail]).map((m) => m.subject)).size).toBe(subjects.length);
+  });
+
   it('tells the customer about a cancellation and the refund', async () => {
     const { cust, bookingId } = await paidBooking();
     await service.processOutbox();
