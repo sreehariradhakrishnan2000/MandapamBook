@@ -23,6 +23,26 @@ export const PUBLIC_ROUTES: Routes = [
     loadComponent: () => import('../booking/book').then((m) => m.Book),
   },
   {
+    path: 'terms',
+    title: 'Terms of Use · MandapamBook',
+    loadComponent: () => import('../legal/terms').then((m) => m.Terms),
+  },
+  {
+    path: 'privacy',
+    title: 'Privacy Policy · MandapamBook',
+    loadComponent: () => import('../legal/privacy').then((m) => m.Privacy),
+  },
+  {
+    path: 'refund-policy',
+    title: 'Refund & Cancellation Policy · MandapamBook',
+    loadComponent: () => import('../legal/refund-policy').then((m) => m.RefundPolicy),
+  },
+  {
+    path: 'contact',
+    title: 'Contact us · MandapamBook',
+    loadComponent: () => import('../legal/contact').then((m) => m.Contact),
+  },
+  {
     path: 'payments/return',
     title: 'Payment · MandapamBook',
     loadComponent: () => import('../payments/payment-return').then((m) => m.PaymentReturn),

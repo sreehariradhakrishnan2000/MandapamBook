@@ -7,7 +7,10 @@ import { errorHandler } from '../../src/http/middleware/errorHandler.js';
 import { MemoryRevocationStore } from '../../src/infra/revocation-store.js';
 import { AccessTokenService } from '../../src/modules/auth/access-tokens.js';
 import {
+  type BookingsPauseService,
+  MAINTENANCE_OFF,
   type MaintenanceService,
+  bookingsPauseGate,
   maintenanceGate,
 } from '../../src/modules/settings/maintenance.js';
 
@@ -15,8 +18,10 @@ const tokens = new AccessTokenService([{ kid: 'k1', secret: randomBytes(32) }], 
 const revocations = new MemoryRevocationStore();
 
 /** A tiny app: the gate in front of a few routes, like the real /api/v1 router. */
-function appWith(state: Maintenance) {
-  const fake = { get: async () => state } as unknown as MaintenanceService;
+function appWith(state: Partial<Maintenance>) {
+  const fake = {
+    get: async () => ({ ...MAINTENANCE_OFF, ...state }),
+  } as unknown as MaintenanceService;
   const api = express.Router();
   api.use(maintenanceGate(fake, tokens, revocations));
   for (const path of [
@@ -93,5 +98,43 @@ describe('maintenance gate', () => {
         .set('Authorization', `Bearer ${t.token}`);
       expect(res.status).toBe(503);
     }
+  });
+});
+
+describe('bookings pause gate', () => {
+  function pausedApp(paused: boolean, message = '') {
+    const fake = { get: async () => ({ paused, message }) } as unknown as BookingsPauseService;
+    const api = express.Router();
+    api.use(bookingsPauseGate(fake));
+    api.all(/.*/, (_req, res) => res.json({ ok: true }));
+    const app = express();
+    app.use('/api/v1', api);
+    app.use(errorHandler);
+    return app;
+  }
+
+  it('refuses only new holds and new payment orders while paused', async () => {
+    const app = pausedApp(true, 'Payments are being fixed');
+    for (const path of ['/api/v1/bookings', '/api/v1/payments/orders']) {
+      const res = await request(app).post(path);
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatchObject({
+        code: 'BOOKINGS_PAUSED',
+        message: 'Payments are being fixed',
+      });
+    }
+    // Browsing, quotes, cancelling, verifying a payment already made and webhooks still work.
+    expect((await request(app).get('/api/v1/auditoriums')).status).toBe(200);
+    expect((await request(app).post('/api/v1/bookings/quote')).status).toBe(200);
+    expect((await request(app).post('/api/v1/bookings/b1/cancel')).status).toBe(200);
+    expect((await request(app).post('/api/v1/payments/verify')).status).toBe(200);
+    expect((await request(app).post('/api/v1/payments/webhooks/razorpay')).status).toBe(200);
+    expect((await request(app).get('/api/v1/bookings')).status).toBe(200);
+  });
+
+  it('uses a default message, and lets everything through when not paused', async () => {
+    const paused = await request(pausedApp(true)).post('/api/v1/bookings');
+    expect(paused.body.error.message).toContain('New bookings are paused');
+    expect((await request(pausedApp(false)).post('/api/v1/bookings')).status).toBe(200);
   });
 });

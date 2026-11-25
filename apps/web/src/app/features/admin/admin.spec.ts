@@ -172,7 +172,14 @@ describe('admin screens', () => {
       owner_response_hours: 24,
     });
     (await pending('/api/v1/status')).flush({
-      maintenance: { enabled: false, message: '', until: null },
+      maintenance: {
+        enabled: false,
+        message: '',
+        until: null,
+        scheduledFrom: null,
+        scheduledTo: null,
+      },
+      bookings: { paused: false, message: '' },
     });
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
@@ -250,7 +257,14 @@ describe('admin screens', () => {
       owner_response_hours: 24,
     });
     (await pending('/api/v1/status')).flush({
-      maintenance: { enabled: false, message: '', until: null },
+      maintenance: {
+        enabled: false,
+        message: '',
+        until: null,
+        scheduledFrom: null,
+        scheduledTo: null,
+      },
+      bookings: { paused: false, message: '' },
     });
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
@@ -289,6 +303,8 @@ describe('admin screens', () => {
       enabled: true,
       message: 'Upgrading payments',
       until: '2030-01-09T15:30:00+05:30',
+      scheduledFrom: null,
+      scheduledTo: null,
     });
     req.flush({ enabled: true, message: 'Upgrading payments', until: '2030-01-09T10:00:00.000Z' });
     await vi.waitFor(() => expect(el.textContent).toContain('Maintenance mode is on'));
@@ -308,7 +324,14 @@ describe('admin screens', () => {
       owner_response_hours: 24,
     });
     (await pending('/api/v1/status')).flush({
-      maintenance: { enabled: false, message: '', until: null },
+      maintenance: {
+        enabled: false,
+        message: '',
+        until: null,
+        scheduledFrom: null,
+        scheduledTo: null,
+      },
+      bookings: { paused: false, message: '' },
     });
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;

@@ -43,8 +43,9 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next)
     };
   }
 
-  // Planned maintenance answers every request with 503; that is not an error to log.
-  const planned = err instanceof HttpError && err.code === 'MAINTENANCE';
+  // Planned maintenance and a bookings pause answer with 503 on purpose: not errors to log.
+  const planned =
+    err instanceof HttpError && (err.code === 'MAINTENANCE' || err.code === 'BOOKINGS_PAUSED');
   if (status >= 500 && !planned) {
     req.log.error({ err }, 'unhandled error');
     captureError(err, { correlationId, path: req.route?.path ?? req.path });

@@ -197,11 +197,26 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Try
     } | null;
     const detail = Array.isArray(body?.error?.details) ? body.error.details[0]?.message : undefined;
     if (err.status === 0) return 'You appear to be offline. Check your connection and try again.';
+    if (err.status === 429) return tooManyAttempts(Number(err.headers.get('Retry-After')));
     if (body?.error?.code === 'MAINTENANCE')
       return 'MandapamBook is down for planned maintenance. Please check back soon.';
+    if (body?.error?.code === 'BOOKINGS_PAUSED')
+      return body.error.message || 'New bookings are paused for a short while.';
     if (err.status === 502 || err.status === 503 || err.status === 504)
       return 'Our server is starting up. Please try again in a minute.';
     return detail ?? body?.error?.message ?? fallback;
   }
   return fallback;
+}
+
+/** "Too many attempts" with how long to wait, from the API's Retry-After (seconds). */
+export function tooManyAttempts(retryAfterSeconds: number): string {
+  if (!Number.isFinite(retryAfterSeconds) || retryAfterSeconds <= 0)
+    return 'Too many attempts. Please wait a few minutes and try again.';
+  if (retryAfterSeconds < 60) {
+    const s = Math.ceil(retryAfterSeconds);
+    return `Too many attempts. Please wait ${s} second${s === 1 ? '' : 's'} and try again.`;
+  }
+  const m = Math.ceil(retryAfterSeconds / 60);
+  return `Too many attempts. Please wait ${m} minute${m === 1 ? '' : 's'} and try again.`;
 }

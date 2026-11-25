@@ -50,6 +50,7 @@ export type AuditAction =
   | 'masterdata.changed'
   | 'settings.changed'
   | 'settings.maintenance_changed'
+  | 'settings.bookings_pause_changed'
   | 'booking.held'
   | 'booking.cancelled'
   | 'report.exported'
