@@ -141,6 +141,44 @@ import { PaymentAdapter } from '../payments/payment-adapter';
           }
         </form>
 
+        @if (auth.user(); as user) {
+          @if (!user.emailVerified) {
+            <section
+              class="flex flex-col gap-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800"
+              aria-labelledby="verify-heading"
+            >
+              <p id="verify-heading" class="font-semibold">Verify your email to book</p>
+              <p>
+                We sent a link to <span class="font-medium">{{ user.email }}</span>. Check your
+                inbox and spam folder, then come back to this page.
+              </p>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <button
+                  type="button"
+                  class="tap font-semibold underline disabled:opacity-60"
+                  [disabled]="verifyBusy()"
+                  (click)="resendVerification()"
+                >
+                  {{ verifyBusy() ? 'Sending…' : 'Resend verification email' }}
+                </button>
+                <button
+                  type="button"
+                  class="tap underline disabled:opacity-60"
+                  [disabled]="verifyBusy()"
+                  (click)="checkVerified()"
+                >
+                  I've verified, check again
+                </button>
+              </div>
+              @if (verifyMessage(); as m) {
+                <p [class.text-red-700]="m.error" [class.text-forest-800]="!m.error" role="status">
+                  {{ m.text }}
+                </p>
+              }
+            </section>
+          }
+        }
+
         @if (error()) {
           <p class="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
             {{ error() }}
@@ -298,6 +336,14 @@ export class Book implements OnInit {
       await this.router.navigate(['/login'], { queryParams: { returnUrl: this.router.url } });
       return;
     }
+    if (this.auth.user()?.emailVerified === false) {
+      // The notice above has the resend button; say so instead of a server error.
+      this.verifyMessage.set({
+        text: 'Verify your email first, using the link we sent or the button above.',
+        error: true,
+      });
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -308,6 +354,51 @@ export class Book implements OnInit {
         await this.refresh();
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected readonly verifyBusy = signal(false);
+  protected readonly verifyMessage = signal<{ text: string; error: boolean } | null>(null);
+
+  /** Sends a fresh verification link without leaving the booking page. */
+  protected async resendVerification(): Promise<void> {
+    this.verifyBusy.set(true);
+    try {
+      await this.auth.resendVerificationEmail();
+      this.verifyMessage.set({
+        text: 'Sent. Open the newest email from MandapamBook; earlier links no longer work.',
+        error: false,
+      });
+    } catch (err) {
+      if (err instanceof HttpErrorResponse && err.status === 409) {
+        await this.checkVerified();
+        return;
+      }
+      this.verifyMessage.set({
+        text: errorMessage(err, 'Could not send the email. Try again in a few minutes.'),
+        error: true,
+      });
+    } finally {
+      this.verifyBusy.set(false);
+    }
+  }
+
+  /** After the link was opened (maybe in another tab), reloads the account to pick it up. */
+  protected async checkVerified(): Promise<void> {
+    this.verifyBusy.set(true);
+    try {
+      await this.auth.refresh();
+      if (this.auth.user()?.emailVerified) {
+        this.verifyMessage.set(null);
+        if (this.error()?.startsWith('Verify your email')) this.error.set(null);
+      } else {
+        this.verifyMessage.set({
+          text: 'Not verified yet. Open the link in the email, then try again.',
+          error: true,
+        });
+      }
+    } finally {
+      this.verifyBusy.set(false);
     }
   }
 
