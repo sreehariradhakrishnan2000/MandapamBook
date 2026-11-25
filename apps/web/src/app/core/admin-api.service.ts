@@ -76,6 +76,19 @@ export interface RevealedKyc {
   bankAccountName: string | null;
 }
 
+export interface SystemHealthView {
+  version: string;
+  email: {
+    provider: string;
+    lastSentAt: string | null;
+    failedLast24h: number;
+    queued: number;
+    smtpKeyExpiresAt: string | null;
+    daysUntilKeyExpiry: number | null;
+  };
+  errorTracking: { api: boolean; web: boolean };
+}
+
 export interface AdminUser {
   id: string;
   email: string;
@@ -159,6 +172,8 @@ export class AdminApi {
     ownerId: string,
     decision: { decision: 'verify' } | { decision: 'reject'; reason: string },
   ) => this.send<OwnerProfileView>('post', `/owners/${ownerId}/kyc/decision`, decision);
+
+  systemHealth = () => this.get<SystemHealthView>('/system-health');
 
   users = (query: { q?: string; role?: string; status?: string; offset?: number }) =>
     this.get<Page<AdminUser>>('/users', query);

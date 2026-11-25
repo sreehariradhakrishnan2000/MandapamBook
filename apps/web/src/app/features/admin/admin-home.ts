@@ -1,7 +1,8 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, type OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Permission } from '@mandapambook/shared';
-import { AdminApi } from '../../core/admin-api.service';
+import { AdminApi, type SystemHealthView } from '../../core/admin-api.service';
 import { AuthService } from '../../core/auth/auth.service';
 
 interface Tile {
@@ -14,7 +15,7 @@ interface Tile {
 
 @Component({
   selector: 'app-admin-home',
-  imports: [RouterLink],
+  imports: [DatePipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-6 py-4">
@@ -41,6 +42,50 @@ interface Tile {
           </li>
         }
       </ul>
+
+      @if (health(); as h) {
+        <section
+          class="rounded-2xl border border-slate-200 bg-white p-5 text-sm"
+          aria-labelledby="health-h"
+        >
+          <h2 id="health-h" class="font-display text-xl font-medium">System health</h2>
+          <dl class="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-[14rem_1fr]">
+            <dt class="text-slate-600">Last booking email sent</dt>
+            <dd>
+              {{ h.email.lastSentAt ? (h.email.lastSentAt | date: 'd MMM y, h:mm a') : 'Never' }}
+            </dd>
+            <dt class="text-slate-600">Emails failed (24 h)</dt>
+            <dd
+              [class.font-semibold]="h.email.failedLast24h > 0"
+              [class.text-red-700]="h.email.failedLast24h > 0"
+            >
+              {{ h.email.failedLast24h }}
+            </dd>
+            <dt class="text-slate-600">Emails waiting to send</dt>
+            <dd>{{ h.email.queued }}</dd>
+            <dt class="text-slate-600">Email (SMTP) key</dt>
+            <dd
+              [class.font-semibold]="keyWarning(h.email.daysUntilKeyExpiry)"
+              [class.text-red-700]="keyWarning(h.email.daysUntilKeyExpiry)"
+            >
+              @if (h.email.daysUntilKeyExpiry === null) {
+                <span class="text-slate-500">Expiry date not set (SMTP_KEY_EXPIRES_AT)</span>
+              } @else if (h.email.daysUntilKeyExpiry <= 0) {
+                Expired on {{ h.email.smtpKeyExpiresAt }}. Replace it now.
+              } @else {
+                Expires {{ h.email.smtpKeyExpiresAt }} (in {{ h.email.daysUntilKeyExpiry }} days)
+              }
+            </dd>
+            <dt class="text-slate-600">Error tracking</dt>
+            <dd>
+              Server {{ h.errorTracking.api ? 'on' : 'off' }} · Browser
+              {{ h.errorTracking.web ? 'on' : 'off' }}
+            </dd>
+            <dt class="text-slate-600">Version</dt>
+            <dd class="font-mono">{{ h.version }}</dd>
+          </dl>
+        </section>
+      }
     </section>
   `,
 })
@@ -102,7 +147,19 @@ export class AdminHome implements OnInit {
     this.all.filter((t) => this.auth.hasPermission(t.permission)),
   );
 
+  protected readonly health = signal<SystemHealthView | null>(null);
+
+  /** Red from 30 days before the key expires. */
+  protected keyWarning(days: number | null): boolean {
+    return days !== null && days <= 30;
+  }
+
   async ngOnInit(): Promise<void> {
+    if (this.auth.hasPermission('report:view'))
+      void this.api.systemHealth().then(
+        (h) => this.health.set(h),
+        () => undefined,
+      );
     const [listings, owners] = await Promise.allSettled([
       this.auth.hasPermission('listing:review')
         ? this.api.listings('PENDING_REVIEW')
