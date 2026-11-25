@@ -26,7 +26,11 @@ import { GoogleOAuth, type GoogleProvider } from './modules/auth/google.js';
 import { AuthService } from './modules/auth/auth.service.js';
 import { type BreachChecker, HibpBreachChecker, noBreachCheck } from './modules/auth/password.js';
 import { RefreshTokenService } from './modules/auth/refresh-tokens.js';
-import type { EmailSender, SmsSender } from './modules/notifications/senders.js';
+import {
+  BackgroundEmailSender,
+  type EmailSender,
+  type SmsSender,
+} from './modules/notifications/senders.js';
 import { ownerRouter } from './modules/owners/owner.routes.js';
 import { createAuthenticate } from './modules/rbac/authenticate.js';
 import {
@@ -91,6 +95,8 @@ export interface Container {
   refreshTokens: RefreshTokenService;
   limiters: RateLimiters;
   authenticate: RequestHandler;
+  /** Emails sent while handling requests; drain it before shutting down. */
+  directEmail: BackgroundEmailSender;
 }
 
 /** Composition root: the only place concrete implementations are chosen. */
@@ -100,6 +106,8 @@ export function buildContainer(deps: ContainerDeps): Container {
   const refreshTokens = new RefreshTokenService(env.REFRESH_TOKEN_KEYS);
   const limiters = new RateLimiters(deps.redis, deps.limitOverrides);
   const audit = new AuditService(db, deps.logger);
+  // Requests never wait on, or fail because of, the mail server. Booking emails use the outbox.
+  const directEmail = new BackgroundEmailSender(deps.email, deps.logger);
   const breaches = deps.breaches ?? (env.HIBP_ENABLED ? new HibpBreachChecker() : noBreachCheck);
   const auth = new AuthService(
     db,
@@ -116,7 +124,7 @@ export function buildContainer(deps: ContainerDeps): Container {
     deps.revocations,
     limiters,
     audit,
-    deps.email,
+    directEmail,
     deps.sms,
     breaches,
   );
@@ -205,7 +213,7 @@ export function buildContainer(deps: ContainerDeps): Container {
       authenticate,
       storage: deps.storage,
       crypto,
-      email: deps.email,
+      email: directEmail,
       settings,
       payments: paymentService,
       appBaseUrl: env.APP_BASE_URL,
@@ -223,5 +231,6 @@ export function buildContainer(deps: ContainerDeps): Container {
     refreshTokens,
     limiters,
     authenticate,
+    directEmail,
   };
 }

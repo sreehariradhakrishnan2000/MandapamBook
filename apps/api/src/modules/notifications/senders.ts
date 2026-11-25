@@ -37,6 +37,18 @@ export interface SmsSender {
   send(message: SmsMessage): Promise<void>;
 }
 
+/** Only the domain of an address, for logs: enough to trace delivery, not to identify. */
+export function recipientDomain(address: string): string {
+  return address.split('@')[1]?.toLowerCase() ?? 'invalid';
+}
+
+/** SMTP waits. nodemailer's defaults (2 min to connect, 10 min idle) would hang a request. */
+export const SMTP_TIMEOUTS = {
+  connectionTimeout: 10_000,
+  greetingTimeout: 10_000,
+  socketTimeout: 30_000,
+} as const;
+
 /** Sends through SMTP. Works with Mailpit (smtp://localhost:1025) and production relays. */
 export class SmtpEmailSender implements EmailSender {
   private readonly transport: Transporter;
@@ -44,12 +56,25 @@ export class SmtpEmailSender implements EmailSender {
   constructor(
     smtpUrl: string,
     private readonly from: string,
+    private readonly logger?: Logger,
   ) {
-    this.transport = nodemailer.createTransport(smtpUrl);
+    this.transport = nodemailer.createTransport({ url: smtpUrl, ...SMTP_TIMEOUTS });
+  }
+
+  /** Checks the server and credentials; resolves false (and logs why) instead of throwing. */
+  async verify(): Promise<boolean> {
+    try {
+      await this.transport.verify();
+      this.logger?.info('smtp connection verified');
+      return true;
+    } catch (err) {
+      this.logger?.error({ err }, 'smtp connection failed: emails will not be delivered');
+      return false;
+    }
   }
 
   async send(message: EmailMessage): Promise<void> {
-    await this.transport.sendMail({
+    const info = await this.transport.sendMail({
       from: this.from,
       to: message.to,
       subject: message.subject,
@@ -61,6 +86,67 @@ export class SmtpEmailSender implements EmailSender {
         contentType: a.contentType,
       })),
     });
+    // A server can accept the connection yet refuse the recipient; that is a failed send.
+    if ((info.rejected?.length ?? 0) > 0 || (info.accepted?.length ?? 0) === 0) {
+      throw new Error(`smtp server refused the recipient: ${String(info.response)}`);
+    }
+    this.logger?.info(
+      {
+        mail: {
+          template: message.template,
+          toDomain: recipientDomain(message.to),
+          messageId: info.messageId,
+        },
+      },
+      'email accepted by smtp server',
+    );
+  }
+}
+
+const RETRY_DELAYS_MS = [5_000, 30_000];
+
+/**
+ * For emails sent while handling a request (verification links, password resets, security
+ * alerts, admin decisions). The request never waits for, or fails because of, the mail
+ * server: delivery runs in the background, retries twice, and logs the outcome. These
+ * messages carry one-time links, so they are not stored in the notification outbox.
+ */
+export class BackgroundEmailSender implements EmailSender {
+  private readonly pending = new Set<Promise<void>>();
+
+  constructor(
+    private readonly inner: EmailSender,
+    private readonly logger: Logger,
+    private readonly delaysMs: readonly number[] = RETRY_DELAYS_MS,
+  ) {}
+
+  send(message: EmailMessage): Promise<void> {
+    const job = this.deliver(message).finally(() => this.pending.delete(job));
+    this.pending.add(job);
+    return Promise.resolve();
+  }
+
+  /** Resolves when every background send has finished (used on shutdown and in tests). */
+  async drain(): Promise<void> {
+    while (this.pending.size) await Promise.all([...this.pending]);
+  }
+
+  private async deliver(message: EmailMessage): Promise<void> {
+    const context = { template: message.template, toDomain: recipientDomain(message.to) };
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.inner.send(message);
+        return;
+      } catch (err) {
+        const delay = this.delaysMs[attempt];
+        if (delay === undefined) {
+          this.logger.error({ err, mail: context, attempts: attempt + 1 }, 'email not delivered');
+          return;
+        }
+        this.logger.warn({ err, mail: context, retryInMs: delay }, 'email failed, retrying');
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
   }
 }
 
@@ -143,7 +229,7 @@ export function createEmailSender(
   logger: Logger,
 ): EmailSender {
   if (env.EMAIL_PROVIDER === 'smtp' && env.SMTP_URL)
-    return new SmtpEmailSender(env.SMTP_URL, env.EMAIL_FROM);
+    return new SmtpEmailSender(env.SMTP_URL, env.EMAIL_FROM, logger);
   if (env.EMAIL_PROVIDER === 'file' && env.EMAIL_FILE_DIR)
     return new FileEmailSender(env.EMAIL_FILE_DIR);
   return new ConsoleEmailSender(logger);

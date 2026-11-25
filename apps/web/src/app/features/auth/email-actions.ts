@@ -69,6 +69,16 @@ export class VerifyEmail implements OnInit {
         <p class="mt-2 text-slate-600" role="status">
           If an account exists for that email, we have sent a reset link. It expires in 30 minutes.
         </p>
+        <p class="mt-2 text-sm text-slate-500">
+          Not there after a few minutes? Check your Spam or Promotions folder, or
+          <button
+            type="button"
+            class="font-medium text-brand-700 underline"
+            (click)="sent.set(false)"
+          >
+            send it again</button
+          >.
+        </p>
         <a routerLink="/login" class="mt-4 inline-block font-semibold text-brand-700 underline"
           >Back to sign in</a
         >
