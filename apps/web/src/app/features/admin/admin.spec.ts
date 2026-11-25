@@ -9,6 +9,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { AdminListingReview } from './listings';
 import { AdminOwnersKyc } from './owners-kyc';
 import { AdminSettings } from './settings';
+import { AdminUsers } from './users';
 
 function session(role: 'ADMIN' | 'SUPER_ADMIN'): AuthSession {
   return {
@@ -192,6 +193,46 @@ describe('admin screens', () => {
       hold_minutes: 10,
       owner_response_hours: 24,
     });
+  });
+
+  it('marks an unverified email as verified after the admin confirms', async () => {
+    await signIn('ADMIN');
+    const fixture = TestBed.createComponent(AdminUsers);
+    fixture.detectChanges();
+    const user = {
+      id: 'u1',
+      email: 'guest@example.test',
+      fullName: 'Guest One',
+      phone: null,
+      role: 'CUSTOMER',
+      status: 'PENDING_VERIFICATION',
+      emailVerifiedAt: null,
+      lastLoginAt: null,
+      lockedUntil: null,
+      createdAt: '2026-11-25T00:00:00Z',
+    };
+    const page = (items: unknown[]) => ({ items, total: items.length, limit: 50, offset: 0 });
+    const list = () => vi.waitFor(() => http.expectOne((r) => r.url === '/api/v1/admin/users'));
+    (await list()).flush(page([user]));
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => expect(el.textContent).toContain('Email not verified'));
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const button = [...el.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Mark email verified'),
+    )!;
+    button.click();
+    expect(confirmSpy).toHaveBeenCalled();
+    const req = await pending('/api/v1/admin/users/u1/verify-email');
+    expect(req.request.method).toBe('POST');
+    req.flush({ id: 'u1', emailVerifiedAt: '2026-11-25T10:00:00Z' });
+    (await list()).flush(
+      page([{ ...user, status: 'ACTIVE', emailVerifiedAt: '2026-11-25T10:00:00Z' }]),
+    );
+    await fixture.whenStable();
+    await vi.waitFor(() => expect(el.textContent).not.toContain('Email not verified'));
+    confirmSpy.mockRestore();
   });
 
   it('does not offer to save settings to plain admins', async () => {

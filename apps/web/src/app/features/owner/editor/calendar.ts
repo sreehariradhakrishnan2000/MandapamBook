@@ -31,7 +31,7 @@ export function isoDate(year: number, monthIndex: number, day: number): string {
           <label class="text-sm"
             >Hall
             <select
-              class="ml-1 rounded-xl border border-slate-300 px-2 py-1.5"
+              class="ml-1 rounded-xl border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
               [ngModel]="hallId()"
               (ngModelChange)="hallId.set($event)"
             >
@@ -81,12 +81,29 @@ export function isoDate(year: number, monthIndex: number, day: number): string {
                     [class]="
                       e.kind === 'BOOKING'
                         ? 'bg-brand-50 text-brand-700'
-                        : 'bg-slate-200 text-slate-700'
+                        : e.kind === 'OFFLINE'
+                          ? 'bg-forest-50 text-forest-800'
+                          : 'bg-slate-200 text-slate-700'
                     "
                   >
-                    {{ slotLabels[e.slot] }}: {{ e.kind === 'BOOKING' ? 'Booked' : 'Blocked' }}
-                    @if (e.blockId) {
-                      <button type="button" class="ml-1 underline" (click)="unblock(e.blockId)">
+                    {{ slotLabels[e.slot] }}:
+                    @switch (e.kind) {
+                      @case ('BOOKING') {
+                        Booked
+                      }
+                      @case ('OFFLINE') {
+                        Booked offline · {{ e.customerName }}
+                      }
+                      @default {
+                        Blocked
+                      }
+                    }
+                    @if (e.kind === 'BLOCK' && e.blockId) {
+                      <button
+                        type="button"
+                        class="-my-2 ml-1 px-1.5 py-2 underline"
+                        (click)="unblock(e.blockId)"
+                      >
                         Unblock
                       </button>
                     }
@@ -103,14 +120,14 @@ export function isoDate(year: number, monthIndex: number, day: number): string {
               type="date"
               name="date"
               required
-              class="rounded-xl border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
               [(ngModel)]="blockDate"
           /></label>
           <label class="flex flex-col gap-1"
             >Slot
             <select
               name="slot"
-              class="rounded-xl border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
               [(ngModel)]="blockSlot"
             >
               @for (s of slots; track s) {
@@ -122,7 +139,7 @@ export function isoDate(year: number, monthIndex: number, day: number): string {
             >Reason (optional)<input
               name="reason"
               maxlength="200"
-              class="rounded-xl border border-slate-300 px-2 py-1.5"
+              class="rounded-xl border border-slate-300 px-2 py-1.5 text-base sm:text-sm"
               [(ngModel)]="blockReason"
           /></label>
           <button
@@ -191,6 +208,12 @@ export class VenueCalendar {
     } catch (err) {
       this.error.set(errorMessage(err));
     }
+  }
+
+  /** Reloads the visible month, e.g. after an offline booking was added or cancelled. */
+  refresh(): void {
+    const id = this.hallId();
+    if (id) void this.load(id, this.month());
   }
 
   protected shift(by: number): void {

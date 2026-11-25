@@ -82,6 +82,7 @@ export interface AdminUser {
   phone: string | null;
   role: Role;
   status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'SUSPENDED';
+  emailVerifiedAt: string | null;
   lastLoginAt: string | null;
   lockedUntil: string | null;
   createdAt: string;
@@ -164,6 +165,8 @@ export class AdminApi {
     this.send<{ role: Role }>('patch', `/users/${id}/role`, { role });
   changeStatus = (id: string, status: 'ACTIVE' | 'SUSPENDED', reason: string) =>
     this.send<unknown>('patch', `/users/${id}/status`, { status, reason });
+  markEmailVerified = (id: string) =>
+    this.send<{ emailVerifiedAt: string }>('post', `/users/${id}/verify-email`);
 
   cities = () => this.get<{ items: CityRow[] }>('/cities');
   addCity = (input: Omit<CityRow, 'id' | 'isActive'>) =>

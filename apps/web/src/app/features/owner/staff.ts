@@ -10,7 +10,7 @@ import { OwnerApi, type StaffMember, type VenueSummary } from '../../core/owner-
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-5 py-4">
-      <a routerLink=".." class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink=".." class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <h1 class="font-display text-3xl font-medium">Staff</h1>
       <p class="text-sm text-slate-600">
         Staff can view bookings and manage the calendar. They can't change prices, payouts or

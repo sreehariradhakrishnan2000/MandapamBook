@@ -12,6 +12,7 @@ import { AuthService, errorMessage } from '../../../core/auth/auth.service';
 import { OwnerApi, type VenueDetail } from '../../../core/owner-api.service';
 import { StatusChip } from '../status-chip';
 import { VenueCalendar } from './calendar';
+import { OfflineBookings } from './offline-bookings';
 import { HallsPricing } from './halls-pricing';
 import { VenuePhotos } from './photos';
 import { VenuePolicies } from './policies';
@@ -29,11 +30,12 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
     VenuePhotos,
     VenuePolicies,
     VenueCalendar,
+    OfflineBookings,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-5 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       @if (venue(); as v) {
         <header class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
@@ -113,7 +115,14 @@ type Tab = 'details' | 'halls' | 'photos' | 'policies' | 'calendar';
               <app-venue-policies [venue]="v" (changed)="reload()" />
             }
             @case ('calendar') {
-              <app-venue-calendar [halls]="v.halls" />
+              <div class="flex flex-col gap-8">
+                <app-venue-calendar #cal [halls]="v.halls" />
+                <app-offline-bookings
+                  [venueId]="v.id"
+                  [halls]="v.halls"
+                  (changed)="cal.refresh()"
+                />
+              </div>
             }
           }
         </div>
@@ -184,7 +193,7 @@ export class VenueEditor implements OnInit {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-4 py-4">
-      <a routerLink="/owner" class="text-sm text-brand-700 underline">← My venues</a>
+      <a routerLink="/owner" class="tap w-fit text-sm text-brand-700 underline">← My venues</a>
       <h1 class="font-display text-3xl font-medium">Add a venue</h1>
       <p class="text-slate-600">Start with the basics. You'll add halls, prices and photos next.</p>
       <app-venue-form (saved)="open($event.id)" />

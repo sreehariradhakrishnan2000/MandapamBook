@@ -1,5 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import type { Type } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -33,6 +34,37 @@ describe('auth forms', () => {
     TestBed.configureTestingModule({
       providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
+  });
+
+  it.each<[string, Type<unknown>]>([
+    ['login', Login],
+    ['register', Register],
+  ])('%s can show and hide the password, keeping what was typed', async (_, component) => {
+    const fixture = TestBed.createComponent(component);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const field = el.querySelector<HTMLInputElement>('#password')!;
+    const toggle = el.querySelector<HTMLButtonElement>('button[aria-controls=password]')!;
+    field.value = 'mandapam-2026';
+    field.dispatchEvent(new Event('input'));
+    expect(toggle.textContent?.trim()).toBe('Show password');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(toggle.type).toBe('button'); // never submits the form
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(field.type).toBe('text');
+    expect(field.value).toBe('mandapam-2026');
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.title).toBe('Hide password');
+
+    toggle.click();
+    fixture.detectChanges();
+    expect(field.type).toBe('password');
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    const http = TestBed.inject(HttpTestingController);
+    http.match('/api/v1/auth/providers').forEach((r) => r.flush({ google: false }));
+    http.verify(); // nothing else was sent
   });
 
   it('login shows a message and sends nothing when fields are empty', async () => {
@@ -85,5 +117,81 @@ describe('auth forms', () => {
     await fixture.whenStable();
     expect(phone.getAttribute('aria-invalid')).toBe('true');
     expect(el.textContent).toContain('valid 10-digit Indian mobile');
+  });
+});
+
+describe('Continue with Google', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+  });
+
+  async function render<T>(
+    component: Type<T>,
+    google: boolean,
+    inputs: Record<string, string> = {},
+  ) {
+    const fixture = TestBed.createComponent(component);
+    for (const [k, v] of Object.entries(inputs)) fixture.componentRef.setInput(k, v);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne('/api/v1/auth/providers').flush({ google });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  const googleLink = (el: HTMLElement) =>
+    [...el.querySelectorAll<HTMLAnchorElement>('a')].find((a) =>
+      a.textContent?.includes('Continue with Google'),
+    );
+
+  it('is hidden when the server has not set up Google sign-in', async () => {
+    expect(googleLink(await render(Login, false))).toBeUndefined();
+  });
+
+  it('links to the API with a safe return path', async () => {
+    const el = await render(Login, true, { returnUrl: '/venues/x?date=2027-01-21' });
+    const href = new URL(googleLink(el)!.getAttribute('href')!, 'http://app.test');
+    expect(href.pathname).toBe('/api/v1/auth/google/start');
+    expect(href.searchParams.get('returnUrl')).toBe('/venues/x?date=2027-01-21');
+    expect(href.searchParams.has('intent')).toBe(false);
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    const evil = await render(Login, true, { returnUrl: '//evil.example' });
+    const evilHref = new URL(googleLink(evil)!.getAttribute('href')!, 'http://app.test');
+    expect(evilHref.searchParams.get('returnUrl')).toBe('/');
+  });
+
+  it('asks for an owner account when "List my venue" is chosen', async () => {
+    const fixture = TestBed.createComponent(Register);
+    fixture.detectChanges();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/v1/auth/providers')
+      .flush({ google: true });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const intent = () =>
+      new URL(googleLink(el)!.getAttribute('href')!, 'http://app.test').searchParams.get('intent');
+    expect(intent()).toBeNull();
+
+    el.querySelector<HTMLInputElement>('input[value=OWNER]')!.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(intent()).toBe('owner');
+    const href = new URL(googleLink(el)!.getAttribute('href')!, 'http://app.test');
+    expect(href.searchParams.get('returnUrl')).toBe('/owner');
+  });
+
+  it('explains a failed Google sign-in on the sign-in page', async () => {
+    const el = await render(Login, true, { error: 'google_other_google_account' });
+    expect(el.querySelector('[role=alert]')?.textContent).toContain(
+      'already linked to a different Google account',
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { type RequestHandler, Router } from 'express';
-import { and, count, desc, eq, ilike, lt, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, lt, or, sql, type SQL } from 'drizzle-orm';
 import {
   adminUserQuerySchema,
   ownerBookingQuerySchema,
@@ -247,6 +247,49 @@ export function adminRouter(deps: AdminRouterDeps): Router {
     });
     if (status === 'SUSPENDED') await auth.revokeAllSessions(targetId, 'suspended');
     res.status(204).end();
+  });
+
+  /**
+   * Marks a user's email as verified without the emailed link, e.g. when a tester or customer
+   * cannot receive our mail. Audited; only a super admin may do it for an admin account.
+   */
+  r.post('/users/:id/verify-email', requirePermission('user:manage'), async (req, res) => {
+    const actor = currentUser(req);
+    const targetId = z.uuid().parse(req.params['id']);
+    const verifiedAt = await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(users).where(eq(users.id, targetId)).for('update');
+      if (!before) throw errors.notFound('User not found');
+      if (before.emailVerifiedAt) return before.emailVerifiedAt;
+      if (
+        (before.role === 'SUPER_ADMIN' || before.role === 'ADMIN') &&
+        actor.role !== 'SUPER_ADMIN'
+      ) {
+        throw errors.forbidden('Only a super admin can change an admin account');
+      }
+      const [after] = await tx
+        .update(users)
+        .set({
+          emailVerifiedAt: new Date(),
+          status: sql`CASE WHEN ${users.status} = 'PENDING_VERIFICATION' THEN 'ACTIVE'::user_status ELSE ${users.status} END`,
+        })
+        .where(eq(users.id, targetId))
+        .returning({ emailVerifiedAt: users.emailVerifiedAt, status: users.status });
+      await audit.record(
+        {
+          action: 'user.email_marked_verified',
+          entityType: 'user',
+          entityId: targetId,
+          actorId: actor.userId,
+          actorRole: actor.role,
+          before: { emailVerified: false, status: before.status },
+          after: { emailVerified: true, status: after?.status },
+        },
+        auditContext(req),
+        tx,
+      );
+      return after?.emailVerifiedAt ?? null;
+    });
+    res.json({ id: targetId, emailVerifiedAt: verifiedAt });
   });
 
   r.get('/audit-logs', requirePermission('audit:view'), async (req, res) => {

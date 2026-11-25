@@ -118,8 +118,23 @@ export class AuthService {
     await firstValueFrom(this.http.delete(`${API}/auth/sessions/${encodeURIComponent(familyId)}`));
   }
 
+  /** Texts a 6-digit code to the number; verifying it saves the number on the account. */
+  async sendPhoneCode(phone: string): Promise<void> {
+    await firstValueFrom(this.http.post(`${API}/auth/otp/send`, { phone }));
+  }
+
+  async verifyPhoneCode(phone: string, code: string): Promise<void> {
+    await firstValueFrom(this.http.post(`${API}/auth/otp/verify`, { phone, code }));
+    await this.refresh(); // so the signed-in user shows the verified number
+  }
+
   async verifyEmail(token: string): Promise<void> {
     await firstValueFrom(this.http.post(`${API}/auth/verify-email`, { token }));
+  }
+
+  /** Emails a fresh verification link to the signed-in user; earlier links stop working. */
+  async resendVerificationEmail(): Promise<void> {
+    await firstValueFrom(this.http.post(`${API}/auth/verify-email/resend`, null));
   }
 
   async forgotPassword(email: string): Promise<void> {

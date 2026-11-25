@@ -33,7 +33,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-5 py-4">
       @if (venue(); as v) {
-        <a [routerLink]="['/venues', v.slug]" class="text-sm text-brand-700 underline"
+        <a [routerLink]="['/venues', v.slug]" class="tap w-fit text-sm text-brand-700 underline"
           >← {{ v.name }}</a
         >
         <h1 class="font-display text-3xl font-medium">Book {{ hall()?.name }} at {{ v.name }}</h1>

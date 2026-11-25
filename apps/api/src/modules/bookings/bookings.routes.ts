@@ -70,7 +70,9 @@ export function bookingsRouter(deps: {
       .from(users)
       .where(eq(users.id, me.userId));
     if (!user?.verified)
-      throw errors.forbidden('Verify your email before booking. Check your inbox for the link.');
+      throw errors.forbidden(
+        'Verify your email before booking. Check your inbox, or resend the link from your account page.',
+      );
     const input = quoteRequestSchema.parse(req.body);
     const { booking, quote } = await service.hold(me.userId, input, auditContext(req));
     res.status(201).json({

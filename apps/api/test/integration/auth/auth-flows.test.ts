@@ -57,6 +57,64 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
       expect(me.body.permissions).toContain('booking:create');
     });
 
+    it('resends a fresh verification link that replaces the old one', async () => {
+      const c = new Client(h.app);
+      const email = uniqueEmail('resend');
+      await c.send('post', '/api/v1/auth/register', {
+        email,
+        password: PASSWORD,
+        fullName: 'Resend Tester',
+        phone: '9876500077',
+      });
+      const first = tokenFromEmail(h.email, email);
+      expect((await c.login(email)).status).toBe(200);
+
+      const res = await c.send('post', '/api/v1/auth/verify-email/resend');
+      expect(res.status).toBe(202);
+      const second = tokenFromEmail(h.email, email);
+      expect(second).not.toBe(first);
+
+      // The earlier link no longer works; the new one does.
+      expect((await c.send('post', '/api/v1/auth/verify-email', { token: first })).status).toBe(
+        400,
+      );
+      expect((await c.send('post', '/api/v1/auth/verify-email', { token: second })).status).toBe(
+        200,
+      );
+      const [user] = await h.db.select().from(users).where(eq(users.email, email));
+      const logs = await h.db
+        .select()
+        .from(auditLogs)
+        .where(
+          and(
+            eq(auditLogs.entityId, user!.id),
+            eq(auditLogs.action, 'auth.verification_email_resent'),
+          ),
+        );
+      expect(logs).toHaveLength(1);
+
+      // Once verified there is nothing to resend.
+      const again = await c.send('post', '/api/v1/auth/verify-email/resend');
+      expect(again.status).toBe(409);
+      expect(again.body.error.code).toBe('EMAIL_ALREADY_VERIFIED');
+    });
+
+    it('requires sign-in to resend, and limits resends per account', async () => {
+      expect(
+        (await new Client(h.app).send('post', '/api/v1/auth/verify-email/resend')).status,
+      ).toBe(401);
+      const u = await createUser(h.db, 'CUSTOMER', {
+        status: 'PENDING_VERIFICATION',
+        emailVerifiedAt: null,
+      });
+      const c = new Client(h.app);
+      expect((await c.login(u.email)).status).toBe(200);
+      const statuses: number[] = [];
+      for (let i = 0; i < 4; i++)
+        statuses.push((await c.send('post', '/api/v1/auth/verify-email/resend')).status);
+      expect(statuses).toEqual([202, 202, 202, 429]);
+    });
+
     it('creates an owner profile for owner sign-ups', async () => {
       const email = uniqueEmail('owner-signup');
       await new Client(h.app).send('post', '/api/v1/auth/register', {
@@ -366,6 +424,28 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
         email: uniqueEmail('ghost'),
       });
       expect(res.status).toBe(202);
+    });
+
+    it('still answers normally when the mail server is down', async () => {
+      const user = await createUser(h.db);
+      const send = h.email.send;
+      h.email.send = () => Promise.reject(new Error('smtp unreachable'));
+      try {
+        const c = new Client(h.app);
+        // Same answer as for an unknown email: a mail failure must not reveal the account.
+        const forgot = await c.send('post', '/api/v1/auth/password/forgot', { email: user.email });
+        expect(forgot.status).toBe(202);
+        const email = uniqueEmail('mailfail');
+        const reg = await c.send('post', '/api/v1/auth/register', {
+          email,
+          password: PASSWORD,
+          fullName: 'Mail Fail',
+        });
+        expect(reg.status).toBe(202);
+        expect(await h.db.select().from(users).where(eq(users.email, email))).toHaveLength(1);
+      } finally {
+        h.email.send = send;
+      }
     });
   });
 

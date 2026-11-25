@@ -183,7 +183,7 @@ export class AdminReports implements OnInit {
           </select>
         </label>
       </header>
-      <div class="overflow-x-auto">
+      <div class="relative overflow-x-auto">
         <table class="w-full min-w-[40rem] text-left text-sm">
           <caption class="sr-only">
             Payouts
@@ -295,6 +295,16 @@ export class AdminPayouts implements OnInit {
               <span class="text-slate-500"
                 >{{ r.customerName }} · {{ r.createdAt | date: 'd MMM y' }}</span
               >
+            </p>
+            <p class="text-xs text-slate-500">
+              {{ r.customerEmail }}
+              @if (r.customerPhone) {
+                · {{ r.customerPhone }}
+              }
+              · Event {{ r.eventDate | date: 'd MMM y' }} ·
+              {{
+                r.source === 'OFFLINE' ? 'Booked offline with the venue' : 'Booked on MandapamBook'
+              }}
             </p>
             @if (r.body) {
               <p class="whitespace-pre-line">{{ r.body }}</p>

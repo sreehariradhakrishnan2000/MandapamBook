@@ -47,3 +47,17 @@ export function reviewerDisplayName(fullName: string): string {
   const last = parts.length > 1 ? parts[parts.length - 1] : undefined;
   return last ? `${first} ${last.charAt(0).toUpperCase()}.` : first;
 }
+
+/** A booking a venue took for this person outside the app, which they can review. */
+export interface ReviewableOfflineBooking {
+  offlineBookingId: string;
+  venueName: string;
+  venueSlug: string;
+  hallName: string;
+  eventType: string | null;
+  firstDate: string;
+  lastDate: string;
+  /** False until the last date has passed. */
+  canReview: boolean;
+  review: { id: string; rating: number; body: string; status: string } | null;
+}

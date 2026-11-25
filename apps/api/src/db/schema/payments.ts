@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -22,8 +23,8 @@ import {
 } from './enums.js';
 import { bookings } from './bookings.js';
 import { ownerProfiles, users } from './identity.js';
-import { auditoriums } from './venues.js';
-import { createdAt, id, timestamps } from './types.js';
+import { auditoriums, offlineBookings } from './venues.js';
+import { citext, createdAt, id, timestamps } from './types.js';
 
 export const payments = pgTable(
   'payments',
@@ -150,9 +151,11 @@ export const reviews = pgTable(
   'reviews',
   {
     id: id(),
-    bookingId: uuid('booking_id')
-      .notNull()
-      .references(() => bookings.id, { onDelete: 'cascade' }),
+    /** The app booking reviewed, or null when it was a booking taken offline. */
+    bookingId: uuid('booking_id').references(() => bookings.id, { onDelete: 'cascade' }),
+    offlineBookingId: uuid('offline_booking_id').references(() => offlineBookings.id, {
+      onDelete: 'cascade',
+    }),
     customerId: uuid('customer_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -163,13 +166,22 @@ export const reviews = pgTable(
     body: text('body').notNull().default(''),
     status: reviewStatus('status').notNull().default('PUBLISHED'),
     ownerReply: text('owner_reply'),
+    /** Who wrote it, as their account said when they did: kept even if the account changes. */
+    reviewerName: text('reviewer_name').notNull(),
+    reviewerEmail: citext('reviewer_email').notNull(),
+    /** Null only on reviews written before a phone number was required. */
+    reviewerPhone: text('reviewer_phone'),
+    /** Date of the event reviewed (the first date for multi-day offline bookings). */
+    eventDate: date('event_date', { mode: 'string' }).notNull(),
     ...timestamps(),
   },
   (t) => [
     uniqueIndex('reviews_booking_key').on(t.bookingId),
+    uniqueIndex('reviews_offline_booking_key').on(t.offlineBookingId),
     index('reviews_auditorium_idx').on(t.auditoriumId, t.createdAt),
     check('reviews_rating', sql`${t.rating} BETWEEN 1 AND 5`),
     check('reviews_body_length', sql`char_length(${t.body}) <= 4000`),
+    check('reviews_one_booking', sql`(${t.bookingId} IS NULL) <> (${t.offlineBookingId} IS NULL)`),
   ],
 );
 
