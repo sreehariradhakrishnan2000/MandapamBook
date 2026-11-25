@@ -44,6 +44,7 @@ export function startSweeps(deps: {
     new InvoiceService(db),
     env.APP_BASE_URL,
     logger,
+    env.ADMIN_NOTIFY_EMAIL,
   );
   const payouts = new PayoutService(db, settings);
 

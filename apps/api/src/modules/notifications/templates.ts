@@ -14,6 +14,9 @@ export interface BookingNotificationData {
   refundPaise: number;
   recipientName: string;
   customerName?: string;
+  /** Admin copies only: the booking's new status and the reason given, if any. */
+  toStatus?: string;
+  reason?: string | null;
 }
 
 export type BookingTemplate =
@@ -26,7 +29,23 @@ export type BookingTemplate =
   | 'review_request'
   | 'owner_new_booking'
   | 'owner_request_pending'
-  | 'owner_booking_cancelled';
+  | 'owner_booking_cancelled'
+  | 'admin_booking_alert';
+
+const ADMIN_HEADINGS: Record<string, { subject: string; heading: string }> = {
+  CONFIRMED: { subject: 'New booking', heading: 'New booking confirmed' },
+  AWAITING_OWNER: {
+    subject: 'New booking request',
+    heading: 'New booking request, waiting for the venue',
+  },
+  CANCELLED: { subject: 'Booking cancelled', heading: 'A booking was cancelled' },
+  REFUNDED: { subject: 'Refund processed', heading: 'A refund was processed' },
+};
+
+const REASONS: Record<string, string> = {
+  rejected_by_owner: 'Declined by the venue',
+  owner_response_timeout: 'The venue did not answer in time',
+};
 
 const SLOT: Record<string, string> = {
   MORNING: 'Muhurtham (morning)',
@@ -204,6 +223,27 @@ function bookingContent(
         ],
         action: { label: 'Accept or decline', url: ownerBookings.url },
       };
+    case 'admin_booking_alert': {
+      const h = ADMIN_HEADINGS[d.toStatus ?? ''] ?? {
+        subject: 'Booking update',
+        heading: 'A booking changed',
+      };
+      return {
+        subject: `${h.subject}: ${d.venueName}, ${d.eventDate} (${d.refCode})`,
+        heading: h.heading,
+        paragraphs: [`${d.venueName} (${d.hallName}) on ${when(d)}.`],
+        details: [
+          ...details,
+          { label: 'Status', value: (d.toStatus ?? '').replaceAll('_', ' ').toLowerCase() },
+          ...(d.reason ? [{ label: 'Reason', value: REASONS[d.reason] ?? d.reason }] : []),
+          { label: 'Total', value: formatInr(d.totalPaise) },
+          { label: 'Paid online', value: formatInr(d.paidPaise) },
+          ...(d.refundPaise > 0 ? [{ label: 'Refund', value: formatInr(d.refundPaise) }] : []),
+        ],
+        action: { label: 'Open admin', url: `${appBaseUrl}/admin` },
+        note: 'You get these because your address is set as ADMIN_NOTIFY_EMAIL.',
+      };
+    }
     case 'owner_booking_cancelled':
       return {
         subject: `Booking cancelled: ${d.eventDate} (${d.refCode})`,
