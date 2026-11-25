@@ -5,8 +5,9 @@ import {
   type HttpRequest,
 } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { type Observable, catchError, defer, tap, throwError, timer, switchMap } from 'rxjs';
+import { type Observable, catchError, defer, from, switchMap, tap, throwError, timer } from 'rxjs';
 import { API } from './auth/auth.service';
+import { Connectivity } from './connectivity';
 
 /**
  * The hosting plan puts the API to sleep after a quiet spell, and waking it takes up to a
@@ -145,6 +146,7 @@ function retryable(req: HttpRequest<unknown>, err: HttpErrorResponse): boolean {
 export const serverWakeInterceptor: HttpInterceptorFn = (req, next) => {
   if (!req.url.startsWith(API)) return next(req);
   const status = inject(ServerStatus);
+  const connectivity = inject(Connectivity);
   const started = Date.now();
 
   const attempt = (n: number): Observable<HttpEvent<unknown>> =>
@@ -164,6 +166,18 @@ export const serverWakeInterceptor: HttpInterceptorFn = (req, next) => {
         if (paused) {
           status.bookingsPaused.set(paused);
           return throwError(() => err);
+        }
+        // Offline: reads wait for the connection to come back (up to 2 minutes), then retry.
+        if (
+          err instanceof HttpErrorResponse &&
+          err.status === 0 &&
+          (req.method === 'GET' || req.method === 'HEAD') &&
+          !connectivity.online() &&
+          n < 3
+        ) {
+          return from(connectivity.whenOnline(120_000)).pipe(
+            switchMap((back) => (back ? attempt(n + 1) : throwError(() => err))),
+          );
         }
         if (!isWakingError(err)) return throwError(() => err);
         if (!retryable(req, err)) {

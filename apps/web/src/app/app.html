@@ -34,6 +34,33 @@
     </div>
   }
 
+  @if (!net.online()) {
+    <div
+      class="flex items-center justify-center gap-2 bg-slate-800 px-4 py-2 text-center text-sm text-white"
+      role="status"
+      aria-live="polite"
+    >
+      <strong class="font-semibold">You're offline.</strong> We'll reconnect automatically when
+      you're back.
+    </div>
+  }
+
+  @if (net.updateAvailable()) {
+    <div
+      class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-forest-800 px-4 py-2 text-center text-sm text-white"
+      role="status"
+    >
+      <span>A new version of MandapamBook is available.</span>
+      <button
+        type="button"
+        class="rounded-full bg-white px-3 py-1 font-semibold text-forest-800"
+        (click)="net.reload()"
+      >
+        Refresh
+      </button>
+    </div>
+  }
+
   @if (server.waking()) {
     <div
       class="flex items-center justify-center gap-2 bg-marigold-100 px-4 py-2 text-center text-sm text-ink"
@@ -203,8 +230,57 @@
   </header>
 
   <main id="main" class="mx-auto max-w-6xl px-4 py-8">
-    <router-outlet />
+    @if (net.navigationFailed()) {
+      <section class="mx-auto max-w-md py-16 text-center" role="alert">
+        <h1 class="font-display text-3xl font-normal">This page couldn't load</h1>
+        <p class="mt-2 text-slate-600">
+          Something went wrong on our side. Reloading usually fixes it.
+        </p>
+        <div class="mt-6 flex justify-center gap-3">
+          <button
+            type="button"
+            class="rounded-full bg-brand-600 px-5 py-2.5 font-semibold text-white"
+            (click)="net.reload()"
+          >
+            Reload
+          </button>
+          <a routerLink="/" class="tap rounded-full px-5 font-semibold text-brand-700 underline"
+            >Go home</a
+          >
+        </div>
+      </section>
+    } @else {
+      <router-outlet />
+    }
   </main>
+
+  @if (net.pageError()) {
+    <div
+      class="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-md flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-xl sm:flex-row sm:items-center"
+      role="alert"
+    >
+      <p class="flex-1">
+        <strong class="font-semibold">Something went wrong on this page.</strong> Reload to try
+        again.
+      </p>
+      <div class="flex gap-2">
+        <button
+          type="button"
+          class="rounded-full bg-brand-600 px-4 py-2 font-semibold text-white"
+          (click)="net.reload()"
+        >
+          Reload
+        </button>
+        <button
+          type="button"
+          class="rounded-full px-3 py-2 text-slate-600 underline"
+          (click)="net.pageError.set(false)"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+  }
 
   <footer class="mt-16 bg-forest-800 text-sm text-forest-200">
     <div class="mx-auto grid max-w-6xl gap-8 px-4 pt-12 pb-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -242,7 +318,19 @@
       </nav>
     </div>
     <div class="border-t border-forest-700">
-      <p class="mx-auto max-w-6xl px-4 py-5">© {{ year }} MandapamBook</p>
+      <div
+        class="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-5 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p>© {{ year }} MandapamBook</p>
+        <nav aria-label="Legal" class="flex flex-wrap gap-x-4">
+          <a routerLink="/terms" class="py-1.5 hover:text-white">Terms</a>
+          <a routerLink="/privacy" class="py-1.5 hover:text-white">Privacy</a>
+          <a routerLink="/refund-policy" class="py-1.5 hover:text-white"
+            >Refunds &amp; cancellations</a
+          >
+          <a routerLink="/contact" class="py-1.5 hover:text-white">Contact us</a>
+        </nav>
+      </div>
     </div>
   </footer>
 }
