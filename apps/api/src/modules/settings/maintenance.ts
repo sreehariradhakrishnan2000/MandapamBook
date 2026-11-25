@@ -5,6 +5,7 @@ import type { Db } from '../../db/client.js';
 import { platformSettings } from '../../db/schema/index.js';
 import { HttpError } from '../../http/errors.js';
 import { type AuditService, auditContext } from '../audit/audit.service.js';
+import type { RevocationStore } from '../../infra/revocation-store.js';
 import type { AccessTokenService } from '../auth/access-tokens.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 
@@ -57,9 +58,31 @@ const STAFF_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
  * app turns that into the maintenance page. Admin routes still run their own full
  * authentication; this only decides who gets past the "closed" sign.
  */
+/**
+ * True only for a valid, unrevoked admin access token: the same checks `authenticate`
+ * makes (signature, expiry, logout, session and user-wide revocation). Anything else,
+ * including no header at all, is treated as a visitor.
+ */
+async function isActiveStaff(
+  authorization: string | undefined,
+  tokens: AccessTokenService,
+  revocations: RevocationStore,
+): Promise<boolean> {
+  const token = /^Bearer ([A-Za-z0-9._-]+)$/.exec(authorization ?? '')?.[1] ?? '';
+  const claims = await tokens.verify(token).catch(() => null);
+  if (!claims || !STAFF_ROLES.has(claims.role)) return false;
+  const [tokenRevoked, familyRevoked, cutoff] = await Promise.all([
+    revocations.isTokenRevoked(claims.jti),
+    revocations.isFamilyRevoked(claims.familyId),
+    revocations.getUserCutoff(claims.userId),
+  ]);
+  return !tokenRevoked && !familyRevoked && (cutoff === null || claims.issuedAtMs > cutoff);
+}
+
 export function maintenanceGate(
   maintenance: MaintenanceService,
   tokens: AccessTokenService,
+  revocations: RevocationStore,
 ): RequestHandler {
   return (req, res, next) => {
     if (ALWAYS_OPEN.some((p) => p.test(req.path))) return next();
@@ -67,9 +90,7 @@ export function maintenanceGate(
       .get()
       .then(async (m) => {
         if (!m.enabled) return next();
-        const token = /^Bearer ([A-Za-z0-9._-]+)$/.exec(req.get('authorization') ?? '')?.[1];
-        const claims = token ? await tokens.verify(token).catch(() => null) : null;
-        if (claims && STAFF_ROLES.has(claims.role)) return next();
+        if (await isActiveStaff(req.get('authorization'), tokens, revocations)) return next();
         const retryAfter = m.until
           ? Math.max(60, Math.round((Date.parse(m.until) - Date.now()) / 1000))
           : 300;

@@ -4,6 +4,7 @@ import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { errorHandler } from '../../src/http/middleware/errorHandler.js';
+import { MemoryRevocationStore } from '../../src/infra/revocation-store.js';
 import { AccessTokenService } from '../../src/modules/auth/access-tokens.js';
 import {
   type MaintenanceService,
@@ -11,12 +12,13 @@ import {
 } from '../../src/modules/settings/maintenance.js';
 
 const tokens = new AccessTokenService([{ kid: 'k1', secret: randomBytes(32) }], 900);
+const revocations = new MemoryRevocationStore();
 
 /** A tiny app: the gate in front of a few routes, like the real /api/v1 router. */
 function appWith(state: Maintenance) {
   const fake = { get: async () => state } as unknown as MaintenanceService;
   const api = express.Router();
-  api.use(maintenanceGate(fake, tokens));
+  api.use(maintenanceGate(fake, tokens, revocations));
   for (const path of [
     '/auditoriums',
     '/status',
@@ -77,5 +79,19 @@ describe('maintenance gate', () => {
     const closed = await request(app).get('/api/v1/auditoriums');
     expect(closed.body.error.message).toContain('planned maintenance');
     expect(closed.headers['retry-after']).toBe('300');
+  });
+
+  it('treats a signed-out or cut-off admin token as a visitor', async () => {
+    const app = appWith({ enabled: true, message: '', until: null });
+    const loggedOut = await tokens.sign({ userId: 'a1', role: 'ADMIN', familyId: 'f-a' });
+    await revocations.revokeToken(loggedOut.claims.jti, 900);
+    const suspended = await tokens.sign({ userId: 'a2', role: 'SUPER_ADMIN', familyId: 'f-b' });
+    await revocations.setUserCutoff('a2', Date.now() + 1, 900);
+    for (const t of [loggedOut, suspended]) {
+      const res = await request(app)
+        .get('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${t.token}`);
+      expect(res.status).toBe(503);
+    }
   });
 });

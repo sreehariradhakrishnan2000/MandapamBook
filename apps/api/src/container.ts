@@ -142,7 +142,7 @@ export function buildContainer(deps: ContainerDeps): Container {
   // Maintenance: the switch and status come first, then the gate that closes the rest.
   const maintenance = new MaintenanceService(db);
   api.use(maintenanceRouter({ maintenance, audit, authenticate }));
-  api.use(maintenanceGate(maintenance, accessTokens));
+  api.use(maintenanceGate(maintenance, accessTokens, deps.revocations));
   const settings = new SettingsService(db);
   const quotes = new QuoteService(db, settings);
   const bookingService = new BookingService(db, quotes, settings, audit);
