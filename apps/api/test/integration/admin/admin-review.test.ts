@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { auditLogs, auditoriums, cities } from '../../../src/db/schema/index.js';
+import { auditLogs, auditoriums, cities, users } from '../../../src/db/schema/index.js';
 import { hasTestDb } from '../../db-helpers.js';
 import { Client, type Harness, createHarness, createUser } from '../../auth-harness.js';
 
@@ -295,6 +295,48 @@ describe.skipIf(!hasTestDb)('admin review', { timeout: 120_000 }, () => {
       const detail = await admin.send('get', `/api/v1/admin/users/${u.id}`);
       expect(detail.body).toMatchObject({ email: u.email, role: 'CUSTOMER' });
       expect(detail.body.passwordHash).toBeUndefined();
+    });
+
+    it('marks an email as verified, activates the account, and audits it once', async () => {
+      const u = await createUser(h.db, 'CUSTOMER', {
+        status: 'PENDING_VERIFICATION',
+        emailVerifiedAt: null,
+      });
+      const path = `/api/v1/admin/users/${u.id}/verify-email`;
+      const res = await admin.send('post', path);
+      expect(res.status).toBe(200);
+      expect(res.body.emailVerifiedAt).toBeTruthy();
+      const [row] = await h.db.select().from(users).where(eq(users.id, u.id));
+      expect(row).toMatchObject({ status: 'ACTIVE' });
+      expect(row!.emailVerifiedAt).not.toBeNull();
+
+      // Repeating it changes nothing and adds no second audit entry.
+      expect((await admin.send('post', path)).status).toBe(200);
+      const logs = await h.db
+        .select()
+        .from(auditLogs)
+        .where(
+          and(eq(auditLogs.entityId, u.id), eq(auditLogs.action, 'user.email_marked_verified')),
+        );
+      expect(logs).toHaveLength(1);
+      expect(logs[0]).toMatchObject({ actorId: adminId });
+    });
+
+    it('lets only super admins verify an admin, and keeps customers out', async () => {
+      const other = await createUser(h.db, 'ADMIN', { emailVerifiedAt: null });
+      const path = `/api/v1/admin/users/${other.id}/verify-email`;
+      expect((await admin.send('post', path)).status).toBe(403);
+      expect((await superAdmin.send('post', path)).status).toBe(200);
+      const customer = await signIn('CUSTOMER');
+      expect((await customer.c.send('post', path)).status).toBe(403);
+      expect(
+        (
+          await admin.send(
+            'post',
+            '/api/v1/admin/users/00000000-0000-4000-8000-000000000000/verify-email',
+          )
+        ).status,
+      ).toBe(404);
     });
   });
 
