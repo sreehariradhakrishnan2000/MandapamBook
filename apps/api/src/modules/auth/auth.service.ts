@@ -19,6 +19,7 @@ import { hmacSha256, numericCode, randomToken, safeEqual } from '../../lib/crypt
 import { HttpError, errors } from '../../http/errors.js';
 import type { RateLimiters } from '../../http/middleware/rate-limit.js';
 import type { AuditContext, AuditService } from '../audit/audit.service.js';
+import { renderEmail } from '../notifications/email-layout.js';
 import type { EmailSender, SmsSender } from '../notifications/senders.js';
 import type { AccessTokenService } from './access-tokens.js';
 import {
@@ -131,8 +132,22 @@ export class AuthService {
       await this.email.send({
         to: input.email,
         template: 'account_exists',
-        subject: 'You already have a MandapamBook account',
-        text: `Someone tried to sign up with this email. If it was you, sign in or reset your password at ${this.config.appBaseUrl}/forgot-password. If not, you can ignore this email.`,
+        ...renderEmail(
+          {
+            subject: 'You already have a MandapamBook account',
+            heading: 'You already have an account',
+            paragraphs: [
+              'Someone tried to sign up with this email address, but it already has a MandapamBook account.',
+              'If it was you, sign in, or reset your password if you have forgotten it.',
+            ],
+            action: {
+              label: 'Reset my password',
+              url: `${this.config.appBaseUrl}/forgot-password`,
+            },
+            note: "If it wasn't you, you can ignore this email. Nothing has changed on your account.",
+          },
+          this.config.appBaseUrl,
+        ),
       });
     }
   }
@@ -406,8 +421,22 @@ export class AuthService {
       await this.email.send({
         to: user.email,
         template: 'security_alert',
-        subject: 'Sign-in to your MandapamBook account was locked',
-        text: `We locked sign-in for ${this.config.lockoutMinutes} minutes after several wrong passwords. If this wasn't you, reset your password at ${this.config.appBaseUrl}/forgot-password.`,
+        ...renderEmail(
+          {
+            subject: 'Sign-in to your MandapamBook account was locked',
+            heading: 'We paused sign-in to your account',
+            paragraphs: [
+              `After several wrong passwords, we locked sign-in for ${this.config.lockoutMinutes} minutes to keep your account safe.`,
+              "If this wasn't you, reset your password now.",
+            ],
+            action: {
+              label: 'Reset my password',
+              url: `${this.config.appBaseUrl}/forgot-password`,
+            },
+            note: 'If it was you, wait a few minutes and try again.',
+          },
+          this.config.appBaseUrl,
+        ),
       });
     }
   }
@@ -437,8 +466,22 @@ export class AuthService {
         await this.email.send({
           to: user.email,
           template: 'security_alert',
-          subject: 'We signed out a MandapamBook session',
-          text: 'An old sign-in token for your account was reused, which can mean it was copied. We signed that device out. If this keeps happening, change your password.',
+          ...renderEmail(
+            {
+              subject: 'We signed out a MandapamBook session',
+              heading: 'We signed out one of your devices',
+              greetingName: user.fullName.trim().split(/\s+/)[0] ?? user.fullName,
+              paragraphs: [
+                'An old sign-in token for your account was used again, which can mean it was copied. To be safe, we signed that device out.',
+                'If this keeps happening, change your password and sign out of all devices from your account page.',
+              ],
+              action: {
+                label: 'Review my devices',
+                url: `${this.config.appBaseUrl}/account`,
+              },
+            },
+            this.config.appBaseUrl,
+          ),
         });
       }
       throw errors.unauthenticated('Your session has ended. Sign in again.');
@@ -633,13 +676,32 @@ export class AuthService {
     });
     const verify = purpose === 'VERIFY_EMAIL';
     const link = `${this.config.appBaseUrl}/${verify ? 'verify-email' : 'reset-password'}?token=${token}`;
+    const firstName = user.fullName.trim().split(/\s+/)[0] ?? user.fullName;
     await this.email.send({
       to: user.email,
       template: verify ? 'verify_email' : 'password_reset',
-      subject: verify ? 'Verify your MandapamBook email' : 'Reset your MandapamBook password',
-      text: verify
-        ? `Hi ${user.fullName}, confirm your email by opening ${link} within 24 hours.`
-        : `Reset your password by opening ${link} within 30 minutes. If you didn't ask for this, ignore this email.`,
+      ...renderEmail(
+        verify
+          ? {
+              subject: 'Verify your MandapamBook email',
+              heading: 'Confirm your email address',
+              greetingName: firstName,
+              paragraphs: [
+                'Welcome to MandapamBook. Confirm this is your email address so you can book halls and get your booking updates.',
+              ],
+              action: { label: 'Verify my email', url: link },
+              note: "This link works for 24 hours. If you didn't create a MandapamBook account, you can ignore this email.",
+            }
+          : {
+              subject: 'Reset your MandapamBook password',
+              heading: 'Reset your password',
+              greetingName: firstName,
+              paragraphs: ['We received a request to reset the password for your account.'],
+              action: { label: 'Choose a new password', url: link },
+              note: "This link works for 30 minutes and only once. If you didn't ask for this, ignore this email: your password stays the same.",
+            },
+        this.config.appBaseUrl,
+      ),
     });
   }
 

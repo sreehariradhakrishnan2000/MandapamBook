@@ -197,7 +197,7 @@ export class NotificationService {
           recipientName: name.split(' ')[0] ?? name,
         };
         const template = n.template as BookingTemplate;
-        const { subject, text } = renderBookingEmail(template, data, this.appBaseUrl);
+        const { subject, text, html } = renderBookingEmail(template, data, this.appBaseUrl);
         const attachments =
           template === 'booking_confirmed'
             ? await this.invoices.pdf(data.bookingId).then(
@@ -219,6 +219,7 @@ export class NotificationService {
           template,
           subject,
           text,
+          html,
           ...(attachments ? { attachments } : {}),
         });
         await this.db
