@@ -123,8 +123,8 @@ describe('AuthService and interceptor', () => {
     http.expectNone('/api/v1/auth/refresh');
   });
 
-  it('guards redirect signed-out users to login with a return URL', () => {
-    const tree = TestBed.runInInjectionContext(() =>
+  it('guards redirect signed-out users to login with a return URL', async () => {
+    const tree = await TestBed.runInInjectionContext(() =>
       signedIn({}, [{ path: 'account' } as never], {} as never),
     );
     expect(String(tree)).toBe('/login?returnUrl=%2Faccount');
@@ -134,7 +134,7 @@ describe('AuthService and interceptor', () => {
     const done = auth.login('priya@example.test', 'pw', false);
     http.expectOne('/api/v1/auth/login').flush(session());
     await done;
-    const tree = TestBed.runInInjectionContext(() =>
+    const tree = await TestBed.runInInjectionContext(() =>
       withPermission('audit:view')({}, [{ path: 'admin' } as never], {} as never),
     );
     expect(String(tree)).toBe('/');

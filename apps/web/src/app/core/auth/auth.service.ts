@@ -104,9 +104,20 @@ export class AuthService {
     }
   }
 
+  private restored: Promise<boolean> | null = null;
+
   /** Called at startup: restores the session if a valid refresh cookie exists. */
   restore(): Promise<boolean> {
-    return this.refresh();
+    this.restored ??= this.refresh();
+    return this.restored;
+  }
+
+  /**
+   * Resolves once the startup session check has finished. Route guards wait on it, so a
+   * signed-in customer is not sent to the sign-in page just because the API was asleep.
+   */
+  whenRestored(): Promise<boolean> {
+    return this.restored ?? Promise.resolve(this.isSignedIn());
   }
 
   async logout(): Promise<void> {
@@ -186,6 +197,8 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Try
     } | null;
     const detail = body?.error?.details?.[0]?.message;
     if (err.status === 0) return 'You appear to be offline. Check your connection and try again.';
+    if (err.status === 502 || err.status === 503 || err.status === 504)
+      return 'Our server is starting up. Please try again in a minute.';
     return detail ?? body?.error?.message ?? fallback;
   }
   return fallback;
