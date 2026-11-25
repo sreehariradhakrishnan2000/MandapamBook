@@ -165,8 +165,13 @@ describe.skipIf(!hasTestDb)('double booking is prevented by the database', () =>
     const lost = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
     expect(won).toHaveLength(1);
     expect(lost).toHaveLength(attempts - 1);
+    // These raw inserts skip the app's per-hall-date lock on purpose, to test the constraint
+    // itself. Under load Postgres may then end some of them with a deadlock instead of the
+    // exclusion error; either way they lost, which is what matters: no double booking.
     for (const r of lost) {
-      expect(await sqlState(() => Promise.reject(r.reason))).toBe(PG_ERROR.EXCLUSION_VIOLATION);
+      expect([PG_ERROR.EXCLUSION_VIOLATION, PG_ERROR.DEADLOCK_DETECTED]).toContain(
+        await sqlState(() => Promise.reject(r.reason)),
+      );
     }
     const active = await db.select().from(hallOccupancy).where(eq(hallOccupancy.eventDate, date));
     expect(active.filter((o) => o.active && o.hallId === f.hallId)).toHaveLength(1);
