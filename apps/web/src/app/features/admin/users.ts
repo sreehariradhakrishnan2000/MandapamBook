@@ -68,6 +68,12 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
                     class="text-slate-500"
                     >{{ u.email }}</span
                   >
+                  @if (!u.emailVerifiedAt) {
+                    <span
+                      class="ml-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
+                      >Email not verified</span
+                    >
+                  }
                 </td>
                 <td class="px-3 py-2">
                   @if (canChangeRoles && u.id !== myId) {
@@ -96,6 +102,15 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
                   {{ u.lastLoginAt ? (u.lastLoginAt | date: 'd MMM y') : '—' }}
                 </td>
                 <td class="px-3 py-2 text-right">
+                  @if (!u.emailVerifiedAt) {
+                    <button
+                      type="button"
+                      class="mr-3 text-brand-700 underline"
+                      (click)="markEmailVerified(u)"
+                    >
+                      Mark email verified
+                    </button>
+                  }
                   @if (u.id !== myId) {
                     @if (u.status === 'SUSPENDED') {
                       <button type="button" class="underline" (click)="setStatus(u, 'ACTIVE')">
@@ -158,6 +173,22 @@ export class AdminUsers implements OnInit {
     } catch (err) {
       this.error.set(errorMessage(err));
       await this.load();
+    }
+  }
+
+  protected async markEmailVerified(u: AdminUser): Promise<void> {
+    this.error.set(null);
+    if (
+      !confirm(
+        `Mark ${u.email} as verified? Only do this if you know the address belongs to ${u.fullName}. It is recorded in the audit log.`,
+      )
+    )
+      return;
+    try {
+      await this.api.markEmailVerified(u.id);
+      await this.load();
+    } catch (err) {
+      this.error.set(errorMessage(err));
     }
   }
 
