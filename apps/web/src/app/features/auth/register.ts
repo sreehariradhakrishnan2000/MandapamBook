@@ -119,6 +119,11 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
               <app-password-toggle [input]="pw" />
             </div>
           </app-form-field>
+          <p class="text-xs text-slate-600">
+            By creating an account you agree to our
+            <a routerLink="/terms" class="text-brand-700 underline">Terms of Use</a> and
+            <a routerLink="/privacy" class="text-brand-700 underline">Privacy Policy</a>.
+          </p>
           <button type="submit" [class]="buttonClass" [disabled]="busy()">
             {{ busy() ? 'Creating account…' : 'Create account' }}
           </button>

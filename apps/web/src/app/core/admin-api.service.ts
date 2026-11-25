@@ -1,6 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type {
+  BookingsPause,
   ListingDecision,
   Maintenance,
   OwnerProfileView,
@@ -74,6 +75,19 @@ export interface RevealedKyc {
   ifsc: string | null;
   gstin: string | null;
   bankAccountName: string | null;
+}
+
+export interface SystemHealthView {
+  version: string;
+  email: {
+    provider: string;
+    lastSentAt: string | null;
+    failedLast24h: number;
+    queued: number;
+    smtpKeyExpiresAt: string | null;
+    daysUntilKeyExpiry: number | null;
+  };
+  errorTracking: { api: boolean; web: boolean };
 }
 
 export interface AdminUser {
@@ -160,6 +174,8 @@ export class AdminApi {
     decision: { decision: 'verify' } | { decision: 'reject'; reason: string },
   ) => this.send<OwnerProfileView>('post', `/owners/${ownerId}/kyc/decision`, decision);
 
+  systemHealth = () => this.get<SystemHealthView>('/system-health');
+
   users = (query: { q?: string; role?: string; status?: string; offset?: number }) =>
     this.get<Page<AdminUser>>('/users', query);
   changeRole = (id: string, role: Role) =>
@@ -189,11 +205,15 @@ export class AdminApi {
   updateSettings = (changes: Partial<PlatformSettings>) =>
     this.send<PlatformSettings>('put', '/settings', changes);
 
-  /** The current maintenance switch, from the public status endpoint. */
-  maintenance = async (): Promise<Maintenance> =>
-    (await firstValueFrom(this.http.get<{ maintenance: Maintenance }>(`${API}/status`)))
-      .maintenance;
+  /** The site switches (maintenance and bookings pause), from the public status endpoint. */
+  siteStatus = () =>
+    firstValueFrom(
+      this.http.get<{ maintenance: Maintenance; bookings: BookingsPause }>(`${API}/status`),
+    );
+  maintenance = async (): Promise<Maintenance> => (await this.siteStatus()).maintenance;
   setMaintenance = (value: Maintenance) => this.send<Maintenance>('put', '/maintenance', value);
+  setBookingsPause = (value: BookingsPause) =>
+    this.send<BookingsPause>('put', '/bookings-pause', value);
 
   auditLogs = (query: {
     action?: string;

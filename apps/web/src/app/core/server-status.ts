@@ -5,8 +5,9 @@ import {
   type HttpRequest,
 } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
-import { type Observable, catchError, defer, tap, throwError, timer, switchMap } from 'rxjs';
+import { type Observable, catchError, defer, from, switchMap, tap, throwError, timer } from 'rxjs';
 import { API } from './auth/auth.service';
+import { Connectivity } from './connectivity';
 
 /**
  * The hosting plan puts the API to sleep after a quiet spell, and waking it takes up to a
@@ -22,19 +23,40 @@ export class ServerStatus {
    * so). Customers then see the maintenance page; admins see a reminder bar.
    */
   readonly maintenance = signal<MaintenanceInfo | null>(null);
+  /** Planned maintenance announced in advance; a banner shows it until it ends. */
+  readonly scheduled = signal<{ from: string; to: string } | null>(null);
+  /** New bookings are paused: browsing works, holding and paying do not. */
+  readonly bookingsPaused = signal<{ message: string } | null>(null);
   private probing = false;
 
-  /** Asks the API whether maintenance is on. Never throws: unknown means "not on". */
+  /**
+   * Reads the site switches (maintenance, its advance notice, bookings pause). Never throws:
+   * if the status cannot be read, what we knew before stands. Returns whether maintenance
+   * is on.
+   */
   async checkMaintenance(): Promise<boolean> {
     if (typeof fetch === 'undefined') return false;
     try {
       const res = await fetch(`${API}/status`, { cache: 'no-store' });
       if (!res.ok) return this.maintenance() !== null;
       const body = (await res.json()) as {
-        maintenance?: { enabled: boolean; message: string; until: string | null };
+        maintenance?: {
+          enabled: boolean;
+          message: string;
+          until: string | null;
+          scheduledFrom?: string | null;
+          scheduledTo?: string | null;
+        };
+        bookings?: { paused: boolean; message: string };
       };
       const m = body.maintenance;
       this.maintenance.set(m?.enabled ? { message: m.message, until: m.until } : null);
+      const upcoming =
+        m?.scheduledFrom && m.scheduledTo && Date.parse(m.scheduledTo) > Date.now()
+          ? { from: m.scheduledFrom, to: m.scheduledTo }
+          : null;
+      this.scheduled.set(upcoming);
+      this.bookingsPaused.set(body.bookings?.paused ? { message: body.bookings.message } : null);
       return Boolean(m?.enabled);
     } catch {
       return this.maintenance() !== null;
@@ -95,9 +117,19 @@ export function maintenanceFrom(err: unknown): MaintenanceInfo | null {
   return { message: body.error.message ?? '', until: body.error.details?.until ?? null };
 }
 
+/** The API's "bookings are paused" answer (503 with code BOOKINGS_PAUSED). */
+export function bookingsPausedFrom(err: unknown): { message: string } | null {
+  if (!(err instanceof HttpErrorResponse) || err.status !== 503) return null;
+  const body = err.error as { error?: { code?: string; message?: string } } | null;
+  return body?.error?.code === 'BOOKINGS_PAUSED' ? { message: body.error.message ?? '' } : null;
+}
+
 export function isWakingError(err: unknown): err is HttpErrorResponse {
   return (
-    err instanceof HttpErrorResponse && WAKING_STATUSES.has(err.status) && !maintenanceFrom(err)
+    err instanceof HttpErrorResponse &&
+    WAKING_STATUSES.has(err.status) &&
+    !maintenanceFrom(err) &&
+    !bookingsPausedFrom(err)
   );
 }
 
@@ -114,6 +146,7 @@ function retryable(req: HttpRequest<unknown>, err: HttpErrorResponse): boolean {
 export const serverWakeInterceptor: HttpInterceptorFn = (req, next) => {
   if (!req.url.startsWith(API)) return next(req);
   const status = inject(ServerStatus);
+  const connectivity = inject(Connectivity);
   const started = Date.now();
 
   const attempt = (n: number): Observable<HttpEvent<unknown>> =>
@@ -128,6 +161,23 @@ export const serverWakeInterceptor: HttpInterceptorFn = (req, next) => {
           status.markUp();
           status.maintenance.set(planned);
           return throwError(() => err);
+        }
+        const paused = bookingsPausedFrom(err);
+        if (paused) {
+          status.bookingsPaused.set(paused);
+          return throwError(() => err);
+        }
+        // Offline: reads wait for the connection to come back (up to 2 minutes), then retry.
+        if (
+          err instanceof HttpErrorResponse &&
+          err.status === 0 &&
+          (req.method === 'GET' || req.method === 'HEAD') &&
+          !connectivity.online() &&
+          n < 3
+        ) {
+          return from(connectivity.whenOnline(120_000)).pipe(
+            switchMap((back) => (back ? attempt(n + 1) : throwError(() => err))),
+          );
         }
         if (!isWakingError(err)) return throwError(() => err);
         if (!retryable(req, err)) {

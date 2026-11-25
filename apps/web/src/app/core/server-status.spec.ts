@@ -120,3 +120,67 @@ describe('planned maintenance', () => {
     expect(errorMessage(await result.catch((e: unknown) => e))).toContain('planned maintenance');
   });
 });
+
+describe('site switches', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const status = (body: unknown) =>
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => body }));
+
+  it('reads the bookings pause and an upcoming maintenance window, and drops past ones', async () => {
+    TestBed.configureTestingModule({});
+    const server = TestBed.inject(ServerStatus);
+    const from = new Date(Date.now() + 86_400_000).toISOString();
+    const to = new Date(Date.now() + 90_000_000).toISOString();
+    status({
+      maintenance: {
+        enabled: false,
+        message: '',
+        until: null,
+        scheduledFrom: from,
+        scheduledTo: to,
+      },
+      bookings: { paused: true, message: 'Razorpay is down' },
+    });
+    expect(await server.checkMaintenance()).toBe(false);
+    expect(server.scheduled()).toEqual({ from, to });
+    expect(server.bookingsPaused()).toEqual({ message: 'Razorpay is down' });
+
+    status({
+      maintenance: {
+        enabled: false,
+        message: '',
+        until: null,
+        scheduledFrom: '2020-01-01T00:00:00Z',
+        scheduledTo: '2020-01-01T01:00:00Z',
+      },
+      bookings: { paused: false, message: '' },
+    });
+    await server.checkMaintenance();
+    expect(server.scheduled()).toBeNull();
+    expect(server.bookingsPaused()).toBeNull();
+  });
+
+  it('turns a paused-booking answer into the banner, without retrying', async () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([serverWakeInterceptor])),
+        provideHttpClientTesting(),
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const server = TestBed.inject(ServerStatus);
+    const hold = firstValueFrom(TestBed.inject(HttpClient).post('/api/v1/bookings', {}));
+    http
+      .expectOne('/api/v1/bookings')
+      .flush(
+        { error: { code: 'BOOKINGS_PAUSED', message: 'Razorpay is down' } },
+        { status: 503, statusText: 'Service Unavailable' },
+      );
+    const err = await hold.catch((e: unknown) => e);
+    expect(server.bookingsPaused()).toEqual({ message: 'Razorpay is down' });
+    expect(server.waking()).toBe(false);
+    expect(errorMessage(err)).toBe('Razorpay is down');
+    http.verify();
+  });
+});

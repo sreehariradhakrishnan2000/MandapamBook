@@ -9,6 +9,7 @@ import { QuoteService } from '../modules/bookings/quote.service.js';
 import { InvoiceService } from '../modules/invoices/invoice.service.js';
 import { NotificationService } from '../modules/notifications/notification.service.js';
 import { createEmailSender } from '../modules/notifications/senders.js';
+import { SystemHealth } from '../modules/admin/system-health.js';
 import { createPaymentProvider } from '../modules/payments/factory.js';
 import { PaymentService } from '../modules/payments/payment.service.js';
 import { PayoutService } from '../modules/payouts/payout.service.js';
@@ -72,9 +73,27 @@ export function startSweeps(deps: {
   tick();
   logger.info({ intervalMs }, 'sweeps started');
 
+  // Hourly: email the admin if the SMTP key is about to expire or emails are failing.
+  // Each alert claims its slot in the database, so several runners never send it twice.
+  const health = new SystemHealth(db, {
+    emailProvider: env.EMAIL_PROVIDER,
+    smtpKeyExpiresAt: env.SMTP_KEY_EXPIRES_AT,
+    adminEmail: env.ADMIN_NOTIFY_EMAIL,
+    appBaseUrl: env.APP_BASE_URL,
+  });
+  const alertEmail = createEmailSender(env, logger.child({ component: 'alerts' }));
+  const checkHealth = () =>
+    void health
+      .sendAlerts(alertEmail, logger)
+      .then((sent) => sent.length && logger.info({ sent }, 'system alerts sent'))
+      .catch((err: unknown) => logger.error({ err }, 'system health check failed'));
+  const healthTimer = setInterval(checkHealth, 60 * 60_000);
+  checkHealth();
+
   return {
     async stop() {
       clearInterval(timer);
+      clearInterval(healthTimer);
       await running;
     },
   };

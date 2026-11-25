@@ -119,8 +119,33 @@ export const maintenanceSchema = z.strictObject({
   message: z.string().trim().max(300).default(''),
   /** When we expect to be back (ISO date-time), or null when unknown. */
   until: z.iso.datetime({ offset: true }).nullable().default(null),
+  /**
+   * Planned maintenance to announce in advance: a banner shows this window to everyone
+   * until it ends. Switching maintenance on at that time is still a manual step.
+   */
+  scheduledFrom: z.iso.datetime({ offset: true }).nullable().default(null),
+  scheduledTo: z.iso.datetime({ offset: true }).nullable().default(null),
 });
 export type Maintenance = z.infer<typeof maintenanceSchema>;
+
+/** Checks the scheduled window makes sense; used when an admin saves it. */
+export const maintenanceUpdateSchema = maintenanceSchema.refine(
+  (m) =>
+    m.scheduledFrom === null || m.scheduledTo === null
+      ? m.scheduledFrom === m.scheduledTo
+      : Date.parse(m.scheduledFrom) < Date.parse(m.scheduledTo),
+  { message: 'Give both a start and an end, with the end after the start', path: ['scheduledTo'] },
+);
+
+/**
+ * Bookings paused: people can still browse halls, but new holds and new payments are
+ * refused with this message. Lighter than maintenance; e.g. while Razorpay has problems.
+ */
+export const bookingsPauseSchema = z.strictObject({
+  paused: z.boolean(),
+  message: z.string().trim().max(300).default(''),
+});
+export type BookingsPause = z.infer<typeof bookingsPauseSchema>;
 
 export const platformSettingsUpdateSchema = platformSettingsSchema
   .partial()

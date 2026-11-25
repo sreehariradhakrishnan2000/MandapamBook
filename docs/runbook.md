@@ -109,6 +109,67 @@ next to Neon us-east-1).
 Neon suspends idle computes. The first `/ready` after a long idle period can fail while the
 compute wakes (about 1–3 s). Probes should allow 2–3 failures before acting.
 
+### Uptime alerts
+
+Use a free external monitor (UptimeRobot, Better Stack) so you hear about an outage before
+customers do:
+
+1. Create an HTTP monitor for `https://<web host>/api/v1/status` every 5 minutes, alerting by
+   email after 2 failures. It goes through the web proxy to the API, so it checks both.
+2. Optionally, a keyword monitor on `https://<api host>/ready` expecting `"status":"ready"`
+   (database and Redis).
+
+**Do not monitor the free Render staging services every 5 minutes.** Pings keep them awake
+around the clock. Two free services awake all month need about 1,490 instance hours, twice
+the 750 free hours per workspace, after which Render suspends them. Monitor production (paid
+instances never sleep); for staging, check by hand or at most hourly.
+
+### System health and alerts
+
+**Admin → Dashboard → System health** shows the last booking email sent, emails failed in
+the last 24 hours, emails waiting, the SMTP key expiry, and whether error tracking is on.
+Every hour the API emails `ADMIN_NOTIFY_EMAIL`:
+
+- weekly, from 30 days before `SMTP_KEY_EXPIRES_AT`. Create a new key, update `SMTP_URL`
+  and `SMTP_KEY_EXPIRES_AT`, and redeploy. Brevo keys also stop after 90 days without
+  sending.
+- at most daily, when booking emails failed after every retry in the last 24 hours.
+
+Each alert claims a row in `platform_settings` (`alert_last_sent:*`), so several instances
+never send it twice.
+
+### Error tracking (Sentry, optional)
+
+Off until `SENTRY_DSN` is set. Create a free Sentry project (Node.js), put its DSN in
+`SENTRY_DSN` on the API, and redeploy. Unexpected 5xx errors are reported with their
+`correlationId`. IP addresses, cookies, headers, request bodies and user data are never
+sent. When you turn it on, add Sentry to the processors listed in the Privacy Policy.
+
+## Backups and restore drill
+
+Neon keeps a history of every change and can restore to any moment inside its window:
+**6 hours on the free plan**. Production needs a paid plan with a window of 7 days or more,
+or daily `pg_dump` backups to storage. Restoring creates a branch from a past moment; the
+live branch is untouched.
+
+1. In Neon (or with its API), create a branch from the database branch with
+   `parent_timestamp` set just before the problem, a read-only compute, and `expires_at` a
+   few hours ahead so it deletes itself.
+2. Check it: row counts and a few known records, such as a booking reference and the last
+   audit entry.
+3. To recover some data, copy the rows you need from the restore branch. To roll the whole
+   database back, use Neon's **Restore** on the live branch to that timestamp; it keeps a
+   backup of the state it replaces.
+
+**Drill, 25 Nov 2026 (staging):**
+
+- **What:** restored `br-red-base-bc3tlnpl` as of 19:32 UTC to a read-only branch that expired
+  by itself.
+- **Result:** users (22), venues (146), bookings (2), payments (2), audit entries (38) and
+  webhooks (1) all matched the live data at that moment, and booking MB-PGN6U5 was
+  CONFIRMED in both. The branch was ready in about 20 seconds.
+- **Next:** repeat every quarter and after any change to the database plan.
+
 ## Rolling back
 
 Images are immutable and every deploy is a commit SHA.

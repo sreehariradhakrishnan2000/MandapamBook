@@ -26,6 +26,7 @@ import type { EmailSender } from '../notifications/senders.js';
 import { parseId } from '../owners/scoped.js';
 import type { PaymentService } from '../payments/payment.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
+import type { SystemHealth } from './system-health.js';
 import { kycReviewRouter } from './kyc-review.routes.js';
 import { escapeLike, listingsReviewRouter } from './listings-review.routes.js';
 import { masterDataRouter } from './masterdata.routes.js';
@@ -56,6 +57,8 @@ export interface AdminRouterDeps {
   settings: SettingsService;
   payments: PaymentService;
   appBaseUrl: string;
+  health: SystemHealth;
+  errorTracking: { api: boolean; web: boolean };
 }
 
 /** Safe user fields for admin screens: never password hashes or lockout internals. */
@@ -135,6 +138,15 @@ export function adminRouter(deps: AdminRouterDeps): Router {
       ctx: auditContext(req),
     });
     res.json(result);
+  });
+
+  /** Things that fail quietly: email delivery, the SMTP key expiry, error tracking. */
+  r.get('/system-health', requirePermission('report:view'), async (_req, res) => {
+    res.set('Cache-Control', 'no-store').json({
+      version: (process.env['APP_VERSION'] ?? 'dev').slice(0, 12),
+      email: await deps.health.email(),
+      errorTracking: deps.errorTracking,
+    });
   });
 
   r.get('/users', requirePermission('user:manage'), async (req, res) => {

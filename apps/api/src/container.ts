@@ -46,10 +46,13 @@ import { ScopedResources } from './modules/owners/scoped.js';
 import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
+import { SystemHealth } from './modules/admin/system-health.js';
 import {
-  MaintenanceService,
+  bookingsPauseGate,
+  createBookingsPauseService,
+  createMaintenanceService,
   maintenanceGate,
-  maintenanceRouter,
+  siteStatusRouter,
 } from './modules/settings/maintenance.js';
 
 export type AuthEnv = Pick<
@@ -70,7 +73,18 @@ export type AuthEnv = Pick<
   | 'GOOGLE_CLIENT_ID'
   | 'GOOGLE_CLIENT_SECRET'
 > &
-  PaymentEnv;
+  PaymentEnv &
+  // Operational settings, optional so tests need not set them.
+  Partial<
+    Pick<
+      Env,
+      | 'EMAIL_PROVIDER'
+      | 'SMTP_KEY_EXPIRES_AT'
+      | 'ADMIN_NOTIFY_EMAIL'
+      | 'SENTRY_DSN'
+      | 'SENTRY_WEB_DSN'
+    >
+  >;
 
 export interface ContainerDeps {
   env: AuthEnv;
@@ -139,10 +153,13 @@ export function buildContainer(deps: ContainerDeps): Container {
 
   const api = Router();
   api.use(limiters.middleware('apiPerIp', byIp));
-  // Maintenance: the switch and status come first, then the gate that closes the rest.
-  const maintenance = new MaintenanceService(db);
-  api.use(maintenanceRouter({ maintenance, audit, authenticate }));
+  // Site switches: the status and admin routes come first, then the gates. Maintenance
+  // closes the site; a bookings pause only refuses new holds and payments.
+  const maintenance = createMaintenanceService(db);
+  const bookingsPause = createBookingsPauseService(db);
+  api.use(siteStatusRouter({ maintenance, bookingsPause, audit, authenticate }));
   api.use(maintenanceGate(maintenance, accessTokens, deps.revocations));
+  api.use(bookingsPauseGate(bookingsPause));
   const settings = new SettingsService(db);
   const quotes = new QuoteService(db, settings);
   const bookingService = new BookingService(db, quotes, settings, audit);
@@ -226,6 +243,13 @@ export function buildContainer(deps: ContainerDeps): Container {
       settings,
       payments: paymentService,
       appBaseUrl: env.APP_BASE_URL,
+      health: new SystemHealth(db, {
+        emailProvider: env.EMAIL_PROVIDER ?? 'console',
+        smtpKeyExpiresAt: env.SMTP_KEY_EXPIRES_AT,
+        adminEmail: env.ADMIN_NOTIFY_EMAIL,
+        appBaseUrl: env.APP_BASE_URL,
+      }),
+      errorTracking: { api: Boolean(env.SENTRY_DSN), web: Boolean(env.SENTRY_WEB_DSN) },
     }),
   );
 
