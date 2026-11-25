@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '
 import { NavigationStart, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/auth/auth.service';
 import { PaymentsService } from './core/payments.service';
+import { ServerStatus } from './core/server-status';
 
 @Component({
   selector: 'app-root',
@@ -13,6 +14,7 @@ import { PaymentsService } from './core/payments.service';
 export class App {
   protected readonly auth = inject(AuthService);
   protected readonly payments = inject(PaymentsService);
+  protected readonly server = inject(ServerStatus);
   /** The phone menu (below md); the header shows its links inline on wider screens. */
   protected readonly menuOpen = signal(false);
 
