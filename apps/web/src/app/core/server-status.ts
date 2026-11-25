@@ -22,19 +22,40 @@ export class ServerStatus {
    * so). Customers then see the maintenance page; admins see a reminder bar.
    */
   readonly maintenance = signal<MaintenanceInfo | null>(null);
+  /** Planned maintenance announced in advance; a banner shows it until it ends. */
+  readonly scheduled = signal<{ from: string; to: string } | null>(null);
+  /** New bookings are paused: browsing works, holding and paying do not. */
+  readonly bookingsPaused = signal<{ message: string } | null>(null);
   private probing = false;
 
-  /** Asks the API whether maintenance is on. Never throws: unknown means "not on". */
+  /**
+   * Reads the site switches (maintenance, its advance notice, bookings pause). Never throws:
+   * if the status cannot be read, what we knew before stands. Returns whether maintenance
+   * is on.
+   */
   async checkMaintenance(): Promise<boolean> {
     if (typeof fetch === 'undefined') return false;
     try {
       const res = await fetch(`${API}/status`, { cache: 'no-store' });
       if (!res.ok) return this.maintenance() !== null;
       const body = (await res.json()) as {
-        maintenance?: { enabled: boolean; message: string; until: string | null };
+        maintenance?: {
+          enabled: boolean;
+          message: string;
+          until: string | null;
+          scheduledFrom?: string | null;
+          scheduledTo?: string | null;
+        };
+        bookings?: { paused: boolean; message: string };
       };
       const m = body.maintenance;
       this.maintenance.set(m?.enabled ? { message: m.message, until: m.until } : null);
+      const upcoming =
+        m?.scheduledFrom && m.scheduledTo && Date.parse(m.scheduledTo) > Date.now()
+          ? { from: m.scheduledFrom, to: m.scheduledTo }
+          : null;
+      this.scheduled.set(upcoming);
+      this.bookingsPaused.set(body.bookings?.paused ? { message: body.bookings.message } : null);
       return Boolean(m?.enabled);
     } catch {
       return this.maintenance() !== null;
@@ -95,9 +116,19 @@ export function maintenanceFrom(err: unknown): MaintenanceInfo | null {
   return { message: body.error.message ?? '', until: body.error.details?.until ?? null };
 }
 
+/** The API's "bookings are paused" answer (503 with code BOOKINGS_PAUSED). */
+export function bookingsPausedFrom(err: unknown): { message: string } | null {
+  if (!(err instanceof HttpErrorResponse) || err.status !== 503) return null;
+  const body = err.error as { error?: { code?: string; message?: string } } | null;
+  return body?.error?.code === 'BOOKINGS_PAUSED' ? { message: body.error.message ?? '' } : null;
+}
+
 export function isWakingError(err: unknown): err is HttpErrorResponse {
   return (
-    err instanceof HttpErrorResponse && WAKING_STATUSES.has(err.status) && !maintenanceFrom(err)
+    err instanceof HttpErrorResponse &&
+    WAKING_STATUSES.has(err.status) &&
+    !maintenanceFrom(err) &&
+    !bookingsPausedFrom(err)
   );
 }
 
@@ -127,6 +158,11 @@ export const serverWakeInterceptor: HttpInterceptorFn = (req, next) => {
           // Planned maintenance: no retrying; the app shows the maintenance page.
           status.markUp();
           status.maintenance.set(planned);
+          return throwError(() => err);
+        }
+        const paused = bookingsPausedFrom(err);
+        if (paused) {
+          status.bookingsPaused.set(paused);
           return throwError(() => err);
         }
         if (!isWakingError(err)) return throwError(() => err);

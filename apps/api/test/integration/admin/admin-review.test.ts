@@ -457,23 +457,61 @@ describe.skipIf(!hasTestDb)('admin review', { timeout: 120_000 }, () => {
           .status,
       ).toBe(400);
 
-      const saved = await superAdmin.send('put', '/api/v1/admin/maintenance', body);
+      // A scheduled window needs both ends, in the right order.
+      const from = '2030-01-09T23:00:00+05:30';
+      const to = '2030-01-10T00:00:00+05:30';
+      for (const bad of [
+        { scheduledFrom: from, scheduledTo: null },
+        { scheduledFrom: to, scheduledTo: from },
+      ])
+        expect(
+          (await superAdmin.send('put', '/api/v1/admin/maintenance', { ...body, ...bad })).status,
+        ).toBe(400);
+
+      const saved = await superAdmin.send('put', '/api/v1/admin/maintenance', {
+        ...body,
+        scheduledFrom: from,
+        scheduledTo: to,
+      });
       expect(saved.status).toBe(200);
-      expect(saved.body).toEqual({ enabled: false, message: 'Back soon', until: null });
+      const expected = {
+        enabled: false,
+        message: 'Back soon',
+        until: null,
+        scheduledFrom: from,
+        scheduledTo: to,
+      };
+      expect(saved.body).toEqual(expected);
 
       const status = await new Client(h.app).send('get', '/api/v1/status');
       expect(status.status).toBe(200);
       expect(status.headers['cache-control']).toBe('no-store');
-      expect(status.body.maintenance).toEqual({
-        enabled: false,
-        message: 'Back soon',
-        until: null,
-      });
+      expect(status.body.maintenance).toEqual(expected);
 
       const logs = await h.db
         .select()
         .from(auditLogs)
         .where(eq(auditLogs.action, 'settings.maintenance_changed'));
+      expect(logs.length).toBeGreaterThan(0);
+      // Clear the notice so the shared staging-like state stays clean.
+      await superAdmin.send('put', '/api/v1/admin/maintenance', { enabled: false });
+    });
+
+    it('lets only super admins pause bookings, and audits it', async () => {
+      // Saved as not paused only, for the same reason as maintenance.
+      const body = { paused: false, message: '  Razorpay is down  ' };
+      expect((await admin.send('put', '/api/v1/admin/bookings-pause', body)).status).toBe(403);
+      expect(
+        (await superAdmin.send('put', '/api/v1/admin/bookings-pause', { paused: 1 })).status,
+      ).toBe(400);
+      const saved = await superAdmin.send('put', '/api/v1/admin/bookings-pause', body);
+      expect(saved.body).toEqual({ paused: false, message: 'Razorpay is down' });
+      const status = await new Client(h.app).send('get', '/api/v1/status');
+      expect(status.body.bookings).toEqual({ paused: false, message: 'Razorpay is down' });
+      const logs = await h.db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.action, 'settings.bookings_pause_changed'));
       expect(logs.length).toBeGreaterThan(0);
     });
   });

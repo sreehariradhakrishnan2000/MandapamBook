@@ -17,6 +17,23 @@
     </div>
   }
 
+  @if (scheduleText(); as when) {
+    <div
+      class="bg-forest-50 px-4 py-2 text-center text-sm text-forest-800 ring-1 ring-forest-200"
+      role="status"
+    >
+      <strong class="font-semibold">Scheduled maintenance:</strong> {{ when }} (India time).
+      MandapamBook will be unavailable during this time.
+    </div>
+  }
+
+  @if (server.bookingsPaused(); as paused) {
+    <div class="bg-brand-50 px-4 py-2 text-center text-sm text-brand-800" role="status">
+      <strong class="font-semibold">New bookings are paused.</strong>
+      {{ paused.message || 'Please try again a little later.' }} You can still browse halls.
+    </div>
+  }
+
   @if (server.waking()) {
     <div
       class="flex items-center justify-center gap-2 bg-marigold-100 px-4 py-2 text-center text-sm text-ink"

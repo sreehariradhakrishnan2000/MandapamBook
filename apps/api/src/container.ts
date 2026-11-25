@@ -47,9 +47,11 @@ import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
 import {
-  MaintenanceService,
+  bookingsPauseGate,
+  createBookingsPauseService,
+  createMaintenanceService,
   maintenanceGate,
-  maintenanceRouter,
+  siteStatusRouter,
 } from './modules/settings/maintenance.js';
 
 export type AuthEnv = Pick<
@@ -139,10 +141,13 @@ export function buildContainer(deps: ContainerDeps): Container {
 
   const api = Router();
   api.use(limiters.middleware('apiPerIp', byIp));
-  // Maintenance: the switch and status come first, then the gate that closes the rest.
-  const maintenance = new MaintenanceService(db);
-  api.use(maintenanceRouter({ maintenance, audit, authenticate }));
+  // Site switches: the status and admin routes come first, then the gates. Maintenance
+  // closes the site; a bookings pause only refuses new holds and payments.
+  const maintenance = createMaintenanceService(db);
+  const bookingsPause = createBookingsPauseService(db);
+  api.use(siteStatusRouter({ maintenance, bookingsPause, audit, authenticate }));
   api.use(maintenanceGate(maintenance, accessTokens, deps.revocations));
+  api.use(bookingsPauseGate(bookingsPause));
   const settings = new SettingsService(db);
   const quotes = new QuoteService(db, settings);
   const bookingService = new BookingService(db, quotes, settings, audit);

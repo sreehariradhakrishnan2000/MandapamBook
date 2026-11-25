@@ -199,6 +199,8 @@ export function errorMessage(err: unknown, fallback = 'Something went wrong. Try
     if (err.status === 0) return 'You appear to be offline. Check your connection and try again.';
     if (body?.error?.code === 'MAINTENANCE')
       return 'MandapamBook is down for planned maintenance. Please check back soon.';
+    if (body?.error?.code === 'BOOKINGS_PAUSED')
+      return body.error.message || 'New bookings are paused for a short while.';
     if (err.status === 502 || err.status === 503 || err.status === 504)
       return 'Our server is starting up. Please try again in a minute.';
     return detail ?? body?.error?.message ?? fallback;
