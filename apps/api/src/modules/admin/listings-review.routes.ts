@@ -22,6 +22,7 @@ import {
 import { HttpError, errors } from '../../http/errors.js';
 import type { ObjectStorage } from '../../infra/storage.js';
 import { type AuditAction, type AuditService, auditContext } from '../audit/audit.service.js';
+import { type EmailContent, renderEmail } from '../notifications/email-layout.js';
 import type { EmailSender } from '../notifications/senders.js';
 import { listingGaps } from '../owners/listings.routes.js';
 import { parseId } from '../owners/scoped.js';
@@ -227,17 +228,48 @@ export function listingsReviewRouter(deps: {
       return row;
     });
 
-    const messages: Record<ListingDecision['decision'], string> = {
-      approve: `Good news: "${current.name}" is now live on MandapamBook.`,
-      reject: `"${current.name}" needs changes before it can go live: ${reason}. Update it at ${appBaseUrl}/owner/venues/${id} and submit again.`,
-      suspend: `"${current.name}" has been taken off MandapamBook: ${reason}. Contact support to resolve this.`,
-      reinstate: `"${current.name}" is live on MandapamBook again.`,
+    const venueLink = { label: 'Open your venue', url: `${appBaseUrl}/owner/venues/${id}` };
+    const why = reason ? [{ label: 'Reason', value: reason }] : undefined;
+    const content: Record<ListingDecision['decision'], Omit<EmailContent, 'subject'>> = {
+      approve: {
+        heading: 'Your venue is live',
+        paragraphs: [
+          `Good news: "${current.name}" is now live on MandapamBook, and families can find and book it.`,
+        ],
+        action: venueLink,
+      },
+      reject: {
+        heading: 'Your venue needs a few changes',
+        paragraphs: [
+          `"${current.name}" needs changes before it can go live. Update it and submit it again.`,
+        ],
+        ...(why ? { details: why } : {}),
+        action: { label: 'Update your venue', url: venueLink.url },
+      },
+      suspend: {
+        heading: 'Your venue has been taken off MandapamBook',
+        paragraphs: [
+          `"${current.name}" is no longer shown to customers. Contact support to resolve this.`,
+        ],
+        ...(why ? { details: why } : {}),
+        action: venueLink,
+      },
+      reinstate: {
+        heading: 'Your venue is live again',
+        paragraphs: [`"${current.name}" is live on MandapamBook again.`],
+        action: venueLink,
+      },
     };
     await email.send({
       to: current.ownerEmail,
       template: 'listing_decision',
-      subject: `Your listing "${current.name}": ${t.to === 'APPROVED' ? 'approved' : t.to.toLowerCase()}`,
-      text: messages[decision.decision],
+      ...renderEmail(
+        {
+          subject: `Your listing "${current.name}": ${t.to === 'APPROVED' ? 'approved' : t.to.toLowerCase()}`,
+          ...content[decision.decision],
+        },
+        appBaseUrl,
+      ),
     });
     res.json(updated);
   });

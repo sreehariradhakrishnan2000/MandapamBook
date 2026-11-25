@@ -21,6 +21,8 @@ export interface EmailMessage {
     | BookingTemplate;
   subject: string;
   text: string;
+  /** The designed version (see email-layout.ts). Mail apps show it; `text` is the fallback. */
+  html?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
@@ -79,6 +81,7 @@ export class SmtpEmailSender implements EmailSender {
       to: message.to,
       subject: message.subject,
       text: message.text,
+      ...(message.html ? { html: message.html } : {}),
       headers: { 'X-MandapamBook-Template': message.template },
       attachments: message.attachments?.map((a) => ({
         filename: a.filename,
