@@ -1,10 +1,10 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { App } from '../../app';
 import { BrowserNavigation } from '../../core/browser-navigation';
-import { PaymentAdapter } from './payment-adapter';
+import { PaymentAdapter, RazorpayLoader, type RazorpayConstructor } from './payment-adapter';
 import { PaymentReturn } from './payment-return';
 
 describe('payments in the web app', () => {
@@ -74,6 +74,112 @@ describe('payments in the web app', () => {
     await vi.waitFor(() =>
       expect(assign).toHaveBeenCalledWith('/api/v1/payments/mock/checkout/mock_order_1'),
     );
+  });
+
+  it('opens Razorpay checkout and hands its signed result to the return page', async () => {
+    setup();
+    let options: Record<string, unknown> = {};
+    const open = vi.fn();
+    const handlers: Record<string, (r: unknown) => void> = {};
+    class FakeRazorpay {
+      constructor(o: Record<string, unknown>) {
+        options = o;
+      }
+      open = open;
+      on(event: string, h: (r: unknown) => void) {
+        handlers[event] = h;
+      }
+    }
+    vi.spyOn(TestBed.inject(RazorpayLoader), 'load').mockResolvedValue(
+      FakeRazorpay as unknown as RazorpayConstructor,
+    );
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(PaymentAdapter);
+    fixture.componentRef.setInput('bookingId', 'b1');
+    fixture.componentRef.setInput('amountPaise', 3_589_900);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector('button')!.click();
+    (await pending('/api/v1/payments/orders')).flush({
+      paymentId: 'p1',
+      provider: 'razorpay',
+      providerOrderId: 'order_A',
+      amountPaise: 3_589_900,
+      currency: 'INR',
+      testMode: true,
+      checkout: {
+        kind: 'razorpay',
+        keyId: 'rzp_test_x',
+        orderId: 'order_A',
+        amount: '3589900',
+        currency: 'INR',
+      },
+    });
+    await vi.waitFor(() => expect(open).toHaveBeenCalled());
+    expect(options).toMatchObject({
+      key: 'rzp_test_x',
+      order_id: 'order_A',
+      amount: 3_589_900,
+      currency: 'INR',
+      name: 'MandapamBook',
+    });
+
+    // A failed attempt shows Razorpay's reason and keeps the window open for a retry.
+    handlers['payment.failed']!({ error: { description: 'Card declined by bank' } });
+    await vi.waitFor(() =>
+      expect(el.querySelector('[role=alert]')?.textContent).toContain('Card declined by bank'),
+    );
+
+    (options['handler'] as (r: unknown) => void)({
+      razorpay_order_id: 'order_A',
+      razorpay_payment_id: 'pay_B',
+      razorpay_signature: 'sig',
+    });
+    await vi.waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith(['/payments/return'], {
+        queryParams: {
+          orderId: 'order_A',
+          paymentId: 'pay_B',
+          signature: 'sig',
+          status: 'success',
+        },
+      }),
+    );
+  });
+
+  it('lets the customer try again after closing the Razorpay window', async () => {
+    setup();
+    let options: Record<string, unknown> = {};
+    class FakeRazorpay {
+      constructor(o: Record<string, unknown>) {
+        options = o;
+      }
+      open() {}
+      on() {}
+    }
+    vi.spyOn(TestBed.inject(RazorpayLoader), 'load').mockResolvedValue(
+      FakeRazorpay as unknown as RazorpayConstructor,
+    );
+    const fixture = TestBed.createComponent(PaymentAdapter);
+    fixture.componentRef.setInput('bookingId', 'b1');
+    fixture.componentRef.setInput('amountPaise', 100);
+    fixture.detectChanges();
+    const button = (fixture.nativeElement as HTMLElement).querySelector('button')!;
+    button.click();
+    (await pending('/api/v1/payments/orders')).flush({
+      paymentId: 'p1',
+      provider: 'razorpay',
+      providerOrderId: 'order_A',
+      amountPaise: 100,
+      currency: 'INR',
+      testMode: true,
+      checkout: { kind: 'razorpay', keyId: 'rzp_test_x', orderId: 'order_A' },
+    });
+    await vi.waitFor(() => expect(options['modal']).toBeDefined());
+    expect(button.disabled).toBe(true);
+    (options['modal'] as { ondismiss: () => void }).ondismiss();
+    await vi.waitFor(() => expect(button.disabled).toBe(false));
   });
 
   it('refuses to follow a checkout URL on another origin', async () => {

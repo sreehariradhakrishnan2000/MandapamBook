@@ -77,7 +77,7 @@ export type ProviderPaymentStatus = 'CREATED' | 'PENDING' | 'CAPTURED' | 'FAILED
 
 export interface PaymentProvider {
   readonly name: ProviderName;
-  /** True only for the mock provider; drives the TEST MODE banner. */
+  /** True for the mock provider and gateway test keys (no real money); drives the TEST MODE banner. */
   readonly testMode: boolean;
   createOrder(input: CreateOrderInput): Promise<ProviderOrder>;
   /** Checks the signature the browser received after checkout. */
