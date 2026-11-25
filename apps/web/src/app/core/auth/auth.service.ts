@@ -193,10 +193,12 @@ export class AuthService {
 export function errorMessage(err: unknown, fallback = 'Something went wrong. Try again.'): string {
   if (err instanceof HttpErrorResponse) {
     const body = err.error as {
-      error?: { message?: string; details?: { message: string }[] };
+      error?: { code?: string; message?: string; details?: { message: string }[] };
     } | null;
-    const detail = body?.error?.details?.[0]?.message;
+    const detail = Array.isArray(body?.error?.details) ? body.error.details[0]?.message : undefined;
     if (err.status === 0) return 'You appear to be offline. Check your connection and try again.';
+    if (body?.error?.code === 'MAINTENANCE')
+      return 'MandapamBook is down for planned maintenance. Please check back soon.';
     if (err.status === 502 || err.status === 503 || err.status === 504)
       return 'Our server is starting up. Please try again in a minute.';
     return detail ?? body?.error?.message ?? fallback;

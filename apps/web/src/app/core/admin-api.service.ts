@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type {
   ListingDecision,
+  Maintenance,
   OwnerProfileView,
   PlatformSettings,
   Role,
@@ -187,6 +188,12 @@ export class AdminApi {
   settings = () => this.get<PlatformSettings>('/settings');
   updateSettings = (changes: Partial<PlatformSettings>) =>
     this.send<PlatformSettings>('put', '/settings', changes);
+
+  /** The current maintenance switch, from the public status endpoint. */
+  maintenance = async (): Promise<Maintenance> =>
+    (await firstValueFrom(this.http.get<{ maintenance: Maintenance }>(`${API}/status`)))
+      .maintenance;
+  setMaintenance = (value: Maintenance) => this.send<Maintenance>('put', '/maintenance', value);
 
   auditLogs = (query: {
     action?: string;
