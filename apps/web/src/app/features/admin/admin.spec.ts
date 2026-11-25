@@ -171,6 +171,9 @@ describe('admin screens', () => {
       hold_minutes: 10,
       owner_response_hours: 24,
     });
+    (await pending('/api/v1/status')).flush({
+      maintenance: { enabled: false, message: '', until: null },
+    });
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;
     const commission = await find<HTMLInputElement>(el, 'input[name=commission]');
@@ -235,6 +238,64 @@ describe('admin screens', () => {
     confirmSpy.mockRestore();
   });
 
+  it('turns maintenance on only after confirming, sending India time as an offset', async () => {
+    await signIn('SUPER_ADMIN');
+    const fixture = TestBed.createComponent(AdminSettings);
+    fixture.detectChanges();
+    (await pending('/api/v1/admin/settings')).flush({
+      commission_bps: 800,
+      platform_fee_paise: 49900,
+      gst_bps: 1800,
+      hold_minutes: 10,
+      owner_response_hours: 24,
+    });
+    (await pending('/api/v1/status')).flush({
+      maintenance: { enabled: false, message: '', until: null },
+    });
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+
+    const toggle = await find<HTMLInputElement>(el, 'input[name=maintenanceOn]');
+    toggle.click();
+    const message = await find<HTMLTextAreaElement>(el, 'textarea[name=maintenanceMessage]');
+    message.value = '  Upgrading payments  ';
+    message.dispatchEvent(new Event('input'));
+    const until = await find<HTMLInputElement>(el, 'input[name=maintenanceUntil]');
+    until.value = '2030-01-09T15:30';
+    until.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    const save = () =>
+      [...el.querySelectorAll('button')]
+        .find((b) => b.textContent?.includes('show the maintenance page'))!
+        .click();
+    // Cancelling the confirmation sends nothing.
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    save();
+    http.expectNone('/api/v1/admin/maintenance');
+
+    confirmSpy.mockReturnValue(true);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ maintenance: { enabled: true, message: '', until: null } }),
+      }),
+    );
+    save();
+    const req = await pending('/api/v1/admin/maintenance');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({
+      enabled: true,
+      message: 'Upgrading payments',
+      until: '2030-01-09T15:30:00+05:30',
+    });
+    req.flush({ enabled: true, message: 'Upgrading payments', until: '2030-01-09T10:00:00.000Z' });
+    await vi.waitFor(() => expect(el.textContent).toContain('Maintenance mode is on'));
+    confirmSpy.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
   it('does not offer to save settings to plain admins', async () => {
     await signIn('ADMIN');
     const fixture = TestBed.createComponent(AdminSettings);
@@ -245,6 +306,9 @@ describe('admin screens', () => {
       gst_bps: 1800,
       hold_minutes: 10,
       owner_response_hours: 24,
+    });
+    (await pending('/api/v1/status')).flush({
+      maintenance: { enabled: false, message: '', until: null },
     });
     await fixture.whenStable();
     const el = fixture.nativeElement as HTMLElement;

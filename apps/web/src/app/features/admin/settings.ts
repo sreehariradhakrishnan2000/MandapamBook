@@ -10,6 +10,13 @@ import {
   type CityRow,
 } from '../../core/admin-api.service';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
+import { ServerStatus } from '../../core/server-status';
+
+/** An ISO time as "YYYY-MM-DDTHH:mm" in India time, for a datetime-local input. */
+function toIndiaLocal(iso: string | null): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return '';
+  return new Date(Date.parse(iso) + 5.5 * 3_600_000).toISOString().slice(0, 16);
+}
 
 @Component({
   selector: 'app-admin-settings',
@@ -107,10 +114,116 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
           }
         </form>
       }
+
+      <section
+        class="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
+        aria-labelledby="maintenance-h"
+      >
+        <h2 id="maintenance-h" class="font-display text-xl font-medium">Maintenance mode</h2>
+        <p class="text-slate-600">
+          Shows a maintenance page to customers and owners. Admins can still use the site, and
+          payments that are already under way are still recorded.
+        </p>
+        @if (maintenanceError()) {
+          <p class="rounded-xl bg-red-50 px-3 py-2 text-red-800" role="alert">
+            {{ maintenanceError() }}
+          </p>
+        }
+        @if (maintenanceSaved(); as msg) {
+          <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-leaf-600" role="status">{{ msg }}</p>
+        }
+        <form class="flex flex-col gap-3" (ngSubmit)="saveMaintenance()">
+          <label class="flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              name="maintenanceOn"
+              [(ngModel)]="maintenance.enabled"
+              [disabled]="!canEdit"
+            />
+            Show the maintenance page
+          </label>
+          <label class="flex flex-col gap-1"
+            >Message for visitors (optional)
+            <textarea
+              name="maintenanceMessage"
+              rows="2"
+              maxlength="300"
+              placeholder="We're doing some planned maintenance on MandapamBook. We'll be back shortly."
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="maintenance.message"
+              [disabled]="!canEdit"
+            ></textarea>
+          </label>
+          <label class="flex flex-col gap-1"
+            >Expected back by (India time, optional)
+            <input
+              name="maintenanceUntil"
+              type="datetime-local"
+              class="w-fit rounded-xl border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="maintenance.until"
+              [disabled]="!canEdit"
+            />
+          </label>
+          @if (canEdit) {
+            <button
+              type="submit"
+              class="w-fit rounded-full px-4 py-2 font-semibold text-white"
+              [class.bg-brand-600]="!maintenance.enabled"
+              [class.bg-forest-800]="maintenance.enabled"
+            >
+              {{ maintenance.enabled ? 'Save and show the maintenance page' : 'Save' }}
+            </button>
+          } @else {
+            <p class="text-slate-500">Only super admins can change this.</p>
+          }
+        </form>
+      </section>
     </section>
   `,
 })
 export class AdminSettings implements OnInit {
+  private readonly server = inject(ServerStatus);
+  protected maintenance = { enabled: false, message: '', until: '' };
+  protected readonly maintenanceError = signal<string | null>(null);
+  protected readonly maintenanceSaved = signal<string | null>(null);
+
+  private async loadMaintenance(): Promise<void> {
+    const m = await this.api.maintenance();
+    this.maintenance = { enabled: m.enabled, message: m.message, until: toIndiaLocal(m.until) };
+  }
+
+  protected async saveMaintenance(): Promise<void> {
+    this.maintenanceError.set(null);
+    this.maintenanceSaved.set(null);
+    const m = this.maintenance;
+    if (
+      m.enabled &&
+      !confirm(
+        'Customers and owners will see the maintenance page until you turn it off. Continue?',
+      )
+    )
+      return;
+    try {
+      const saved = await this.api.setMaintenance({
+        enabled: m.enabled,
+        message: m.message.trim(),
+        until: m.until ? `${m.until}:00+05:30` : null,
+      });
+      this.maintenance = {
+        enabled: saved.enabled,
+        message: saved.message,
+        until: toIndiaLocal(saved.until),
+      };
+      this.maintenanceSaved.set(
+        saved.enabled
+          ? 'Maintenance mode is on. Customers see the maintenance page within a few seconds.'
+          : 'Maintenance mode is off. The site is open to everyone.',
+      );
+      await this.server.checkMaintenance();
+    } catch (err) {
+      this.maintenanceError.set(errorMessage(err));
+    }
+  }
   private readonly api = inject(AdminApi);
   protected readonly canEdit = inject(AuthService).hasPermission('settings:update');
   protected readonly error = signal<string | null>(null);
@@ -124,7 +237,10 @@ export class AdminSettings implements OnInit {
   } | null>(null);
 
   async ngOnInit(): Promise<void> {
-    this.apply(await this.api.settings());
+    await Promise.all([
+      this.api.settings().then((s) => this.apply(s)),
+      this.loadMaintenance().catch(() => undefined),
+    ]);
   }
 
   private apply(s: PlatformSettings): void {

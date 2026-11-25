@@ -49,6 +49,7 @@ export type AuditAction =
   | 'owner.kyc_revealed'
   | 'masterdata.changed'
   | 'settings.changed'
+  | 'settings.maintenance_changed'
   | 'booking.held'
   | 'booking.cancelled'
   | 'report.exported'
