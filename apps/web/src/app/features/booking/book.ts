@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { SLOTS, type QuoteView, type Slot } from '@mandapambook/shared';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
+import { ServerStatus } from '../../core/server-status';
 import {
   BookingApi,
   type HoldResponse,
@@ -236,6 +237,11 @@ import { PaymentAdapter } from '../payments/payment-adapter';
               <p class="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
                 This slot is already booked. Choose another date or slot.
               </p>
+            } @else if (server.bookingsPaused(); as paused) {
+              <p class="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-800" role="status">
+                <strong class="font-semibold">New bookings are paused.</strong>
+                {{ paused.message || 'Please try again a little later.' }}
+              </p>
             } @else {
               <button
                 type="button"
@@ -256,6 +262,7 @@ export class Book implements OnInit {
   private readonly api = inject(BookingApi);
   private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
+  protected readonly server = inject(ServerStatus);
 
   readonly hallId = input.required<string>();
   readonly slug = input<string>();
@@ -315,6 +322,8 @@ export class Book implements OnInit {
 
   async ngOnInit(): Promise<void> {
     if (this.verified() === '1' && this.auth.user()?.emailVerified) this.justVerified.set(true);
+    // Fresh pause status: someone may have paused bookings since the site was opened.
+    void this.server.checkMaintenance();
     this.form = {
       date: this.date() ?? '',
       slot: this.slot() ?? 'MORNING',

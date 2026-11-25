@@ -40,6 +40,13 @@ export class App {
     () => this.server.maintenance() !== null && !this.isStaff() && !this.url().startsWith('/login'),
   );
 
+  /** "Thu 27 Nov, 11:00 pm – 12:00 am" for an announced window, unless it is under way. */
+  protected readonly scheduleText = computed(() => {
+    const s = this.server.scheduled();
+    if (!s || this.server.maintenance()) return null;
+    return scheduleLabel(s.from, s.to);
+  });
+
   constructor() {
     const router = inject(Router);
     void this.payments.loadConfig();
@@ -61,4 +68,27 @@ export class App {
     this.menuOpen.set(false);
     void this.auth.logout();
   }
+}
+
+const IST = 'Asia/Kolkata';
+const day = new Intl.DateTimeFormat('en-IN', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  timeZone: IST,
+});
+const time = new Intl.DateTimeFormat('en-IN', {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: IST,
+});
+
+/** A maintenance window in India time; the day is repeated only if it ends on another day. */
+export function scheduleLabel(fromIso: string, toIso: string): string {
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+  const sameDay = day.format(from) === day.format(to);
+  return sameDay
+    ? `${day.format(from)}, ${time.format(from)} – ${time.format(to)}`
+    : `${day.format(from)}, ${time.format(from)} – ${day.format(to)}, ${time.format(to)}`;
 }

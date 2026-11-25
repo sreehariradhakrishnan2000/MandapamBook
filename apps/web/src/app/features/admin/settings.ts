@@ -13,6 +13,11 @@ import { AuthService, errorMessage } from '../../core/auth/auth.service';
 import { ServerStatus } from '../../core/server-status';
 
 /** An ISO time as "YYYY-MM-DDTHH:mm" in India time, for a datetime-local input. */
+/** A datetime-local value, read as India time, as an ISO string with the +05:30 offset. */
+function fromIndiaLocal(local: string): string | null {
+  return local ? `${local}:00+05:30` : null;
+}
+
 function toIndiaLocal(iso: string | null): string {
   if (!iso || Number.isNaN(Date.parse(iso))) return '';
   return new Date(Date.parse(iso) + 5.5 * 3_600_000).toISOString().slice(0, 16);
@@ -164,6 +169,35 @@ function toIndiaLocal(iso: string | null): string {
               [disabled]="!canEdit"
             />
           </label>
+          <fieldset class="flex flex-col gap-2 rounded-xl border border-slate-200 p-3">
+            <legend class="px-1 font-medium">Announce scheduled maintenance (optional)</legend>
+            <p class="text-slate-600">
+              Shows a banner to everyone until the window ends, e.g. "Scheduled maintenance: Thu 27
+              Nov, 11:00 pm – 12:00 am". Turn maintenance on yourself when it starts.
+            </p>
+            <div class="flex flex-wrap gap-3">
+              <label class="flex flex-col gap-1"
+                >From (India time)
+                <input
+                  name="scheduledFrom"
+                  type="datetime-local"
+                  class="w-fit rounded-xl border border-slate-300 px-2 py-1.5"
+                  [(ngModel)]="maintenance.scheduledFrom"
+                  [disabled]="!canEdit"
+                />
+              </label>
+              <label class="flex flex-col gap-1"
+                >To (India time)
+                <input
+                  name="scheduledTo"
+                  type="datetime-local"
+                  class="w-fit rounded-xl border border-slate-300 px-2 py-1.5"
+                  [(ngModel)]="maintenance.scheduledTo"
+                  [disabled]="!canEdit"
+                />
+              </label>
+            </div>
+          </fieldset>
           @if (canEdit) {
             <button
               type="submit"
@@ -178,18 +212,94 @@ function toIndiaLocal(iso: string | null): string {
           }
         </form>
       </section>
+
+      <section
+        class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 text-sm"
+        aria-labelledby="pause-h"
+      >
+        <h2 id="pause-h" class="font-display text-xl font-medium">Pause new bookings</h2>
+        <p class="text-slate-600">
+          People can still browse halls and manage their bookings, but cannot hold dates or pay. Use
+          it when payments are having problems, for example a Razorpay outage.
+        </p>
+        @if (pauseError()) {
+          <p class="rounded-xl bg-red-50 px-3 py-2 text-red-800" role="alert">{{ pauseError() }}</p>
+        }
+        @if (pauseSaved(); as msg) {
+          <p class="rounded-xl bg-leaf-600/10 px-3 py-2 text-leaf-600" role="status">{{ msg }}</p>
+        }
+        <form class="flex flex-col gap-3" (ngSubmit)="savePause()">
+          <label class="flex items-center gap-2 font-medium">
+            <input type="checkbox" name="paused" [(ngModel)]="pause.paused" [disabled]="!canEdit" />
+            Pause new bookings
+          </label>
+          <label class="flex flex-col gap-1"
+            >Message (optional)
+            <textarea
+              name="pauseMessage"
+              rows="2"
+              maxlength="300"
+              placeholder="Please try again a little later."
+              class="rounded-xl border border-slate-300 px-2 py-1.5"
+              [(ngModel)]="pause.message"
+              [disabled]="!canEdit"
+            ></textarea>
+          </label>
+          @if (canEdit) {
+            <button
+              type="submit"
+              class="w-fit rounded-full bg-brand-600 px-4 py-2 font-semibold text-white"
+            >
+              Save
+            </button>
+          }
+        </form>
+      </section>
     </section>
   `,
 })
 export class AdminSettings implements OnInit {
+  protected pause = { paused: false, message: '' };
+  protected readonly pauseError = signal<string | null>(null);
+  protected readonly pauseSaved = signal<string | null>(null);
+
+  protected async savePause(): Promise<void> {
+    this.pauseError.set(null);
+    this.pauseSaved.set(null);
+    try {
+      const saved = await this.api.setBookingsPause({
+        paused: this.pause.paused,
+        message: this.pause.message.trim(),
+      });
+      this.pause = { ...saved };
+      this.pauseSaved.set(saved.paused ? 'New bookings are paused.' : 'Bookings are open again.');
+      await this.server.checkMaintenance();
+    } catch (err) {
+      this.pauseError.set(errorMessage(err));
+    }
+  }
+
   private readonly server = inject(ServerStatus);
-  protected maintenance = { enabled: false, message: '', until: '' };
+  protected maintenance = {
+    enabled: false,
+    message: '',
+    until: '',
+    scheduledFrom: '',
+    scheduledTo: '',
+  };
   protected readonly maintenanceError = signal<string | null>(null);
   protected readonly maintenanceSaved = signal<string | null>(null);
 
   private async loadMaintenance(): Promise<void> {
-    const m = await this.api.maintenance();
-    this.maintenance = { enabled: m.enabled, message: m.message, until: toIndiaLocal(m.until) };
+    const { maintenance: m, bookings } = await this.api.siteStatus();
+    this.maintenance = {
+      enabled: m.enabled,
+      message: m.message,
+      until: toIndiaLocal(m.until),
+      scheduledFrom: toIndiaLocal(m.scheduledFrom),
+      scheduledTo: toIndiaLocal(m.scheduledTo),
+    };
+    this.pause = { ...bookings };
   }
 
   protected async saveMaintenance(): Promise<void> {
@@ -207,12 +317,16 @@ export class AdminSettings implements OnInit {
       const saved = await this.api.setMaintenance({
         enabled: m.enabled,
         message: m.message.trim(),
-        until: m.until ? `${m.until}:00+05:30` : null,
+        until: fromIndiaLocal(m.until),
+        scheduledFrom: fromIndiaLocal(m.scheduledFrom),
+        scheduledTo: fromIndiaLocal(m.scheduledTo),
       });
       this.maintenance = {
         enabled: saved.enabled,
         message: saved.message,
         until: toIndiaLocal(saved.until),
+        scheduledFrom: toIndiaLocal(saved.scheduledFrom),
+        scheduledTo: toIndiaLocal(saved.scheduledTo),
       };
       this.maintenanceSaved.set(
         saved.enabled

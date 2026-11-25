@@ -1,49 +1,81 @@
-import { type Maintenance, maintenanceSchema } from '@mandapambook/shared';
+import {
+  type BookingsPause,
+  type Maintenance,
+  bookingsPauseSchema,
+  maintenanceSchema,
+  maintenanceUpdateSchema,
+} from '@mandapambook/shared';
 import { eq } from 'drizzle-orm';
 import { type RequestHandler, Router } from 'express';
+import type { z } from 'zod';
 import type { Db } from '../../db/client.js';
 import { platformSettings } from '../../db/schema/index.js';
 import { HttpError } from '../../http/errors.js';
-import { type AuditService, auditContext } from '../audit/audit.service.js';
 import type { RevocationStore } from '../../infra/revocation-store.js';
+import { type AuditAction, type AuditService, auditContext } from '../audit/audit.service.js';
 import type { AccessTokenService } from '../auth/access-tokens.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 
-const KEY = 'maintenance';
-const OFF: Maintenance = { enabled: false, message: '', until: null };
-/** How long a read is reused. Switching on or off reaches every instance within this. */
+/** How long a read is reused. A change reaches every instance within this. */
 const CACHE_MS = 5_000;
 
-/** The maintenance switch, stored as one row in platform_settings (no migration needed). */
-export class MaintenanceService {
-  private cached: { value: Maintenance; at: number } | null = null;
+/**
+ * One switch stored as a row in platform_settings (no migration needed), read through a
+ * short cache because the gates below run on every request.
+ */
+export class SettingStore<T> {
+  private cached: { value: T; at: number } | null = null;
 
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    readonly key: string,
+    private readonly schema: z.ZodType<T>,
+    private readonly fallback: T,
+  ) {}
 
-  async get(): Promise<Maintenance> {
+  async get(): Promise<T> {
     if (this.cached && Date.now() - this.cached.at < CACHE_MS) return this.cached.value;
     const [row] = await this.db
       .select({ value: platformSettings.value })
       .from(platformSettings)
-      .where(eq(platformSettings.key, KEY));
-    const parsed = maintenanceSchema.safeParse(row?.value);
-    const value = parsed.success ? parsed.data : OFF;
+      .where(eq(platformSettings.key, this.key));
+    const parsed = this.schema.safeParse(row?.value);
+    const value = parsed.success ? parsed.data : this.fallback;
     this.cached = { value, at: Date.now() };
     return value;
   }
 
-  async set(
-    value: Maintenance,
-    actorId: string,
-  ): Promise<{ before: Maintenance; after: Maintenance }> {
+  async set(value: T, actorId: string): Promise<{ before: T; after: T }> {
     const before = await this.get();
     await this.db
       .insert(platformSettings)
-      .values({ key: KEY, value, updatedBy: actorId })
+      .values({ key: this.key, value, updatedBy: actorId })
       .onConflictDoUpdate({ target: platformSettings.key, set: { value, updatedBy: actorId } });
     this.cached = { value, at: Date.now() };
     return { before, after: value };
   }
+}
+
+export type MaintenanceService = SettingStore<Maintenance>;
+export type BookingsPauseService = SettingStore<BookingsPause>;
+
+export const MAINTENANCE_OFF: Maintenance = {
+  enabled: false,
+  message: '',
+  until: null,
+  scheduledFrom: null,
+  scheduledTo: null,
+};
+
+export function createMaintenanceService(db: Db): MaintenanceService {
+  return new SettingStore(db, 'maintenance', maintenanceSchema, MAINTENANCE_OFF);
+}
+
+export function createBookingsPauseService(db: Db): BookingsPauseService {
+  return new SettingStore(db, 'bookings_pause', bookingsPauseSchema, {
+    paused: false,
+    message: '',
+  });
 }
 
 /**
@@ -53,11 +85,6 @@ export class MaintenanceService {
 const ALWAYS_OPEN = [/^\/status$/, /^\/auth\//, /^\/payments\/webhooks\//];
 const STAFF_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
-/**
- * While maintenance is on, answers everyone except admins with 503 MAINTENANCE. The web
- * app turns that into the maintenance page. Admin routes still run their own full
- * authentication; this only decides who gets past the "closed" sign.
- */
 /**
  * True only for a valid, unrevoked admin access token: the same checks `authenticate`
  * makes (signature, expiry, logout, session and user-wide revocation). Anything else,
@@ -79,12 +106,17 @@ async function isActiveStaff(
   return !tokenRevoked && !familyRevoked && (cutoff === null || claims.issuedAtMs > cutoff);
 }
 
+/**
+ * While maintenance is on, answers everyone except admins with 503 MAINTENANCE. The web
+ * app turns that into the maintenance page. Admin routes still run their own full
+ * authentication; this only decides who gets past the "closed" sign.
+ */
 export function maintenanceGate(
   maintenance: MaintenanceService,
   tokens: AccessTokenService,
   revocations: RevocationStore,
 ): RequestHandler {
-  return (req, res, next) => {
+  return (req, _res, next) => {
     if (ALWAYS_OPEN.some((p) => p.test(req.path))) return next();
     maintenance
       .get()
@@ -108,33 +140,65 @@ export function maintenanceGate(
   };
 }
 
-export function maintenanceRouter(deps: {
+/** The requests that start a booking or a payment. Everything else keeps working. */
+const BOOKING_STARTS = [/^\/bookings$/, /^\/payments\/orders$/];
+
+/**
+ * While bookings are paused, refuses new holds and new payment orders with 503
+ * BOOKINGS_PAUSED. Browsing, cancelling, verifying payments already made and webhooks
+ * keep working, so no money is left in limbo.
+ */
+export function bookingsPauseGate(pause: BookingsPauseService): RequestHandler {
+  return (req, _res, next) => {
+    if (req.method !== 'POST' || !BOOKING_STARTS.some((p) => p.test(req.path))) return next();
+    pause
+      .get()
+      .then((p) => {
+        if (!p.paused) return next();
+        next(
+          new HttpError(
+            503,
+            'BOOKINGS_PAUSED',
+            p.message || 'New bookings are paused for a short while. Please try again later.',
+            undefined,
+            { 'Cache-Control': 'no-store' },
+          ),
+        );
+      })
+      .catch(next);
+  };
+}
+
+export function siteStatusRouter(deps: {
   maintenance: MaintenanceService;
+  bookingsPause: BookingsPauseService;
   audit: AuditService;
   authenticate: RequestHandler;
 }): Router {
-  const { maintenance, audit, authenticate } = deps;
+  const { maintenance, bookingsPause, audit, authenticate } = deps;
   const r = Router();
 
-  /** Public: the web app and the maintenance page read this. */
+  /** Public: the web app, the maintenance page and the banners read this. */
   r.get('/status', async (_req, res) => {
-    res.set('Cache-Control', 'no-store').json({ maintenance: await maintenance.get() });
+    const [m, b] = await Promise.all([maintenance.get(), bookingsPause.get()]);
+    res.set('Cache-Control', 'no-store').json({ maintenance: m, bookings: b });
   });
 
-  /** Super admins switch maintenance on or off. Audited. */
-  r.put(
-    '/admin/maintenance',
-    authenticate,
-    requirePermission('settings:update'),
-    async (req, res) => {
+  const audited = <T>(
+    path: string,
+    store: SettingStore<T>,
+    schema: z.ZodType<T>,
+    action: AuditAction,
+  ) =>
+    r.put(path, authenticate, requirePermission('settings:update'), async (req, res) => {
       const me = currentUser(req);
-      const value = maintenanceSchema.parse(req.body);
-      const { before, after } = await maintenance.set(value, me.userId);
+      const value = schema.parse(req.body);
+      const { before, after } = await store.set(value, me.userId);
       await audit.record(
         {
-          action: 'settings.maintenance_changed',
+          action,
           entityType: 'platform_settings',
-          entityId: KEY,
+          entityId: store.key,
           actorId: me.userId,
           actorRole: me.role,
           before,
@@ -143,7 +207,20 @@ export function maintenanceRouter(deps: {
         auditContext(req),
       );
       res.json(after);
-    },
+    });
+
+  /** Super admins switch maintenance (and its advance notice) and the bookings pause. */
+  audited(
+    '/admin/maintenance',
+    maintenance,
+    maintenanceUpdateSchema,
+    'settings.maintenance_changed',
+  );
+  audited(
+    '/admin/bookings-pause',
+    bookingsPause,
+    bookingsPauseSchema,
+    'settings.bookings_pause_changed',
   );
   return r;
 }
