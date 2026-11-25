@@ -54,6 +54,13 @@ import { PaymentAdapter } from '../payments/payment-adapter';
               slot is released.
             </p>
             <app-payment-adapter [bookingId]="hold.id" [amountPaise]="hold.quote.payNowPaise" />
+            <p class="text-xs text-slate-600">
+              By paying you agree to the
+              <a routerLink="/refund-policy" class="text-brand-700 underline"
+                >Refund &amp; Cancellation Policy</a
+              >
+              and the venue's cancellation terms.
+            </p>
           } @else {
             <p>This hold has expired and the slot was released. You can try again.</p>
           }
