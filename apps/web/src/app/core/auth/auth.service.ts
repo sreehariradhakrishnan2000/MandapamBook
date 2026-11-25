@@ -132,6 +132,11 @@ export class AuthService {
     await firstValueFrom(this.http.post(`${API}/auth/verify-email`, { token }));
   }
 
+  /** Emails a fresh verification link to the signed-in user; earlier links stop working. */
+  async resendVerificationEmail(): Promise<void> {
+    await firstValueFrom(this.http.post(`${API}/auth/verify-email/resend`, null));
+  }
+
   async forgotPassword(email: string): Promise<void> {
     await firstValueFrom(this.http.post(`${API}/auth/password/forgot`, { email }));
   }

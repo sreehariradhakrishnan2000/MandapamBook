@@ -257,6 +257,11 @@ export function authRouter({
     res.set('Cache-Control', 'no-store').json(await auth.me(currentUser(req).userId));
   });
 
+  r.post('/verify-email/resend', authenticate, async (req, res) => {
+    await auth.resendVerificationEmail(currentUser(req).userId, clientContext(req));
+    res.status(202).json({ message: 'We sent a new verification link to your email.' });
+  });
+
   r.post('/logout-all', authenticate, async (req, res) => {
     await auth.logoutAll(currentUser(req).userId, clientContext(req));
     res.clearCookie(REFRESH_COOKIE, refreshCookieOptions());

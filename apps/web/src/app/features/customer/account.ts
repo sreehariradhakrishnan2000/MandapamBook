@@ -14,9 +14,29 @@ import { AuthService, type SessionInfo, errorMessage } from '../../core/auth/aut
         @if (auth.user(); as user) {
           <p class="mt-1 text-slate-600">{{ user.fullName }} · {{ user.email }}</p>
           @if (!user.emailVerified) {
-            <p class="mt-3 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700">
-              Verify your email to make bookings. Check your inbox for the link.
-            </p>
+            <div
+              class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-brand-50 px-3 py-2 text-sm text-brand-700"
+            >
+              <p>Verify your email to make bookings. Check your inbox (and spam) for the link.</p>
+              <button
+                type="button"
+                class="tap font-semibold underline disabled:opacity-60"
+                [disabled]="resendBusy()"
+                (click)="resend()"
+              >
+                {{ resendBusy() ? 'Sending…' : 'Resend verification email' }}
+              </button>
+            </div>
+            @if (resendMessage(); as m) {
+              <p
+                class="mt-2 text-sm"
+                [class.text-red-700]="m.error"
+                [class.text-forest-800]="!m.error"
+                role="status"
+              >
+                {{ m.text }}
+              </p>
+            }
           }
         }
       </header>
@@ -179,9 +199,30 @@ export class Account implements OnInit {
   protected readonly phoneBusy = signal(false);
   protected readonly phoneMessage = signal<{ text: string; error: boolean } | null>(null);
 
+  protected readonly resendBusy = signal(false);
+  protected readonly resendMessage = signal<{ text: string; error: boolean } | null>(null);
+
   async ngOnInit(): Promise<void> {
     this.phone.set(this.auth.user()?.phone ?? '');
     await this.load();
+  }
+
+  protected async resend(): Promise<void> {
+    this.resendBusy.set(true);
+    try {
+      await this.auth.resendVerificationEmail();
+      this.resendMessage.set({
+        text: `We sent a new link to ${this.auth.user()?.email ?? 'your email'}. It works for 24 hours; earlier links no longer do.`,
+        error: false,
+      });
+    } catch (err) {
+      this.resendMessage.set({
+        text: errorMessage(err, 'Could not send the email. Try again in a few minutes.'),
+        error: true,
+      });
+    } finally {
+      this.resendBusy.set(false);
+    }
   }
 
   protected async send(): Promise<void> {
