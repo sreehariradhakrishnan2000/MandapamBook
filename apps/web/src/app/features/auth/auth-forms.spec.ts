@@ -3,7 +3,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import type { Type } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
+import { VerifyEmail } from './email-actions';
 import { Login, safeReturnUrl } from './login';
 import { Register, indianMobile } from './register';
 
@@ -193,5 +194,53 @@ describe('Continue with Google', () => {
     expect(el.querySelector('[role=alert]')?.textContent).toContain(
       'already linked to a different Google account',
     );
+  });
+});
+
+describe('verify email page', () => {
+  let http: HttpTestingController;
+  const pending = (url: string) => vi.waitFor(() => http.expectOne((r) => r.url === url));
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  it('sends a signed-in customer straight back to where they left off', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(VerifyEmail);
+    fixture.componentRef.setInput('token', 'tok');
+    fixture.componentRef.setInput('next', '/book/h1?date=2030-01-09&slot=EVENING');
+    fixture.detectChanges();
+    (await pending('/api/v1/auth/verify-email')).flush({ message: 'ok' });
+    (await pending('/api/v1/auth/csrf')).flush({ csrfToken: 'c' });
+    (await pending('/api/v1/auth/refresh')).flush({
+      accessToken: 't',
+      expiresIn: 900,
+      user: { id: 'u1', email: 'u@example.test', emailVerified: true },
+    });
+    await vi.waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith('/book/h1?date=2030-01-09&slot=EVENING&verified=1'),
+    );
+  });
+
+  it('asks to sign in on another device, and never follows an off-site next', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(VerifyEmail);
+    fixture.componentRef.setInput('token', 'tok');
+    fixture.componentRef.setInput('next', '//evil.example/');
+    fixture.detectChanges();
+    (await pending('/api/v1/auth/verify-email')).flush({ message: 'ok' });
+    (await pending('/api/v1/auth/csrf')).flush({ csrfToken: 'c' });
+    (await pending('/api/v1/auth/refresh')).flush(
+      { error: { code: 'UNAUTHENTICATED' } },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+    const el = fixture.nativeElement as HTMLElement;
+    await vi.waitFor(() => expect(el.textContent).toContain('Sign in to continue'));
+    expect(navigate).not.toHaveBeenCalled();
+    expect(el.querySelector('a')?.getAttribute('href')).toBe('/login?returnUrl=%2Faccount');
   });
 });

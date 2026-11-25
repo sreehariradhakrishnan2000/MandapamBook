@@ -2,13 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   type OnInit,
+  computed,
   inject,
   input,
   signal,
 } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
+import { safeReturnUrl } from './login';
 import { BUTTON_CLASS, FormField, INPUT_CLASS } from '../../shared/form-field';
 import { PasswordToggle } from '../../shared/password-toggle';
 
@@ -24,9 +26,17 @@ import { PasswordToggle } from '../../shared/password-toggle';
         }
         @case ('done') {
           <h1 class="font-display text-3xl font-medium">Email verified</h1>
-          <a routerLink="/login" class="mt-4 inline-block font-semibold text-brand-700 underline"
-            >Sign in</a
-          >
+          @if (returning()) {
+            <p class="mt-2 text-slate-600">Taking you back to where you left off…</p>
+          } @else {
+            <p class="mt-2 text-slate-600">Sign in to continue where you left off.</p>
+            <a
+              routerLink="/login"
+              [queryParams]="{ returnUrl: returnPath() }"
+              class="mt-4 inline-block font-semibold text-brand-700 underline"
+              >Sign in</a
+            >
+          }
         }
         @default {
           <h1 class="font-display text-3xl font-medium">Link not valid</h1>
@@ -38,9 +48,17 @@ import { PasswordToggle } from '../../shared/password-toggle';
 })
 export class VerifyEmail implements OnInit {
   private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
   readonly token = input<string>();
+  /** Where the customer was when they asked for this link, e.g. a booking page. */
+  readonly next = input<string>();
   protected readonly state = signal<'working' | 'done' | 'failed'>('working');
+  protected readonly returning = signal(false);
   protected readonly error = signal('This link is invalid or has expired.');
+  protected readonly returnPath = computed(() => {
+    const path = safeReturnUrl(this.next());
+    return path === '/' ? '/account' : path;
+  });
 
   async ngOnInit(): Promise<void> {
     const token = this.token();
@@ -50,12 +68,23 @@ export class VerifyEmail implements OnInit {
     }
     try {
       await this.auth.verifyEmail(token);
+      this.auth.announceEmailVerified();
       this.state.set('done');
+      // Same browser: the session is still there, so go straight back, now verified.
+      if (await this.auth.refresh()) {
+        this.returning.set(true);
+        await this.router.navigateByUrl(withVerifiedFlag(this.returnPath()));
+      }
     } catch (err) {
       this.error.set(errorMessage(err, this.error()));
       this.state.set('failed');
     }
   }
+}
+
+/** Adds verified=1 so the page we return to can say "Email verified". */
+function withVerifiedFlag(path: string): string {
+  return `${path}${path.includes('?') ? '&' : '?'}verified=1`;
 }
 
 @Component({
