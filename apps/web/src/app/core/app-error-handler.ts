@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ErrorHandler, Injectable, inject } from '@angular/core';
 import { Connectivity, isChunkLoadError } from './connectivity';
+import { ErrorTracking } from './error-tracking';
 
 const QUIET_STATUSES = new Set([0, 401, 502, 503, 504]);
 
@@ -12,6 +13,7 @@ const QUIET_STATUSES = new Set([0, 401, 502, 503, 504]);
 @Injectable()
 export class AppErrorHandler implements ErrorHandler {
   private readonly connectivity = inject(Connectivity);
+  private readonly tracking = inject(ErrorTracking);
 
   handleError(error: unknown): void {
     console.error(error);
@@ -24,6 +26,7 @@ export class AppErrorHandler implements ErrorHandler {
       this.connectivity.updateAvailable.set(true);
       return;
     }
+    this.tracking.capture(error);
     this.connectivity.pageError.set(true);
   }
 }
