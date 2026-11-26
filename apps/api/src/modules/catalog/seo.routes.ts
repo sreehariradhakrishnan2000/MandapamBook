@@ -27,12 +27,26 @@ const slugSchema = z.string().regex(/^[a-z0-9-]{1,120}$/);
  * requests from link-preview bots (WhatsApp, Facebook, Telegram, X…) here, because those
  * bots do not run the app's JavaScript and would otherwise see a blank page.
  */
-export function seoRouter(deps: { db: Db; storage: ObjectStorage; appBaseUrl: string }): Router {
+export function seoRouter(deps: {
+  db: Db;
+  storage: ObjectStorage;
+  appBaseUrl: string;
+  /** SEO_INDEXING: false keeps the whole site out of search engines. */
+  indexing?: boolean;
+}): Router {
   const { db, storage } = deps;
   const base = deps.appBaseUrl.replace(/\/$/, '');
+  const indexing = deps.indexing ?? true;
   const r = Router();
 
   r.get('/seo/robots.txt', (_req, res) => {
+    if (!indexing) {
+      res
+        .type('text/plain')
+        .set('Cache-Control', 'public, max-age=3600')
+        .send('# Not open to search engines yet.\nUser-agent: *\nDisallow: /\n');
+      return;
+    }
     const lines = [
       'User-agent: *',
       'Allow: /',
@@ -45,6 +59,15 @@ export function seoRouter(deps: { db: Db; storage: ObjectStorage; appBaseUrl: st
   });
 
   r.get('/seo/sitemap.xml', async (_req, res) => {
+    if (!indexing) {
+      res
+        .type('application/xml')
+        .set('Cache-Control', 'public, max-age=3600')
+        .send(
+          '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>\n',
+        );
+      return;
+    }
     const venues = await db
       .select({ slug: auditoriums.slug, updatedAt: auditoriums.updatedAt })
       .from(auditoriums)
