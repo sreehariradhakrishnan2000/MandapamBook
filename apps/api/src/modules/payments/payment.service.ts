@@ -12,6 +12,7 @@ import {
   type PaymentProvider,
   WebhookSignatureError,
 } from './provider.js';
+import { withoutPersonalData } from './redact.js';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type PaymentRow = typeof payments.$inferSelect;
@@ -295,7 +296,8 @@ export class PaymentService {
           provider: providerName,
           eventId: event.eventId,
           eventType: event.type,
-          payload: event.raw as object,
+          // Kept for debugging, without the customer's personal or card details.
+          payload: withoutPersonalData(event.raw) as object,
           processedAt: new Date(),
         })
         .onConflictDoNothing()

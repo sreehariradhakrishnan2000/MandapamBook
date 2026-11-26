@@ -8,6 +8,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { type Observable, catchError, defer, from, switchMap, tap, throwError, timer } from 'rxjs';
 import { API } from './auth/auth.service';
 import { Connectivity } from './connectivity';
+import { ErrorTracking } from './error-tracking';
 
 /**
  * The hosting plan puts the API to sleep after a quiet spell, and waking it takes up to a
@@ -16,6 +17,7 @@ import { Connectivity } from './connectivity';
  */
 @Injectable({ providedIn: 'root' })
 export class ServerStatus {
+  private readonly tracking = inject(ErrorTracking);
   /** True while the API is not answering yet; drives the banner in the app shell. */
   readonly waking = signal(false);
   /**
@@ -48,6 +50,7 @@ export class ServerStatus {
           scheduledTo?: string | null;
         };
         bookings?: { paused: boolean; message: string };
+        errorTracking?: { dsn: string | null; environment: string };
       };
       const m = body.maintenance;
       this.maintenance.set(m?.enabled ? { message: m.message, until: m.until } : null);
@@ -57,6 +60,11 @@ export class ServerStatus {
           : null;
       this.scheduled.set(upcoming);
       this.bookingsPaused.set(body.bookings?.paused ? { message: body.bookings.message } : null);
+      // Browser error tracking turns on only when the API names a Sentry DSN.
+      this.tracking.configure(
+        body.errorTracking?.dsn,
+        body.errorTracking?.environment ?? 'production',
+      );
       return Boolean(m?.enabled);
     } catch {
       return this.maintenance() !== null;

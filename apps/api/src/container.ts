@@ -83,6 +83,7 @@ export type AuthEnv = Pick<
       | 'ADMIN_NOTIFY_EMAIL'
       | 'SENTRY_DSN'
       | 'SENTRY_WEB_DSN'
+      | 'APP_ENV'
     >
   >;
 
@@ -157,7 +158,18 @@ export function buildContainer(deps: ContainerDeps): Container {
   // closes the site; a bookings pause only refuses new holds and payments.
   const maintenance = createMaintenanceService(db);
   const bookingsPause = createBookingsPauseService(db);
-  api.use(siteStatusRouter({ maintenance, bookingsPause, audit, authenticate }));
+  api.use(
+    siteStatusRouter({
+      maintenance,
+      bookingsPause,
+      audit,
+      authenticate,
+      webErrorTracking: {
+        dsn: env.SENTRY_WEB_DSN ?? null,
+        environment: env.APP_ENV ?? 'development',
+      },
+    }),
+  );
   api.use(maintenanceGate(maintenance, accessTokens, deps.revocations));
   api.use(bookingsPauseGate(bookingsPause));
   const settings = new SettingsService(db);

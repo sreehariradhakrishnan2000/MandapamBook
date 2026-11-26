@@ -35,6 +35,8 @@ describe('email layout', () => {
     expect(mail.html).toContain(`src="${BASE}/email/kalash.png"`);
     expect(mail.html).toContain('#c2410c'); // the site's vermilion button
     expect(mail.html).toContain('Shubh Vivah');
+    // The hidden preview line is padded so inboxes don't append the email's first text.
+    expect(mail.html).toContain(`Welcome to MandapamBook.${'&#847;&zwnj;&nbsp;'.repeat(90)}</div>`);
   });
 
   it('escapes user-supplied values and refuses non-http links', () => {
