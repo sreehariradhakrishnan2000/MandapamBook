@@ -27,6 +27,14 @@ import { InrPipe } from '../../shared/inr.pipe';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex flex-col gap-2">
+      @if (payments.config()?.testMode) {
+        <p
+          class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-center text-sm font-semibold text-red-800"
+          role="note"
+        >
+          Test payments only – no real money is charged
+        </p>
+      }
       <button
         type="button"
         class="w-full rounded-full bg-brand-600 px-4 py-2.5 font-semibold text-white disabled:opacity-60"
@@ -44,7 +52,7 @@ import { InrPipe } from '../../shared/inr.pipe';
   `,
 })
 export class PaymentAdapter {
-  private readonly payments = inject(PaymentsService);
+  protected readonly payments = inject(PaymentsService);
   private readonly navigation = inject(BrowserNavigation);
   private readonly razorpayLoader = inject(RazorpayLoader);
   private readonly auth = inject(AuthService);

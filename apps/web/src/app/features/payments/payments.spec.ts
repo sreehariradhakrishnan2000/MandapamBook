@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { App } from '../../app';
 import { BrowserNavigation } from '../../core/browser-navigation';
+import { PaymentsService } from '../../core/payments.service';
 import { PaymentAdapter, RazorpayLoader, type RazorpayConstructor } from './payment-adapter';
 import { PaymentReturn } from './payment-return';
 
@@ -36,6 +37,22 @@ describe('payments in the web app', () => {
     (await pending('/api/v1/payments/config')).flush({ provider: 'razorpay', testMode: false });
     await live.whenStable();
     expect((live.nativeElement as HTMLElement).textContent).not.toContain('TEST MODE');
+  });
+
+  it('says "test payments only" next to the Pay button while the gateway is in test mode', async () => {
+    setup();
+    const payments = TestBed.inject(PaymentsService);
+    const fixture = TestBed.createComponent(PaymentAdapter);
+    fixture.componentRef.setInput('bookingId', 'b1');
+    fixture.componentRef.setInput('amountPaise', 100);
+    payments.config.set({ provider: 'razorpay', testMode: true });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Test payments only – no real money is charged');
+
+    payments.config.set({ provider: 'razorpay', testMode: false });
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('Test payments only');
   });
 
   it('creates an order with an idempotency key and opens the same-origin checkout', async () => {

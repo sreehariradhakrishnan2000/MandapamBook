@@ -79,7 +79,7 @@ describe('loadEnv', () => {
         S3_ACCESS_KEY_ID: 'test-only-key-id',
         S3_SECRET_ACCESS_KEY: 'test-only-secret',
         PAYMENT_PROVIDER: 'razorpay',
-        RAZORPAY_KEY_ID: 'rzp_live_testonly123',
+        RAZORPAY_KEY_ID: 'rzp_test_testonly123',
         RAZORPAY_KEY_SECRET: 'test-only-razorpay-secret',
         RAZORPAY_WEBHOOK_SECRET: 'test-only-webhook-secret',
       }),
@@ -153,20 +153,42 @@ describe('loadEnv', () => {
       ).toThrow(/TLS/);
     });
 
-    it('allows Razorpay test keys only in staging, and live keys only in production', () => {
-      const razorpay = (key: string) => ({
+    describe('payments mode', () => {
+      const razorpay = (key: string, extra: Record<string, string> = {}) => ({
         ...prodLike,
         PAYMENT_PROVIDER: 'razorpay',
         RAZORPAY_KEY_ID: key,
         RAZORPAY_KEY_SECRET: 'k'.repeat(24),
         RAZORPAY_WEBHOOK_SECRET: 'w'.repeat(24),
+        ...extra,
       });
-      expect(loadEnv({ ...razorpay('rzp_test_abc'), APP_ENV: 'staging' }).APP_ENV).toBe('staging');
-      expect(() => loadEnv(razorpay('rzp_test_abc'))).toThrow(/test keys/);
-      expect(() => loadEnv({ ...razorpay('rzp_live_abc'), APP_ENV: 'staging' })).toThrow(
-        /live keys are not allowed in staging/,
-      );
-      expect(loadEnv(razorpay('rzp_live_abc')).PAYMENT_PROVIDER).toBe('razorpay');
+
+      it('defaults to test, and lets production and staging run on test keys', () => {
+        expect(loadEnv(razorpay('rzp_test_abc')).PAYMENTS_MODE).toBe('test');
+        expect(loadEnv({ ...razorpay('rzp_test_abc'), APP_ENV: 'staging' }).APP_ENV).toBe(
+          'staging',
+        );
+      });
+
+      it('refuses to start in test mode if a live key is anywhere in the settings', () => {
+        expect(() => loadEnv(razorpay('rzp_live_abc'))).toThrow(/refuses live Razorpay keys/);
+        // A live key pasted into the wrong setting is caught too, and named.
+        expect(() =>
+          loadEnv(razorpay('rzp_test_abc', { SOME_OTHER_SETTING: 'rzp_live_oops' })),
+        ).toThrow(/found in SOME_OTHER_SETTING/);
+      });
+
+      it('allows live payments only on production, explicitly, with a live key', () => {
+        const live = { PAYMENTS_MODE: 'live' };
+        expect(loadEnv(razorpay('rzp_live_abc', live)).PAYMENTS_MODE).toBe('live');
+        expect(() => loadEnv(razorpay('rzp_test_abc', live))).toThrow(/needs a live key/);
+        expect(() => loadEnv({ ...razorpay('rzp_live_abc', live), APP_ENV: 'staging' })).toThrow(
+          /not allowed in staging/,
+        );
+        expect(() => loadEnv({ ...valid, PAYMENTS_MODE: 'live' })).toThrow(
+          /need NODE_ENV=production/,
+        );
+      });
     });
 
     it('rejects APP_ENV outside NODE_ENV=production', () => {
