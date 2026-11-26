@@ -85,5 +85,13 @@ export interface PaymentProvider {
   /** Verifies and normalises a webhook. Throws WebhookSignatureError when it is not authentic. */
   handleWebhook(input: WebhookInput): Promise<NormalizedWebhookEvent>;
   refund(input: RefundInput): Promise<ProviderRefund>;
+  /**
+   * Current state of a refund the provider already accepted. Used to follow up pending
+   * refunds: asking again with refund() would start a second refund.
+   */
+  getRefund(input: {
+    providerPaymentId: string;
+    providerRefundId: string;
+  }): Promise<ProviderRefund>;
   getStatus(input: { providerOrderId: string }): Promise<ProviderPaymentStatus>;
 }

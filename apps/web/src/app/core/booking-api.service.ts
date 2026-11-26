@@ -111,6 +111,24 @@ export interface BookingDetail extends BookingSummary {
   cancellationTiers: CancellationTier[];
   history: { toStatus: BookingStatus; at: string }[];
   review: { id: string; rating: number } | null;
+  refund: RefundStatus | null;
+  cancelledAt: string | null;
+}
+
+/** Money going back to the customer for one booking (see the API's refund-status.ts). */
+export interface RefundStatus {
+  amountPaise: number;
+  status: 'PROCESSING' | 'COMPLETED';
+  startedAt: string;
+  completedAt: string | null;
+  reference: string | null;
+}
+
+export interface RefundUpdate {
+  bookingId: string;
+  refCode: string;
+  venueName: string;
+  refund: RefundStatus;
 }
 
 export interface RefundPreview {
@@ -170,6 +188,8 @@ export class BookingApi {
 
   mine = () => firstValueFrom(this.http.get<{ items: BookingSummary[] }>(`${API}/bookings/mine`));
   booking = (id: string) => firstValueFrom(this.http.get<BookingDetail>(`${API}/bookings/${id}`));
+  refundUpdates = () =>
+    firstValueFrom(this.http.get<{ items: RefundUpdate[] }>(`${API}/bookings/refund-updates`));
   cancelPreview = (id: string) =>
     firstValueFrom(this.http.get<RefundPreview>(`${API}/bookings/${id}/cancel-preview`));
   cancel = (id: string, reason?: string) =>

@@ -23,8 +23,11 @@ import { FileDownload } from '../../core/file-download';
 import { InsightsApi } from '../../core/insights-api.service';
 import { InrPipe } from '../../shared/inr.pipe';
 import { OfflineReviews } from './offline-reviews';
+import { RefundStatusCard } from './refund-status-card';
 
 const CANCELLABLE = new Set(['HELD', 'PENDING_PAYMENT', 'AWAITING_OWNER', 'CONFIRMED']);
+/** Statuses a booking only reaches after it was paid. */
+const PAID_STATUSES = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED']);
 const INVOICEABLE = new Set(['AWAITING_OWNER', 'CONFIRMED', 'COMPLETED', 'CANCELLED', 'REFUNDED']);
 
 @Component({
@@ -87,7 +90,7 @@ export class MyBookings implements OnInit {
 
 @Component({
   selector: 'app-booking-detail',
-  imports: [DatePipe, FormsModule, RouterLink, InrPipe],
+  imports: [DatePipe, FormsModule, RouterLink, InrPipe, RefundStatusCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-4 py-4">
@@ -125,11 +128,21 @@ export class MyBookings implements OnInit {
           <dd class="text-right font-semibold">{{ b.totalPaise | inr }}</dd>
           <dt>Online advance</dt>
           <dd class="text-right">{{ b.advancePaise | inr }}</dd>
-          @if (b.refundDuePaise) {
-            <dt class="text-leaf-600">Refund due</dt>
-            <dd class="text-right text-leaf-600">{{ b.refundDuePaise | inr }}</dd>
+          @if (b.refund; as r) {
+            <dt class="text-leaf-600">
+              {{ r.status === 'COMPLETED' ? 'Refunded' : 'Refund in progress' }}
+            </dt>
+            <dd class="text-right text-leaf-600">{{ r.amountPaise | inr }}</dd>
           }
         </dl>
+
+        <app-refund-status-card
+          [refund]="b.refund"
+          [refCode]="b.refCode"
+          [cancelledAt]="b.cancelledAt"
+          [eventDate]="b.eventDate"
+          [paidAndCancelled]="paidAndCancelled(b)"
+        />
 
         @if (invoiceable()) {
           <button
@@ -283,6 +296,9 @@ export class BookingDetailPage implements OnInit {
   protected readonly statusLabels = STATUS_LABELS;
   protected readonly b = signal<BookingDetail | null>(null);
   protected readonly preview = signal<RefundPreview | null>(null);
+  protected paidAndCancelled(b: BookingDetail): boolean {
+    return b.status === 'CANCELLED' && b.history.some((h) => PAID_STATUSES.has(h.toStatus));
+  }
   protected readonly confirming = signal(false);
   protected readonly cancellable = signal(false);
   protected readonly error = signal<string | null>(null);

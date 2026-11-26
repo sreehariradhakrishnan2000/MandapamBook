@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import type { Db } from '../../db/client.js';
 import { auditoriums, bookings, payments, refunds, webhookEvents } from '../../db/schema/index.js';
@@ -352,13 +352,27 @@ export class PaymentService {
               ),
             );
           return 'processed';
-        case 'refund.processed':
+        case 'refund.processed': {
+          if (!event.providerRefundId) return 'processed';
+          const [refund] = await tx
+            .select({ id: refunds.id })
+            .from(refunds)
+            .where(eq(refunds.providerRefundId, event.providerRefundId));
+          // The full completion (payment totals, booking REFUNDED, email), not just the flag.
+          if (refund) await this.completeRefund(tx, refund.id, event.providerRefundId, SYSTEM);
+          return 'processed';
+        }
         case 'refund.failed':
           if (event.providerRefundId) {
             await tx
               .update(refunds)
-              .set({ status: event.type === 'refund.processed' ? 'PROCESSED' : 'FAILED' })
-              .where(eq(refunds.providerRefundId, event.providerRefundId));
+              .set({ status: 'FAILED' })
+              .where(
+                and(
+                  eq(refunds.providerRefundId, event.providerRefundId),
+                  ne(refunds.status, 'PROCESSED'),
+                ),
+              );
           }
           return 'processed';
         default:
@@ -595,15 +609,33 @@ export class PaymentService {
     if (!r.providerPaymentId)
       throw new Error(`payment for refund ${refundId} has no provider payment id`);
 
+    // A refund the gateway already accepted is followed up, never requested again:
+    // a second refund() call would start a second refund for the same money.
+    const pendingId = r.refund.status === 'PENDING' ? r.refund.providerRefundId : null;
+    const followUp = pendingId !== null;
     let outcome: Awaited<ReturnType<PaymentProvider['refund']>>;
     try {
-      outcome = await this.provider.refund({
-        providerPaymentId: r.providerPaymentId,
-        amountPaise: r.refund.amountPaise,
-        idempotencyKey: r.refund.idempotencyKey,
-        reason: r.refund.reason,
-      });
+      outcome = pendingId
+        ? await this.provider.getRefund({
+            providerPaymentId: r.providerPaymentId,
+            providerRefundId: pendingId,
+          })
+        : await this.provider.refund({
+            providerPaymentId: r.providerPaymentId,
+            amountPaise: r.refund.amountPaise,
+            idempotencyKey: r.refund.idempotencyKey,
+            reason: r.refund.reason,
+          });
     } catch (err) {
+      if (followUp) {
+        // Could not ask; the refund itself is still under way. Check again later.
+        this.logger.warn({ err, refundId }, 'refund status check failed; will check again');
+        await this.db
+          .update(refunds)
+          .set({ updatedAt: new Date() })
+          .where(eq(refunds.id, refundId));
+        return 'PENDING';
+      }
       this.logger.error({ err, refundId }, 'provider refund failed; will retry');
       await this.db
         .update(refunds)
@@ -614,69 +646,80 @@ export class PaymentService {
     if (outcome.status !== 'PROCESSED') {
       await this.db
         .update(refunds)
-        .set({ providerRefundId: outcome.providerRefundId, status: outcome.status })
-        .where(eq(refunds.id, refundId));
+        .set({
+          providerRefundId: outcome.providerRefundId,
+          status: outcome.status,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(refunds.id, refundId), ne(refunds.status, 'PROCESSED')));
       return outcome.status;
     }
 
-    await this.db.transaction(async (tx) => {
-      const [locked] = await tx
-        .select()
-        .from(refunds)
-        .where(eq(refunds.id, refundId))
-        .for('update');
-      if (!locked || locked.status === 'PROCESSED') return;
-      await tx
-        .update(refunds)
-        .set({ status: 'PROCESSED', providerRefundId: outcome.providerRefundId })
-        .where(eq(refunds.id, refundId));
-      const [p] = await tx
-        .select()
-        .from(payments)
-        .where(eq(payments.id, locked.paymentId))
-        .for('update');
-      if (!p) return;
-      const refunded = p.refundedPaise + locked.amountPaise;
-      await tx
-        .update(payments)
-        .set({
-          refundedPaise: refunded,
-          status: refunded >= p.amountPaise ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
-        })
-        .where(eq(payments.id, p.id));
-      const [b] = await tx
-        .select()
-        .from(bookings)
-        .where(eq(bookings.id, p.bookingId))
-        .for('update');
-      // A cancelled booking is finished once its refund is paid.
-      if (b && b.status === 'CANCELLED') {
-        await transition(tx, {
-          bookingId: b.id,
-          from: 'CANCELLED',
-          to: 'REFUNDED',
-          version: b.version,
-          reason: 'refund_processed',
-        });
-      }
-      await this.audit.record(
-        {
-          action: 'payment.refunded',
-          entityType: 'payment',
-          entityId: p.id,
-          actorId: locked.initiatedBy,
-          after: {
-            refundId,
-            amountPaise: locked.amountPaise,
-            reason: locked.reason,
-            bookingId: p.bookingId,
-          },
-        },
-        ctx,
-        tx,
-      );
-    });
+    await this.db.transaction((tx) =>
+      this.completeRefund(tx, refundId, outcome.providerRefundId, ctx),
+    );
     return 'PROCESSED';
+  }
+
+  /**
+   * Applies a refund the gateway reports as processed, once: marks it, adds it to the
+   * payment, moves a cancelled booking to REFUNDED (which sends the "refund processed"
+   * email) and audits it. Reached from the instant path, the follow-up check and the
+   * refund.processed webhook, whichever comes first.
+   */
+  private async completeRefund(
+    tx: Tx,
+    refundId: string,
+    providerRefundId: string | null,
+    ctx: AuditContext,
+  ): Promise<void> {
+    const [locked] = await tx.select().from(refunds).where(eq(refunds.id, refundId)).for('update');
+    if (!locked || locked.status === 'PROCESSED') return;
+    await tx
+      .update(refunds)
+      .set({ status: 'PROCESSED', providerRefundId: providerRefundId ?? locked.providerRefundId })
+      .where(eq(refunds.id, refundId));
+    const [p] = await tx
+      .select()
+      .from(payments)
+      .where(eq(payments.id, locked.paymentId))
+      .for('update');
+    if (!p) return;
+    const refunded = p.refundedPaise + locked.amountPaise;
+    await tx
+      .update(payments)
+      .set({
+        refundedPaise: refunded,
+        status: refunded >= p.amountPaise ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+      })
+      .where(eq(payments.id, p.id));
+    const [b] = await tx.select().from(bookings).where(eq(bookings.id, p.bookingId)).for('update');
+    // A cancelled booking is finished once its refund is paid.
+    if (b && b.status === 'CANCELLED') {
+      await transition(tx, {
+        bookingId: b.id,
+        from: 'CANCELLED',
+        to: 'REFUNDED',
+        version: b.version,
+        reason: 'refund_processed',
+      });
+    }
+    await this.audit.record(
+      {
+        action: 'payment.refunded',
+        entityType: 'payment',
+        entityId: p.id,
+        actorId: locked.initiatedBy,
+        after: {
+          refundId,
+          amountPaise: locked.amountPaise,
+          reason: locked.reason,
+          bookingId: p.bookingId,
+        },
+      },
+      ctx,
+      tx,
+    );
   }
 
   /**
@@ -775,15 +818,34 @@ export class PaymentService {
     return n;
   }
 
-  /** Worker: execute queued refunds and retry failed ones. */
-  async retryRefunds(limit = 50, minAgeMs = 30_000): Promise<number> {
+  /**
+   * Worker: execute queued refunds, retry failed ones, and check on refunds the gateway
+   * accepted but has not finished (in case its webhook never arrives). Those checks are
+   * spaced out: gateway refunds can take days.
+   */
+  async retryRefunds(
+    limit = 50,
+    minAgeMs = 30_000,
+    followUpEveryMs = 10 * 60_000,
+  ): Promise<number> {
+    const now = Date.now();
     const due = await this.db
       .select({ id: refunds.id })
       .from(refunds)
       .where(
-        and(
-          or(eq(refunds.status, 'PENDING'), eq(refunds.status, 'FAILED')),
-          lt(refunds.updatedAt, new Date(Date.now() - minAgeMs)),
+        or(
+          and(
+            or(
+              eq(refunds.status, 'FAILED'),
+              and(eq(refunds.status, 'PENDING'), isNull(refunds.providerRefundId)),
+            ),
+            lt(refunds.updatedAt, new Date(now - minAgeMs)),
+          ),
+          and(
+            eq(refunds.status, 'PENDING'),
+            isNotNull(refunds.providerRefundId),
+            lt(refunds.updatedAt, new Date(now - followUpEveryMs)),
+          ),
         ),
       )
       .limit(limit);
