@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
+import { TERMS_VERSION } from '@mandapambook/shared';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -98,7 +99,7 @@ describe.skipIf(!hasTestDb)('payments', { timeout: 120_000 }, () => {
       .set('Origin', ORIGIN)
       .set('Authorization', `Bearer ${c.accessToken}`);
     if (key) req = req.set('Idempotency-Key', key);
-    return req.send({ bookingId });
+    return req.send({ bookingId, acceptTerms: true });
   }
 
   /**
@@ -171,6 +172,33 @@ describe.skipIf(!hasTestDb)('payments', { timeout: 120_000 }, () => {
         first.body.providerOrderId,
       );
       expect(await paymentOf(bookingId)).toHaveLength(1);
+    });
+
+    it('needs the terms tick and records the acceptance with the booking refund tiers', async () => {
+      const { cust, bookingId } = await heldBooking();
+      for (const body of [{ bookingId }, { bookingId, acceptTerms: false }]) {
+        const refused = await request(h.app)
+          .post('/api/v1/payments/orders')
+          .set('Origin', ORIGIN)
+          .set('Authorization', `Bearer ${cust.c.accessToken}`)
+          .send(body);
+        expect(refused.status).toBe(400);
+      }
+      expect(await paymentOf(bookingId)).toHaveLength(0);
+
+      expect((await order(cust.c, bookingId)).status).toBe(201);
+      const accepted = await h.db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, 'terms.accepted'), eq(auditLogs.entityId, bookingId)));
+      expect(accepted).toHaveLength(1);
+      const [b] = await h.db.select().from(bookings).where(eq(bookings.id, bookingId));
+      expect(accepted[0]!.actorId).toBe(cust.id);
+      expect(accepted[0]!.after).toMatchObject({
+        context: 'payment',
+        termsVersion: TERMS_VERSION,
+        cancellationTiers: b!.priceSnapshot.cancellationTiers,
+      });
     });
 
     it('refuses other customers, reused keys, expired holds and bad keys', async () => {

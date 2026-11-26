@@ -68,6 +68,7 @@ test('resending the verification email brings the customer back to the booking, 
   await page.getByLabel('Full name').fill('Lakshmi Nair');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel(/I agree to the Terms of Use/).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
   await signIn(page, email);

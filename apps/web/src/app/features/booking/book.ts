@@ -24,6 +24,7 @@ import {
 } from '../../core/booking-api.service';
 import { InrPipe } from '../../shared/inr.pipe';
 import { PaymentAdapter } from '../payments/payment-adapter';
+import { BeforeYouPay } from './before-you-pay';
 
 /**
  * Booking flow: choose date, slot, guests and add-ons → see the server's price breakdown →
@@ -31,7 +32,7 @@ import { PaymentAdapter } from '../payments/payment-adapter';
  */
 @Component({
   selector: 'app-book',
-  imports: [FormsModule, RouterLink, InrPipe, PaymentAdapter],
+  imports: [FormsModule, RouterLink, InrPipe, PaymentAdapter, BeforeYouPay],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="mx-auto flex max-w-2xl flex-col gap-5 py-4">
@@ -54,14 +55,17 @@ import { PaymentAdapter } from '../payments/payment-adapter';
               <span class="font-mono text-lg font-bold tabular-nums">{{ countdown() }}</span> or the
               slot is released.
             </p>
-            <app-payment-adapter [bookingId]="hold.id" [amountPaise]="hold.quote.payNowPaise" />
-            <p class="text-xs text-slate-600">
-              By paying you agree to the
-              <a routerLink="/refund-policy" class="text-brand-700 underline"
-                >Refund &amp; Cancellation Policy</a
-              >
-              and the venue's cancellation terms.
-            </p>
+            <app-before-you-pay
+              [tiers]="venue()?.cancellationPolicy?.tiers ?? []"
+              [eventDate]="hold.quote.eventDate"
+              [platformFeePaise]="hold.quote.platformFeePaise"
+              [(agreed)]="termsAgreed"
+            />
+            <app-payment-adapter
+              [bookingId]="hold.id"
+              [amountPaise]="hold.quote.payNowPaise"
+              [agreed]="termsAgreed()"
+            />
           } @else {
             <p>This hold has expired and the slot was released. You can try again.</p>
           }
@@ -300,6 +304,8 @@ export class Book implements OnInit {
   protected readonly held = signal<HoldResponse | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly busy = signal(false);
+  /** The "I agree to the cancellation terms" tick above the Pay button. */
+  protected readonly termsAgreed = signal(false);
   private readonly now = signal(Date.now());
   protected readonly secondsLeft = computed(() => {
     const h = this.held();

@@ -119,6 +119,45 @@ describe('auth forms', () => {
     expect(phone.getAttribute('aria-invalid')).toBe('true');
     expect(el.textContent).toContain('valid 10-digit Indian mobile');
   });
+
+  it('register needs the terms tick before it sends anything', async () => {
+    const fixture = TestBed.createComponent(Register);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    const type = (id: string, value: string) => {
+      const input = el.querySelector<HTMLInputElement>('#' + id)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    };
+    type('fullName', 'Asha Menon');
+    type('email', 'asha@example.com');
+    type('password', 'mandapam-2026');
+    const submit = () => {
+      el.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit'));
+      fixture.detectChanges();
+    };
+    const http = TestBed.inject(HttpTestingController);
+
+    submit();
+    await fixture.whenStable();
+    expect(el.textContent).toContain('Tick the box to accept the terms');
+    expect(el.querySelector('#acceptTerms')!.getAttribute('aria-invalid')).toBe('true');
+    expect(http.match('/api/v1/auth/register')).toHaveLength(0);
+    const links = [...el.querySelectorAll('label a')].map((a) => a.getAttribute('href'));
+    expect(links).toEqual(['/terms', '/refund-policy', '/privacy']);
+
+    el.querySelector<HTMLInputElement>('#acceptTerms')!.click();
+    submit();
+    const req = http.expectOne('/api/v1/auth/register');
+    expect(req.request.body).toEqual({
+      accountType: 'CUSTOMER',
+      fullName: 'Asha Menon',
+      email: 'asha@example.com',
+      password: 'mandapam-2026',
+      acceptTerms: true,
+    });
+    req.flush(null, { status: 202, statusText: 'Accepted' });
+  });
 });
 
 describe('Continue with Google', () => {
@@ -170,6 +209,9 @@ describe('Continue with Google', () => {
 
   it('asks for an owner account when "List my venue" is chosen', async () => {
     const fixture = TestBed.createComponent(Register);
+    fixture.detectChanges();
+    // Google sign-up skips the form, so it only appears once the terms are accepted.
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#acceptTerms')!.click();
     fixture.detectChanges();
     TestBed.inject(HttpTestingController)
       .expectOne('/api/v1/auth/providers')

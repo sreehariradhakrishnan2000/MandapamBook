@@ -52,6 +52,10 @@ test('a customer searches, holds a date, pays in test mode and gets a confirmati
   });
 
   await test.step('customer pays the advance on the test checkout', async () => {
+    await expect(page.getByRole('region', { name: /Before you pay/ })).toContainText(
+      'not refundable',
+    );
+    await page.getByLabel(/I have read and agree to these cancellation terms/).check();
     await page.getByRole('button', { name: /^Pay ₹[\d,]+(\.\d{2})? now$/ }).click();
     await expect(page).toHaveURL(/\/api\/v1\/payments\/mock\/checkout\//);
     await page.getByRole('button', { name: 'Pay success', exact: true }).click();

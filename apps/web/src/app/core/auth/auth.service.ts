@@ -74,6 +74,7 @@ export class AuthService {
     fullName: string;
     phone?: string;
     accountType: 'CUSTOMER' | 'OWNER';
+    acceptTerms: true;
   }): Promise<void> {
     await firstValueFrom(this.http.post(`${API}/auth/register`, input));
   }

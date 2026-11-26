@@ -38,6 +38,8 @@ import { InrPipe } from '../../shared/inr.pipe';
       <button
         type="button"
         class="w-full rounded-full bg-brand-600 px-4 py-2.5 font-semibold text-white disabled:opacity-60"
+        [class.opacity-60]="!agreed()"
+        [attr.aria-disabled]="!agreed() || null"
         [disabled]="busy()"
         (click)="pay()"
       >
@@ -60,12 +62,18 @@ export class PaymentAdapter {
   private readonly zone = inject(NgZone);
   readonly bookingId = input.required<string>();
   readonly amountPaise = input.required<number>();
+  /** The terms tick from the "Before you pay" box; paying is refused until it is set. */
+  readonly agreed = input(true);
 
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   private readonly attemptKey = `pay-${crypto.randomUUID()}`;
 
   protected async pay(): Promise<void> {
+    if (!this.agreed()) {
+      this.error.set('Tick the box above to accept the cancellation terms before paying.');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     try {
