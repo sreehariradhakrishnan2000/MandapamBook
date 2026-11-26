@@ -65,7 +65,8 @@ export type AuditAction =
   | 'payment.webhook_rejected'
   | 'payment.amount_mismatch'
   | 'payment.captured'
-  | 'payment.refunded';
+  | 'payment.refunded'
+  | 'terms.accepted';
 
 export interface AuditEntry {
   action: AuditAction;

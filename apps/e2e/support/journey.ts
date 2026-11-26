@@ -22,6 +22,7 @@ export async function registerAndVerify(
   await page.getByLabel('Full name').fill(opts.fullName);
   await page.getByLabel('Email').fill(opts.email);
   await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByLabel(/I agree to the Terms of Use/).check();
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible();
 

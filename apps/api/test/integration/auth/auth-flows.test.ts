@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { TERMS_VERSION } from '@mandapambook/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { auditLogs, refreshTokens, users } from '../../../src/db/schema/index.js';
 import { hasTestDb } from '../../db-helpers.js';
@@ -30,6 +31,7 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
         email,
         password: PASSWORD,
         fullName: 'Meera Pillai',
+        acceptTerms: true,
         phone: '9876500001',
       });
       expect(reg.status).toBe(202);
@@ -64,6 +66,7 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
         email,
         password: PASSWORD,
         fullName: 'Resend Tester',
+        acceptTerms: true,
         phone: '9876500077',
       });
       const first = tokenFromEmail(h.email, email);
@@ -146,6 +149,7 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
         email,
         password: PASSWORD,
         fullName: 'Owner Signup',
+        acceptTerms: true,
         accountType: 'OWNER',
       });
       const [u] = await h.db.select().from(users).where(eq(users.email, email));
@@ -158,6 +162,7 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
         email: existing.email.toUpperCase(),
         password: PASSWORD,
         fullName: 'Impostor',
+        acceptTerms: true,
       });
       expect(res.status).toBe(202);
       expect(h.email.lastTo(existing.email)?.template).toBe('account_exists');
@@ -170,21 +175,44 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
         email,
         password: 'short',
         fullName: 'Weak',
+        acceptTerms: true,
       });
       expect(short.status).toBe(400);
       const containsEmail = await c.send('post', '/api/v1/auth/register', {
         email,
         password: `${email.split('@')[0]}123456`,
         fullName: 'Weak',
+        acceptTerms: true,
       });
       expect(containsEmail.body.error.code).toBe('WEAK_PASSWORD');
       const admin = await c.send('post', '/api/v1/auth/register', {
         email,
         password: PASSWORD,
         fullName: 'Sneaky',
+        acceptTerms: true,
         accountType: 'SUPER_ADMIN',
       });
       expect(admin.status).toBe(400);
+    });
+
+    it('needs the terms tick and records which terms version was accepted', async () => {
+      const c = new Client(h.app);
+      const email = uniqueEmail('terms');
+      const body = { email, password: PASSWORD, fullName: 'Terms Reader' };
+      expect((await c.send('post', '/api/v1/auth/register', body)).status).toBe(400);
+      expect(
+        (await c.send('post', '/api/v1/auth/register', { ...body, acceptTerms: false })).status,
+      ).toBe(400);
+      expect(await h.db.select().from(users).where(eq(users.email, email))).toHaveLength(0);
+
+      const ok = await c.send('post', '/api/v1/auth/register', { ...body, acceptTerms: true });
+      expect(ok.status).toBe(202);
+      const [u] = await h.db.select().from(users).where(eq(users.email, email));
+      const [entry] = await h.db
+        .select()
+        .from(auditLogs)
+        .where(and(eq(auditLogs.action, 'auth.register'), eq(auditLogs.entityId, u!.id)));
+      expect(entry?.after).toMatchObject({ termsAccepted: TERMS_VERSION });
     });
   });
 
@@ -465,6 +493,7 @@ describe.skipIf(!hasTestDb)('auth flows', () => {
           email,
           password: PASSWORD,
           fullName: 'Mail Fail',
+          acceptTerms: true,
         });
         expect(reg.status).toBe(202);
         expect(await h.db.select().from(users).where(eq(users.email, email))).toHaveLength(1);

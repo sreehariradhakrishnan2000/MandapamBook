@@ -13,6 +13,7 @@ import {
   WebhookSignatureError,
 } from './provider.js';
 import { withoutPersonalData } from './redact.js';
+import { TERMS_VERSION } from '@mandapambook/shared';
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 type PaymentRow = typeof payments.$inferSelect;
@@ -114,6 +115,25 @@ export class PaymentService {
         })
         .returning();
       if (!payment) throw new Error('payment insert returned nothing');
+      // Evidence for disputes: who agreed, to which terms version, and the exact refund
+      // tiers this booking carries (the snapshot taken when the date was held).
+      await this.audit.record(
+        {
+          action: 'terms.accepted',
+          entityType: 'booking',
+          entityId: booking.id,
+          actorId: customerId,
+          after: {
+            context: 'payment',
+            termsVersion: TERMS_VERSION,
+            cancellationTiers: booking.priceSnapshot.cancellationTiers,
+            platformFeePaise: booking.platformFeePaise,
+            advancePaise: booking.advancePaise,
+          },
+        },
+        ctx,
+        tx,
+      );
       if (booking.status === 'HELD') {
         await transition(tx, {
           bookingId: booking.id,

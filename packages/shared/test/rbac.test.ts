@@ -47,6 +47,7 @@ describe('auth schemas', () => {
       password: 'correct horse battery',
       fullName: 'Priya Nair',
       phone: '98765 43210',
+      acceptTerms: true,
     });
     expect(parsed).toMatchObject({
       email: 'priya@example.test',
@@ -56,13 +57,18 @@ describe('auth schemas', () => {
   });
 
   it('rejects self-assigned privileged roles and unknown fields', () => {
-    const base = { email: 'a@example.test', password: 'long enough pw', fullName: 'Asha' };
+    const base = {
+      email: 'a@example.test',
+      password: 'long enough pw',
+      fullName: 'Asha',
+      acceptTerms: true,
+    };
     expect(registerSchema.safeParse({ ...base, accountType: 'ADMIN' }).success).toBe(false);
     expect(registerSchema.safeParse({ ...base, role: 'SUPER_ADMIN' }).success).toBe(false);
   });
 
   it('enforces password length', () => {
-    const base = { email: 'a@example.test', fullName: 'Asha' };
+    const base = { email: 'a@example.test', fullName: 'Asha', acceptTerms: true };
     expect(registerSchema.safeParse({ ...base, password: 'short' }).success).toBe(false);
     expect(registerSchema.safeParse({ ...base, password: 'x'.repeat(129) }).success).toBe(false);
   });

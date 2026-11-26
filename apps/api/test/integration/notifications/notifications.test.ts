@@ -60,7 +60,7 @@ describe.skipIf(!hasTestDb)('notifications and invoices', { timeout: 120_000 }, 
       .post('/api/v1/payments/orders')
       .set('Origin', 'http://localhost:4200')
       .set('Authorization', `Bearer ${cust.c.accessToken}`)
-      .send({ bookingId: hold.body.id });
+      .send({ bookingId: hold.body.id, acceptTerms: true });
     await request(h.app)
       .post(`${o.body.checkout.url}/complete`)
       .type('form')

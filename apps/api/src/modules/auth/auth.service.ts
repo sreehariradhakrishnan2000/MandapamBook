@@ -3,6 +3,7 @@ import {
   type AuthSession,
   type AuthUser,
   permissionsFor,
+  TERMS_VERSION,
   type registerSchema,
 } from '@mandapambook/shared';
 import type { z } from 'zod';
@@ -115,7 +116,7 @@ export class AuthService {
             entityId: user.id,
             actorId: user.id,
             actorRole: user.role,
-            after: { role: user.role },
+            after: { role: user.role, termsAccepted: TERMS_VERSION },
           },
           ctx,
           tx,

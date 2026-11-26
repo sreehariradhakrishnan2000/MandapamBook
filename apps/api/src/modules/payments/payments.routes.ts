@@ -1,4 +1,5 @@
 import { type RequestHandler, Router } from 'express';
+import { acceptTermsSchema } from '@mandapambook/shared';
 import { z } from 'zod';
 import { type RateLimiters, byIp } from '../../http/middleware/rate-limit.js';
 import { auditContext } from '../audit/audit.service.js';
@@ -6,7 +7,8 @@ import { parseId } from '../owners/scoped.js';
 import { currentUser, requirePermission } from '../rbac/authenticate.js';
 import type { PaymentService } from './payment.service.js';
 
-const orderSchema = z.strictObject({ bookingId: z.uuid() });
+/** Paying needs the "I agree to the Terms and the cancellation terms" tick. */
+const orderSchema = z.strictObject({ bookingId: z.uuid(), acceptTerms: acceptTermsSchema });
 const verifySchema = z.strictObject({
   providerOrderId: z.string().min(1).max(100),
   providerPaymentId: z.string().min(1).max(100),

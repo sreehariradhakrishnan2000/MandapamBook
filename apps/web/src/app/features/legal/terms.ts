@@ -15,7 +15,10 @@ import { LegalShell } from './legal-shell';
         kalyana mandapams, convention halls and auditoriums for weddings and other events. It is
         operated by {{ L.operatorDescription }} ("we", "us"). These Terms of Use apply to everyone
         who uses the website: visitors, customers who book, and venue owners who list their halls.
-        By creating an account or making a booking you agree to them.
+        You accept them by ticking the "I agree" box when you create an account, and again, together
+        with the venue's cancellation terms, before you pay for a booking. We keep a record of each
+        acceptance: the date and time, the version of these terms, and for a booking the
+        cancellation terms shown to you.
       </p>
       <p>
         The venues on MandapamBook are owned and run by independent venue owners. We provide the
@@ -76,8 +79,26 @@ import { LegalShell } from './legal-shell';
       <p>
         Cancellations and refunds follow our
         <a routerLink="/refund-policy">Refund &amp; Cancellation Policy</a> and the cancellation
-        policy shown on each venue's page, which you can read before you book.
+        policy of the venue you book. Both are shown on the venue's page and summarised again right
+        before you pay. In short:
       </p>
+      <ul>
+        <li>
+          If you cancel, the refund depends on how many days are left before the event, following
+          that venue's cancellation tiers, and is calculated on the advance you paid online. Close
+          to the event there may be no refund at all.
+        </li>
+        <li>The platform fee is not refunded when you cancel.</li>
+        <li>
+          If the venue declines your request, does not reply within 24 hours, or cannot host a
+          confirmed booking, you get back everything you paid online.
+        </li>
+        <li>A booking cannot be moved to another date; cancel it and book again.</li>
+        <li>
+          Money you pay directly to the venue (the balance, extra services) is refunded by the venue
+          under its own terms.
+        </li>
+      </ul>
 
       <h2>6. Reviews</h2>
       <p>

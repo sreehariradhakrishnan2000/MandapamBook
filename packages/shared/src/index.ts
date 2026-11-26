@@ -8,3 +8,4 @@ export * from './booking.js';
 export * from './review.js';
 export * from './geo.js';
 export * from './patch.js';
+export * from './legal.js';

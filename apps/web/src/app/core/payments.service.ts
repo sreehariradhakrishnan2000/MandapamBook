@@ -46,7 +46,8 @@ export class PaymentsService {
     return firstValueFrom(
       this.http.post<PaymentOrder>(
         `${API}/payments/orders`,
-        { bookingId },
+        // The pay step only calls this once the terms tick is set.
+        { bookingId, acceptTerms: true },
         { headers: { 'Idempotency-Key': idempotencyKey } },
       ),
     );

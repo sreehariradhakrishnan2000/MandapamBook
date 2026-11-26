@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { acceptTermsSchema } from './legal.js';
 import { indianMobileSchema } from './phone.js';
 import { ROLES } from './rbac.js';
 
@@ -21,6 +22,8 @@ export const registerSchema = z.strictObject({
   fullName: fullNameSchema,
   phone: indianMobileSchema.optional(),
   accountType: z.enum(['CUSTOMER', 'OWNER']).default('CUSTOMER'),
+  /** The sign-up form's required "I agree to the Terms" tick. */
+  acceptTerms: acceptTermsSchema,
 });
 export type RegisterInput = z.input<typeof registerSchema>;
 
