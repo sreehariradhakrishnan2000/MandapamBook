@@ -194,6 +194,21 @@ export class RazorpayProvider implements PaymentProvider {
     };
   }
 
+  async getRefund(input: {
+    providerPaymentId: string;
+    providerRefundId: string;
+  }): Promise<ProviderRefund> {
+    const refund = await this.call<{ id: string; status: string }>(
+      'GET',
+      `/v1/payments/${encodeURIComponent(input.providerPaymentId)}/refunds/${encodeURIComponent(input.providerRefundId)}`,
+    );
+    return {
+      providerRefundId: refund.id,
+      status: REFUND_STATUS[refund.status] ?? 'PENDING',
+      raw: refund,
+    };
+  }
+
   async getStatus(input: { providerOrderId: string }): Promise<ProviderPaymentStatus> {
     let payments: { items?: { status?: string }[] };
     try {
