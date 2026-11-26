@@ -11,6 +11,14 @@ map $http_cf_connecting_ip $mb_client_ip {
   ''      $remote_addr;
 }
 
+# Link-preview bots (WhatsApp, Facebook, X, LinkedIn, Telegram…) do not run JavaScript, so
+# they get a small page from the API with the shared page's title, description and photo.
+# Search engines are not listed: they render the app like a browser.
+map $http_user_agent $link_preview_bot {
+  default 0;
+  "~*(facebookexternalhit|facebot|whatsapp|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|pinterest|skypeuripreview|redditbot|embedly|applebot)" 1;
+}
+
 server {
   listen 8080;
   server_name _;
@@ -49,7 +57,18 @@ server {
     try_files $uri =404;
   }
 
+  # Built by the API: it knows the site address and the live venues.
+  location = /robots.txt {
+    rewrite ^ /api/v1/seo/robots.txt last;
+  }
+  location = /sitemap.xml {
+    rewrite ^ /api/v1/seo/sitemap.xml last;
+  }
+
   location / {
+    if ($link_preview_bot) {
+      rewrite ^ /api/v1/seo/share?path=$uri? last;
+    }
     add_header Cache-Control "no-cache";
     include /etc/nginx/conf.d/security-headers.inc;
     try_files $uri $uri/ /index.html;

@@ -47,6 +47,7 @@ import { paymentsRouter } from './modules/payments/payments.routes.js';
 import type { PaymentProvider } from './modules/payments/provider.js';
 import { SettingsService } from './modules/settings/settings.service.js';
 import { SystemHealth } from './modules/admin/system-health.js';
+import { seoRouter } from './modules/catalog/seo.routes.js';
 import {
   bookingsPauseGate,
   createBookingsPauseService,
@@ -179,6 +180,7 @@ export function buildContainer(deps: ContainerDeps): Container {
   const paymentService = new PaymentService(db, provider, settings, audit, deps.logger);
   const invoices = new InvoiceService(db);
   api.use(catalogRouter({ db, storage: deps.storage }));
+  api.use(seoRouter({ db, storage: deps.storage, appBaseUrl: env.APP_BASE_URL }));
   api.use(
     bookingsRouter({
       db,

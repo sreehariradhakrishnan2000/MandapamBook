@@ -8,6 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { Meta, Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   googleMapsDirectionsUrl,
@@ -364,6 +365,8 @@ const POLICY_LABELS: Record<string, string> = {
 })
 export class Venue {
   private readonly api = inject(BookingApi);
+  private readonly title = inject(Title);
+  private readonly meta = inject(Meta);
   private readonly insights = inject(InsightsApi);
   protected readonly reviews = signal<VenueReviews | null>(null);
   readonly slug = input.required<string>();
@@ -424,6 +427,15 @@ export class Venue {
     try {
       const v = await this.api.venue(slug);
       this.venue.set(v);
+      // What search results and browser tabs show for this venue.
+      this.title.setTitle(`${v.name}, ${v.city} · MandapamBook`);
+      const summary = (v.description ?? '').replace(/\s+/g, ' ').trim();
+      this.meta.updateTag({
+        name: 'description',
+        content: summary
+          ? summary.slice(0, 160)
+          : `Wedding and event venue in ${v.city}. Check dates, prices and book online on MandapamBook.`,
+      });
       void this.insights.venueReviews(v.id).then(
         (r) => this.reviews.set(r),
         () => undefined,
