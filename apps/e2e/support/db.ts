@@ -33,3 +33,24 @@ export async function completeBooking(refCode: string): Promise<void> {
     await client.end();
   }
 }
+
+/**
+ * Turns a site switch (maintenance, bookings pause) on or off, as a super admin would in
+ * Admin → Settings. The API caches switches for 5 seconds, so callers wait for the change.
+ */
+export async function setSiteSwitch(
+  key: 'maintenance' | 'bookings_pause',
+  value: Record<string, unknown>,
+): Promise<void> {
+  const client = new pg.Client({ connectionString: E2E_DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(
+      `INSERT INTO platform_settings (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [key, JSON.stringify(value)],
+    );
+  } finally {
+    await client.end();
+  }
+}
