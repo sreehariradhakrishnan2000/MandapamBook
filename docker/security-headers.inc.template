@@ -7,3 +7,5 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Permissions-Policy "camera=(), microphone=(), geolocation=(self), payment=(self)" always;
 add_header Cross-Origin-Opener-Policy "same-origin" always;
 add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' ${STORAGE_ORIGIN} https://api.razorpay.com https://lumberjack.razorpay.com https://*.sentry.io; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+# ROBOTS_TAG="noindex, nofollow" keeps the site out of search engines; empty sends nothing.
+add_header X-Robots-Tag "${ROBOTS_TAG}" always;

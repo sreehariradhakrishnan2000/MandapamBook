@@ -85,6 +85,7 @@ export type AuthEnv = Pick<
       | 'SENTRY_DSN'
       | 'SENTRY_WEB_DSN'
       | 'APP_ENV'
+      | 'SEO_INDEXING'
     >
   >;
 
@@ -180,7 +181,14 @@ export function buildContainer(deps: ContainerDeps): Container {
   const paymentService = new PaymentService(db, provider, settings, audit, deps.logger);
   const invoices = new InvoiceService(db);
   api.use(catalogRouter({ db, storage: deps.storage }));
-  api.use(seoRouter({ db, storage: deps.storage, appBaseUrl: env.APP_BASE_URL }));
+  api.use(
+    seoRouter({
+      db,
+      storage: deps.storage,
+      appBaseUrl: env.APP_BASE_URL,
+      indexing: env.SEO_INDEXING ?? true,
+    }),
+  );
   api.use(
     bookingsRouter({
       db,

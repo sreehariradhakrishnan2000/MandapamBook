@@ -170,6 +170,40 @@ live branch is untouched.
   CONFIRMED in both. The branch was ready in about 20 seconds.
 - **Next:** repeat every quarter and after any change to the database plan.
 
+## Production in test-payments mode
+
+Production runs on the real domain with **Razorpay test keys only**, so everything can be
+tested end to end without real money:
+
+| Setting (API)      | Value                                                                        |
+| ------------------ | ---------------------------------------------------------------------------- |
+| `PAYMENTS_MODE`    | `test`. The API refuses to start if any setting holds an `rzp_live_` key.    |
+| `PAYMENT_PROVIDER` | `razorpay`, with `rzp_test_` keys and a **separate** test webhook and secret |
+| `SEO_INDEXING`     | `false`, until real venues are listed                                        |
+| Web `ROBOTS_TAG`   | `noindex, nofollow`                                                          |
+
+The site shows the TEST MODE banner, and "Test payments only – no real money is charged"
+next to Pay.
+
+**Going live later:**
+
+1. Complete Razorpay KYC.
+2. Create a live webhook with a **new** secret.
+3. Set `PAYMENTS_MODE=live` and the live keys.
+4. Set `SEO_INDEXING=true` and an empty `ROBOTS_TAG` once real venues replace the test ones.
+
+### Rollback plan for the production launch
+
+| What went wrong                | Undo                                                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bad release                    | Redeploy the previous image (Rolling back, below), or in Render deploy the previous image by URL                                                                                                      |
+| Bad migration or data          | Neon: restore the production branch to the restore point taken just before the migration (Backups and restore drill, above)                                                                           |
+| Domain or DNS                  | In Cloudflare, point `@` and `www` back. If the nameserver move itself is the problem, switch the nameservers in GoDaddy back to `ns07`/`ns08.domaincontrol.com`; the old GoDaddy records stay there. |
+| Email stops after the DNS move | Re-check the MX (ImprovMX), `brevo*._domainkey` CNAMEs, `brevo-code` TXT, SPF and `_dmarc` in Cloudflare, all **DNS only** (grey cloud)                                                               |
+| Anything during testing        | Turn on maintenance mode in Admin → Settings                                                                                                                                                          |
+
+No real money can move in this mode, so a rollback never involves refunds.
+
 ## Rolling back
 
 Images are immutable and every deploy is a commit SHA.

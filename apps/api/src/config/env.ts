@@ -170,6 +170,13 @@ export const envSchema = z.object({
   /** Sentry DSN for browser errors (a separate Sentry project). Blank = off. Public by design. */
   SENTRY_WEB_DSN: blankIsUnset(z.url()),
 
+  /**
+   * Whether search engines may index the site. Off: robots.txt disallows everything, every
+   * page carries a noindex header, and the sitemap is empty (e.g. while only test venues
+   * are listed).
+   */
+  SEO_INDEXING: booleanString.default(true),
+
   // --- Data protection ---
   /** AES-256-GCM keys for PAN and bank details ("kid:base64url", exactly 32 bytes each). */
   FIELD_ENCRYPTION_KEYS: keyRing,
@@ -184,6 +191,13 @@ export const envSchema = z.object({
   S3_FORCE_PATH_STYLE: booleanString.default(true),
 
   // --- Payments ---
+  /**
+   * test = no real money: only gateway test keys are accepted, and the API refuses to start
+   * if any setting holds a live key (rzp_live_…). live = real payments, accepted only on
+   * production (APP_ENV unset) with live keys. Defaults to test, so going live is always a
+   * deliberate, explicit change.
+   */
+  PAYMENTS_MODE: z.enum(['test', 'live']).default('test'),
   /** Which gateway to use. Switching gateways is only this change plus its credentials. */
   PAYMENT_PROVIDER: z.enum(['mock', 'razorpay']).default('mock'),
   /** Mock gateway: signs checkout results (like a gateway key secret). */
@@ -235,13 +249,27 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       problems.push(`EMAIL_PROVIDER: ${env.EMAIL_PROVIDER} is not allowed in production`);
     if (env.STORAGE_PROVIDER === 'memory')
       problems.push('STORAGE_PROVIDER: memory is not allowed in production');
-    // Staging may take test payments; real production may not.
+    // Real production uses a real gateway (in test or live mode), never the built-in mock.
     if (!staging && env.PAYMENT_PROVIDER === 'mock')
       problems.push('PAYMENT_PROVIDER: the mock gateway is not allowed in production');
-    if (!staging && env.RAZORPAY_KEY_ID?.startsWith('rzp_test_'))
-      problems.push('RAZORPAY_KEY_ID: test keys are not allowed in production');
-    if (staging && env.RAZORPAY_KEY_ID?.startsWith('rzp_live_'))
-      problems.push('RAZORPAY_KEY_ID: live keys are not allowed in staging');
+    if (staging && env.PAYMENTS_MODE === 'live')
+      problems.push('PAYMENTS_MODE: live payments are not allowed in staging');
+  }
+  if (env.PAYMENTS_MODE === 'live') {
+    if (env.NODE_ENV !== 'production')
+      problems.push('PAYMENTS_MODE: live payments need NODE_ENV=production');
+    if (env.PAYMENT_PROVIDER === 'razorpay' && !env.RAZORPAY_KEY_ID?.startsWith('rzp_live_'))
+      problems.push('RAZORPAY_KEY_ID: PAYMENTS_MODE=live needs a live key (rzp_live_…)');
+  } else {
+    // Test mode: no live key anywhere, not only in RAZORPAY_KEY_ID, so a live key pasted
+    // into the wrong setting cannot take real money either.
+    const live = Object.entries(source)
+      .filter(([, value]) => typeof value === 'string' && value.includes('rzp_live_'))
+      .map(([key]) => key);
+    if (live.length)
+      problems.push(
+        `PAYMENTS_MODE: test mode refuses live Razorpay keys (found in ${live.join(', ')}); remove them or set PAYMENTS_MODE=live`,
+      );
   }
   if (
     env.PAYMENT_PROVIDER === 'mock' &&
