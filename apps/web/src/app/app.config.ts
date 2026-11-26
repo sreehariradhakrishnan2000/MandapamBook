@@ -43,11 +43,15 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: AppErrorHandler },
     // The wake interceptor is outermost, so a retried request goes through auth again.
     provideHttpClient(withFetch(), withInterceptors([serverWakeInterceptor, authInterceptor])),
-    // Restore the session from the refresh cookie before the first navigation, but never
-    // hold the page blank for long: if the API is still waking, the app shows its
-    // "starting up" banner while signed-in pages wait in their guards (whenRestored).
-    provideAppInitializer(() =>
-      Promise.race([inject(AuthService).restore(), new Promise((r) => setTimeout(r, 4_000))]),
-    ),
+    // Restore the session from the refresh cookie. Only someone signed in last time waits
+    // for it before the first paint (so the header shows their account at once), and never
+    // longer than 4 s. Everyone else gets the page immediately while it runs in the
+    // background; signed-in pages wait in their guards (whenRestored) either way.
+    provideAppInitializer(() => {
+      const auth = inject(AuthService);
+      const restoring = auth.restore();
+      if (!auth.likelySignedIn) return;
+      return Promise.race([restoring, new Promise((r) => setTimeout(r, 4_000))]);
+    }),
   ],
 };

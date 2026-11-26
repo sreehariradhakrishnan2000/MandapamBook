@@ -65,7 +65,7 @@ export class AuthService {
     const session = await firstValueFrom(
       this.http.post<AuthSession>(`${API}/auth/login`, { email, password, rememberMe }),
     );
-    this.session.set(session);
+    this.setSession(session);
   }
 
   async register(input: {
@@ -95,21 +95,34 @@ export class AuthService {
       const session = await firstValueFrom(
         this.http.post<AuthSession>(`${API}/auth/refresh`, null, { headers }),
       );
-      this.session.set(session);
+      this.setSession(session);
       return true;
     } catch (err) {
       if (err instanceof HttpErrorResponse && err.status === 403) this.csrfToken = null;
-      this.session.set(null);
+      this.setSession(null);
       return false;
     }
   }
 
   private restored: Promise<boolean> | null = null;
 
-  /** Called at startup: restores the session if a valid refresh cookie exists. */
+  /**
+   * Called at startup: restores the session if a valid refresh cookie exists. A visitor
+   * who was signed out last time is not checked at all (no wasted round trips, no 401).
+   */
   restore(): Promise<boolean> {
-    this.restored ??= this.refresh();
+    this.restored ??= readSignedInHint() === 'no' ? Promise.resolve(false) : this.refresh();
     return this.restored;
+  }
+
+  /** Signed in on this browser last time, so the startup check is worth waiting for. */
+  get likelySignedIn(): boolean {
+    return readSignedInHint() === 'yes';
+  }
+
+  private setSession(session: AuthSession | null): void {
+    this.session.set(session);
+    writeSignedInHint(session ? 'yes' : 'no');
   }
 
   /**
@@ -125,7 +138,7 @@ export class AuthService {
       const headers = { 'X-CSRF-Token': await this.csrf() };
       await firstValueFrom(this.http.post(`${API}/auth/logout`, null, { headers }));
     } finally {
-      this.session.set(null);
+      this.setSession(null);
       await this.router.navigateByUrl('/');
     }
   }
@@ -134,7 +147,7 @@ export class AuthService {
     try {
       await firstValueFrom(this.http.post(`${API}/auth/logout-all`, null));
     } finally {
-      this.session.set(null);
+      this.setSession(null);
       await this.router.navigateByUrl('/login');
     }
   }
@@ -178,7 +191,7 @@ export class AuthService {
 
   /** Clears local state when the server reports the session is gone. */
   clear(): void {
-    this.session.set(null);
+    this.setSession(null);
   }
 
   private async csrf(): Promise<string> {
@@ -219,4 +232,27 @@ export function tooManyAttempts(retryAfterSeconds: number): string {
   }
   const m = Math.ceil(retryAfterSeconds / 60);
   return `Too many attempts. Please wait ${m} minute${m === 1 ? '' : 's'} and try again.`;
+}
+
+/**
+ * Whether this browser was signed in last time. Only a hint for how to start up quickly:
+ * the session itself lives in an httpOnly cookie and is always checked by the server.
+ */
+const SIGNED_IN_HINT = 'mb:signed-in';
+
+function readSignedInHint(): 'yes' | 'no' | null {
+  try {
+    const v = localStorage.getItem(SIGNED_IN_HINT);
+    return v === 'yes' || v === 'no' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSignedInHint(value: 'yes' | 'no'): void {
+  try {
+    localStorage.setItem(SIGNED_IN_HINT, value);
+  } catch {
+    // Private mode or blocked storage: startup simply checks the session every time.
+  }
 }
