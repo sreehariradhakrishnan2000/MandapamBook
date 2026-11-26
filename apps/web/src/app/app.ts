@@ -12,10 +12,11 @@ import { PaymentsService } from './core/payments.service';
 import { Connectivity } from './core/connectivity';
 import { ServerStatus } from './core/server-status';
 import { MaintenancePage } from './shared/maintenance-page';
+import { RefundNotice } from './shared/refund-notice';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, MaintenancePage],
+  imports: [RouterOutlet, RouterLink, MaintenancePage, RefundNotice],
   templateUrl: './app.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown.escape)': 'menuOpen.set(false)' },
