@@ -53,10 +53,6 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
               venue</label
             >
           </fieldset>
-          <app-google-sign-in
-            [intent]="form.controls.accountType.value === 'OWNER' ? 'owner' : 'customer'"
-            [returnUrl]="form.controls.accountType.value === 'OWNER' ? '/owner' : '/'"
-          />
           <app-form-field
             for="fullName"
             label="Full name"
@@ -119,14 +115,46 @@ export function indianMobile(control: AbstractControl<string>): ValidationErrors
               <app-password-toggle [input]="pw" />
             </div>
           </app-form-field>
-          <p class="text-xs text-slate-600">
-            By creating an account you agree to our
-            <a routerLink="/terms" class="text-brand-700 underline">Terms of Use</a> and
-            <a routerLink="/privacy" class="text-brand-700 underline">Privacy Policy</a>.
-          </p>
+          <div class="flex flex-col gap-1">
+            <label class="flex items-start gap-2 text-sm text-slate-700">
+              <input
+                id="acceptTerms"
+                type="checkbox"
+                formControlName="acceptTerms"
+                class="mt-0.5 size-4 shrink-0 accent-brand-600"
+                [attr.aria-invalid]="show('acceptTerms')"
+                aria-describedby="acceptTerms-error"
+              />
+              <span
+                >I agree to the
+                <a routerLink="/terms" target="_blank" class="text-brand-700 underline"
+                  >Terms of Use</a
+                >,
+                <a routerLink="/refund-policy" target="_blank" class="text-brand-700 underline"
+                  >Refund &amp; Cancellation Policy</a
+                >
+                and
+                <a routerLink="/privacy" target="_blank" class="text-brand-700 underline"
+                  >Privacy Policy</a
+                >.</span
+              >
+            </label>
+            @if (show('acceptTerms')) {
+              <p id="acceptTerms-error" class="text-sm text-red-700" role="alert">
+                Tick the box to accept the terms and create your account
+              </p>
+            }
+          </div>
           <button type="submit" [class]="buttonClass" [disabled]="busy()">
             {{ busy() ? 'Creating account…' : 'Create account' }}
           </button>
+          <!-- Google sign-up skips this form, so it appears only once the terms are accepted. -->
+          @if (form.controls.acceptTerms.value) {
+            <app-google-sign-in
+              [intent]="form.controls.accountType.value === 'OWNER' ? 'owner' : 'customer'"
+              [returnUrl]="form.controls.accountType.value === 'OWNER' ? '/owner' : '/'"
+            />
+          }
         </form>
         <p class="mt-6 text-sm">
           Already registered? <a routerLink="/login" class="text-brand-700 underline">Sign in</a>
@@ -149,6 +177,7 @@ export class Register {
     email: ['', [Validators.required, Validators.email]],
     phone: ['', indianMobile],
     password: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(128)]],
+    acceptTerms: [false, Validators.requiredTrue],
   });
 
   protected show(name: keyof typeof this.form.controls): boolean {
@@ -162,8 +191,10 @@ export class Register {
     this.busy.set(true);
     this.error.set(null);
     try {
-      const { phone, ...rest } = this.form.getRawValue();
-      await this.auth.register(phone ? { ...rest, phone } : rest);
+      // acceptTerms is true here: the form is invalid without the tick.
+      const { phone, fullName, email, password, accountType } = this.form.getRawValue();
+      const input = { fullName, email, password, accountType, acceptTerms: true as const };
+      await this.auth.register(phone ? { ...input, phone } : input);
       this.done.set(true);
     } catch (err) {
       this.error.set(errorMessage(err));

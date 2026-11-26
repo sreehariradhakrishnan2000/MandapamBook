@@ -70,6 +70,7 @@ describe('payments in the web app', () => {
     const first = await pending('/api/v1/payments/orders');
     const key = first.request.headers.get('Idempotency-Key');
     expect(key).toMatch(/^pay-[0-9a-f-]{36}$/);
+    expect(first.request.body).toEqual({ bookingId: 'b1', acceptTerms: true });
     first.flush(
       { error: { code: 'PAYMENT_PROVIDER_ERROR', message: 'Try again' } },
       { status: 502, statusText: 'Bad Gateway' },
@@ -91,6 +92,30 @@ describe('payments in the web app', () => {
     await vi.waitFor(() =>
       expect(assign).toHaveBeenCalledWith('/api/v1/payments/mock/checkout/mock_order_1'),
     );
+  });
+
+  it('will not start a payment until the cancellation terms are accepted', async () => {
+    setup({ assign: vi.fn() });
+    const fixture = TestBed.createComponent(PaymentAdapter);
+    fixture.componentRef.setInput('bookingId', 'b1');
+    fixture.componentRef.setInput('amountPaise', 100);
+    fixture.componentRef.setInput('agreed', false);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const button = el.querySelector('button')!;
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+
+    button.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[role=alert]')?.textContent).toContain(
+      'accept the cancellation terms',
+    );
+    expect(http.match('/api/v1/payments/orders')).toHaveLength(0);
+
+    fixture.componentRef.setInput('agreed', true);
+    fixture.detectChanges();
+    button.click();
+    expect((await pending('/api/v1/payments/orders')).request.body.acceptTerms).toBe(true);
   });
 
   it('opens Razorpay checkout and hands its signed result to the return page', async () => {

@@ -22,5 +22,5 @@ export const LEGAL = {
   },
   /** Courts with jurisdiction over disputes. */
   jurisdiction: 'Kollam, Kerala',
-  lastUpdated: '26 November 2026',
+  lastUpdated: '27 November 2026',
 } as const;
