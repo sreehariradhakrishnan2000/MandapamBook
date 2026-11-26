@@ -57,7 +57,10 @@ import { InrPipe } from '../../shared/inr.pipe';
                 <span class="block text-slate-500">Customer details appear once paid</span>
               }
             </span>
-            <span class="flex flex-col items-end gap-1">
+            <!-- Phones: a full-width row under the details. Wider: a column on the right. -->
+            <span
+              class="flex w-full flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 sm:w-auto sm:flex-col sm:items-end sm:gap-1 sm:border-0 sm:pt-0"
+            >
               <span class="font-semibold">{{ statusLabels[b.status] }}</span>
               <span class="tabular-nums text-slate-600">{{ b.totalPaise | inr }}</span>
               @if (canApprove && b.status === 'AWAITING_OWNER') {
