@@ -47,6 +47,13 @@ const C = {
 };
 
 const SERIF = "'Fraunces', Georgia, 'Times New Roman', serif";
+
+/**
+ * Invisible characters after the preview line. Inbox lists fill the rest of the preview
+ * with the email's first visible text ("MandapamBook Reset your password Hi…"); this
+ * filler takes up that space so only our preview sentence shows.
+ */
+const PREVIEW_FILLER = '&#847;&zwnj;&nbsp;'.repeat(90);
 const SANS =
   "'Inter', 'Noto Sans Malayalam', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
@@ -135,7 +142,7 @@ function renderHtml(c: EmailContent, appBaseUrl: string): string {
 <title>${e(c.subject)}</title>
 </head>
 <body style="margin:0;padding:0;background:${C.page};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.page};">${e(preheader)}</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.page};">${e(preheader)}${PREVIEW_FILLER}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.page};">
   <tr><td align="center" style="padding:32px 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
