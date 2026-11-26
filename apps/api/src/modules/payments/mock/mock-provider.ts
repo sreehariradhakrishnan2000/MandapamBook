@@ -156,12 +156,37 @@ export class MockPaymentProvider implements PaymentProvider {
     };
   }
 
+  /**
+   * Like Razorpay's "normal" speed: when true, refunds start PENDING and finish only when
+   * settleRefund() is called (tests) — by webhook or by the follow-up getRefund().
+   */
+  delayRefunds = false;
+  private readonly refundStates = new Map<string, ProviderRefund['status']>();
+  /** How many refunds were started at the "gateway" (to prove none is started twice). */
+  refundsStarted = 0;
+
   async refund(input: RefundInput): Promise<ProviderRefund> {
+    const providerRefundId = `mock_rfnd_${randomToken(10)}`;
+    const status = this.delayRefunds ? 'PENDING' : 'PROCESSED';
+    this.refundsStarted++;
+    this.refundStates.set(providerRefundId, status);
+    return { providerRefundId, status, raw: { ...input } };
+  }
+
+  async getRefund(input: {
+    providerPaymentId: string;
+    providerRefundId: string;
+  }): Promise<ProviderRefund> {
     return {
-      providerRefundId: `mock_rfnd_${randomToken(10)}`,
-      status: 'PROCESSED',
+      providerRefundId: input.providerRefundId,
+      status: this.refundStates.get(input.providerRefundId) ?? 'FAILED',
       raw: { ...input },
     };
+  }
+
+  /** Test helper: the gateway finishes a delayed refund. */
+  settleRefund(providerRefundId: string, status: 'PROCESSED' | 'FAILED' = 'PROCESSED'): void {
+    this.refundStates.set(providerRefundId, status);
   }
 
   async getStatus({

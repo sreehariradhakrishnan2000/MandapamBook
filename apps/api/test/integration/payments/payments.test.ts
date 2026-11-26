@@ -455,6 +455,92 @@ describe.skipIf(!hasTestDb)('payments', { timeout: 120_000 }, () => {
       });
     });
 
+    describe('when the gateway finishes refunds later (Razorpay normal speed)', () => {
+      beforeAll(() => {
+        h.gateway.delayRefunds = true;
+      });
+      afterAll(() => {
+        h.gateway.delayRefunds = false;
+      });
+
+      async function cancelWithPendingRefund() {
+        const { cust, bookingId } = await paidBooking(instantHall);
+        const res = await cust.c.send('post', `/api/v1/bookings/${bookingId}/cancel`, {});
+        expect(res.body).toMatchObject({ status: 'CANCELLED', refundStatus: 'PENDING' });
+        const [refund] = await h.db
+          .select({ refund: refunds })
+          .from(refunds)
+          .innerJoin(payments, eq(payments.id, refunds.paymentId))
+          .where(eq(payments.bookingId, bookingId));
+        return {
+          cust,
+          bookingId,
+          refund: refund!.refund,
+          refundPaise: res.body.refund.refundPaise,
+        };
+      }
+
+      it('shows the refund as processing, follows it up without starting a second refund', async () => {
+        const { cust, bookingId, refund, refundPaise } = await cancelWithPendingRefund();
+        const detail = await cust.c.send('get', `/api/v1/bookings/${bookingId}`);
+        expect(detail.body.refund).toMatchObject({
+          amountPaise: refundPaise,
+          status: 'PROCESSING',
+          completedAt: null,
+          reference: refund.providerRefundId,
+        });
+        const updates = await cust.c.send('get', '/api/v1/bookings/refund-updates');
+        expect(updates.body.items).toContainEqual(
+          expect.objectContaining({
+            bookingId,
+            refund: expect.objectContaining({ status: 'PROCESSING' }),
+          }),
+        );
+
+        const started = h.gateway.refundsStarted;
+        await h.container.payments.retryRefunds(50, 0, 0);
+        expect(h.gateway.refundsStarted).toBe(started); // checked, not requested again
+        expect(await bookingStatus(bookingId)).toBe('CANCELLED');
+
+        // The gateway finishes it; the next follow-up completes everything.
+        h.gateway.settleRefund(refund.providerRefundId!);
+        await h.container.payments.retryRefunds(50, 0, 0);
+        expect(h.gateway.refundsStarted).toBe(started);
+        expect(await bookingStatus(bookingId)).toBe('REFUNDED');
+        expect((await paymentOf(bookingId))[0]).toMatchObject({
+          status: 'PARTIALLY_REFUNDED',
+          refundedPaise: refundPaise,
+        });
+        const after = await cust.c.send('get', `/api/v1/bookings/${bookingId}`);
+        expect(after.body.refund).toMatchObject({ status: 'COMPLETED', amountPaise: refundPaise });
+        expect(after.body.refund.completedAt).not.toBeNull();
+      });
+
+      it('completes the booking from the refund.processed webhook, once', async () => {
+        const { bookingId, refund, refundPaise } = await cancelWithPendingRefund();
+        const event = {
+          id: `evt_${randomUUID()}`,
+          event: 'refund.processed',
+          refundId: refund.providerRefundId,
+        };
+        expect((await webhook(event)).body.outcome).toBe('processed');
+        expect(await bookingStatus(bookingId)).toBe('REFUNDED');
+        // Another event for the same refund changes nothing.
+        await webhook({ ...event, id: `evt_${randomUUID()}` });
+        expect((await paymentOf(bookingId))[0]!.refundedPaise).toBe(refundPaise);
+        const audits = await h.db
+          .select()
+          .from(auditLogs)
+          .where(
+            and(
+              eq(auditLogs.action, 'payment.refunded'),
+              eq(auditLogs.entityId, (await paymentOf(bookingId))[0]!.id),
+            ),
+          );
+        expect(audits).toHaveLength(1);
+      });
+    });
+
     it('waits for the owner in request mode, then refunds everything if declined', async () => {
       const { bookingId, amountPaise } = await paidBooking(requestHall);
       const [b] = await h.db.select().from(bookings).where(eq(bookings.id, bookingId));

@@ -21,6 +21,7 @@ import type { PaymentService } from '../payments/payment.service.js';
 import type { InvoiceService } from '../invoices/invoice.service.js';
 import type { BookingService } from './booking.service.js';
 import type { QuoteService } from './quote.service.js';
+import { refundStatuses, refundUpdates } from './refund-status.js';
 
 export const bookingSummary = {
   id: bookings.id,
@@ -98,6 +99,15 @@ export function bookingsRouter(deps: {
     res.set('Cache-Control', 'no-store').json({ items });
   });
 
+  /**
+   * Refunds still on their way to the customer, and ones completed recently: the web app
+   * shows them as a notice on every page so nobody has to wonder where their money is.
+   */
+  r.get('/bookings/refund-updates', requirePermission('booking:create'), async (req, res) => {
+    const me = currentUser(req);
+    res.set('Cache-Control', 'no-store').json({ items: await refundUpdates(db, me.userId) });
+  });
+
   /** A customer's own booking. Anyone else's returns 404. */
   const loadOwn = async (customerId: string, rawId: unknown) => {
     const id = parseId(rawId);
@@ -150,9 +160,12 @@ export function bookingsRouter(deps: {
       .select({ id: reviews.id, rating: reviews.rating })
       .from(reviews)
       .where(eq(reviews.bookingId, b.id));
+    const refund = (await refundStatuses(db, [b])).get(b.id) ?? null;
     res.set('Cache-Control', 'no-store').json({
       ...summary,
       review: review ?? null,
+      refund,
+      cancelledAt: b.cancelledAt,
       subtotalPaise: b.subtotalPaise,
       addonsPaise: b.addonsPaise,
       gstPaise: b.gstPaise,
