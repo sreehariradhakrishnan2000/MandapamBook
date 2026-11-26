@@ -29,6 +29,7 @@ describe('AuthService and interceptor', () => {
   let client: HttpClient;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -41,7 +42,10 @@ describe('AuthService and interceptor', () => {
     client = TestBed.inject(HttpClient);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+  });
 
   /** Waits until a request to url is pending (async hops vary), then returns it. */
   const pending = (url: string) => vi.waitFor(() => http.expectOne(url));
@@ -62,8 +66,20 @@ describe('AuthService and interceptor', () => {
     expect(auth.user()?.fullName).toBe('Priya Nair');
     expect(auth.hasPermission('booking:create')).toBe(true);
     expect(auth.hasPermission('audit:view')).toBe(false);
-    expect(localStorage.length).toBe(0);
+    // No credential ever reaches browser storage: only the yes/no "signed in last time"
+    // hint that lets the next visit start without waiting.
+    expect(Object.keys(localStorage)).toEqual(['mb:signed-in']);
+    expect(localStorage.getItem('mb:signed-in')).toBe('yes');
+    expect(JSON.stringify(localStorage)).not.toContain('access-1');
     expect(sessionStorage.length).toBe(0);
+  });
+
+  it('skips the startup check for a visitor who was signed out last time', async () => {
+    localStorage.setItem('mb:signed-in', 'no');
+    expect(auth.likelySignedIn).toBe(false);
+    await expect(auth.restore()).resolves.toBe(false);
+    http.expectNone('/api/v1/auth/csrf');
+    http.expectNone('/api/v1/auth/refresh');
   });
 
   it('shares one refresh request between concurrent callers', async () => {

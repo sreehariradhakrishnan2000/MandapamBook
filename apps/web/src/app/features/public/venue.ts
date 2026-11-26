@@ -116,6 +116,7 @@ const POLICY_LABELS: Record<string, string> = {
                         (v.photos.length === 2 ? ' md:col-span-2 md:aspect-auto' : '')
                   "
                   [attr.loading]="i === 0 ? null : 'lazy'"
+                  [attr.fetchpriority]="i === 0 ? 'high' : null"
                 />
               }
             </div>
