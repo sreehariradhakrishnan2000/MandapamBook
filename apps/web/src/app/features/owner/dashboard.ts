@@ -1,13 +1,15 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, type OnInit, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { OwnerProfileView } from '@mandapambook/shared';
 import { AuthService, errorMessage } from '../../core/auth/auth.service';
+import { BookingApi, type OwnerBooking } from '../../core/booking-api.service';
 import { OwnerApi, type VenueSummary } from '../../core/owner-api.service';
 import { StatusChip } from './status-chip';
 
 @Component({
   selector: 'app-owner-dashboard',
-  imports: [RouterLink, StatusChip],
+  imports: [DatePipe, RouterLink, StatusChip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="flex flex-col gap-6 py-4">
@@ -59,6 +61,58 @@ import { StatusChip } from './status-chip';
         <p class="text-sm text-red-700" role="alert">{{ error() }}</p>
       }
 
+      @if (glance(); as g) {
+        <section aria-labelledby="glance-h">
+          <h2 id="glance-h" class="sr-only">At a glance</h2>
+          <ul class="grid gap-3 sm:grid-cols-3">
+            <li>
+              <a
+                routerLink="bookings"
+                class="flex h-full flex-col gap-1 rounded-2xl border p-4"
+                [class.border-brand-300]="g.waiting > 0"
+                [class.bg-brand-50]="g.waiting > 0"
+                [class.border-slate-200]="g.waiting === 0"
+                [class.bg-white]="g.waiting === 0"
+              >
+                <span class="text-sm text-slate-600">Waiting for your answer</span>
+                <span class="font-display text-3xl tabular-nums">{{ g.waiting }}</span>
+                <span class="text-xs" [class.text-brand-800]="g.waiting > 0">
+                  {{
+                    g.waiting > 0
+                      ? 'Answer within 24 hours, or they are refunded automatically'
+                      : 'No requests right now'
+                  }}
+                </span>
+              </a>
+            </li>
+            <li>
+              <a
+                routerLink="bookings"
+                class="flex h-full flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4"
+              >
+                <span class="text-sm text-slate-600">Events in the next 30 days</span>
+                <span class="font-display text-3xl tabular-nums">{{ g.upcoming }}</span>
+                <span class="text-xs text-slate-600">
+                  @if (g.next; as n) {
+                    Next: {{ n.eventDate | date: 'EEE d MMM' }} · {{ n.hallName }}
+                  } @else {
+                    Nothing booked yet
+                  }
+                </span>
+              </a>
+            </li>
+            <li class="flex h-full flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+              <span class="text-sm text-slate-600">Venues live</span>
+              <span class="font-display text-3xl tabular-nums"
+                >{{ g.live
+                }}<span class="text-lg text-slate-500"> of {{ venues().length }}</span></span
+              >
+              <span class="text-xs text-slate-600">Visible to customers in search</span>
+            </li>
+          </ul>
+        </section>
+      }
+
       <ul class="grid gap-3 sm:grid-cols-2">
         @for (v of venues(); track v.id) {
           <li class="rounded-2xl border border-slate-200 bg-white p-4">
@@ -96,14 +150,38 @@ export class OwnerDashboard implements OnInit {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
+  private readonly bookings = inject(BookingApi);
+  /** The owner's day at a glance: requests to answer, events coming up, venues live. */
+  protected readonly glance = signal<{
+    waiting: number;
+    upcoming: number;
+    next: OwnerBooking | null;
+    live: number;
+  } | null>(null);
+
   async ngOnInit(): Promise<void> {
     try {
-      const [venues, profile] = await Promise.all([
+      const [venues, profile, bookings] = await Promise.all([
         this.api.venues(),
         this.isOwner ? this.api.profile() : Promise.resolve(null),
+        this.bookings.ownerBookings().catch(() => null),
       ]);
       this.venues.set(venues.items);
       this.profile.set(profile);
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(
+        new Date(),
+      );
+      const in30 = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+      const items = bookings?.items ?? [];
+      const upcoming = items
+        .filter((b) => b.status === 'CONFIRMED' && b.eventDate >= today && b.eventDate <= in30)
+        .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+      this.glance.set({
+        waiting: items.filter((b) => b.status === 'AWAITING_OWNER').length,
+        upcoming: upcoming.length,
+        next: upcoming[0] ?? null,
+        live: venues.items.filter((v) => v.status === 'APPROVED').length,
+      });
     } catch (err) {
       this.error.set(errorMessage(err, 'Could not load your venues.'));
     } finally {

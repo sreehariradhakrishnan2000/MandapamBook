@@ -82,7 +82,7 @@ export function createBookingsPauseService(db: Db): BookingsPauseService {
  * Paths that keep working during maintenance: the status the maintenance page polls,
  * sign-in (so staff can get in) and payment webhooks (money that moved must be recorded).
  */
-const ALWAYS_OPEN = [/^\/status$/, /^\/auth\//, /^\/payments\/webhooks\//];
+const ALWAYS_OPEN = [/^\/status$/, /^\/auth\//, /^\/payments\/webhooks\//, /^\/seo\//];
 const STAFF_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 
 /**

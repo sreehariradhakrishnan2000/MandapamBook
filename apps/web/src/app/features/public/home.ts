@@ -19,6 +19,14 @@ type Sort = NonNullable<SearchQuery['sort']>;
  * mandap photo-1587271636175, arches photo-1761472606347, reception-hall photo-1779308936221,
  * ballroom photo-1712314947761, garden-stage photo-1744805624954, marigold photo-1789971649652.
  */
+/**
+ * The phone-sized copies made next to each site photo (480 and 720 px wide), so phones
+ * download a fifth of the bytes. Regenerate them when a photo changes.
+ */
+function responsive(name: string, fullWidth: number): string {
+  return `images/${name}-480.webp 480w, images/${name}-720.webp 720w, images/${name}.webp ${fullWidth}w`;
+}
+
 @Component({
   selector: 'app-home',
   imports: [RouterLink, HallCard, SearchForm],
@@ -44,6 +52,10 @@ type Sort = NonNullable<SearchQuery['sort']>;
         <div class="photo-scrim relative isolate overflow-hidden rounded-3xl">
           <img
             [src]="c.image"
+            [srcset]="c.srcset"
+            sizes="(min-width: 768px) 50vw, 100vw"
+            width="1200"
+            height="800"
             alt=""
             class="aspect-[4/3] w-full object-cover sm:aspect-[16/11]"
             [attr.fetchpriority]="$first ? 'high' : null"
@@ -75,6 +87,10 @@ type Sort = NonNullable<SearchQuery['sort']>;
             >
               <img
                 [src]="o.image"
+                [srcset]="o.srcset"
+                sizes="(min-width: 640px) 33vw, 100vw"
+                width="800"
+                height="600"
                 alt=""
                 loading="lazy"
                 class="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -174,6 +190,10 @@ type Sort = NonNullable<SearchQuery['sort']>;
       </div>
       <img
         src="images/marigold.webp"
+        [srcset]="marigold"
+        sizes="(min-width: 768px) 40vw, 100vw"
+        width="900"
+        height="1000"
         alt=""
         loading="lazy"
         class="hidden h-72 w-full rounded-2xl object-cover md:block"
@@ -201,6 +221,7 @@ type Sort = NonNullable<SearchQuery['sort']>;
 })
 export class Home {
   private readonly api = inject(BookingApi);
+  protected readonly marigold = responsive('marigold', 900);
 
   protected readonly heroCards = [
     {
@@ -208,12 +229,14 @@ export class Home {
       cta: 'Browse halls',
       link: '/search',
       image: 'images/mandap.webp',
+      srcset: responsive('mandap', 1200),
     },
     {
       title: 'Own a mandapam? List it here.',
       cta: 'List your venue',
       link: '/register',
       image: 'images/arches.webp',
+      srcset: responsive('arches', 1200),
     },
   ];
 
@@ -224,6 +247,7 @@ export class Home {
       tag: 'Reception slot',
       query: { slot: 'EVENING' },
       image: 'images/garden-stage.webp',
+      srcset: responsive('garden-stage', 800),
     },
     {
       title: 'Full-day weddings',
@@ -231,6 +255,7 @@ export class Home {
       tag: 'Full day',
       query: { slot: 'FULL_DAY' },
       image: 'images/reception-hall.webp',
+      srcset: responsive('reception-hall', 800),
     },
     {
       title: 'Grand halls',
@@ -238,6 +263,7 @@ export class Home {
       tag: '1,000+ guests',
       query: { guests: 1000 },
       image: 'images/ballroom.webp',
+      srcset: responsive('ballroom', 800),
     },
   ];
 
