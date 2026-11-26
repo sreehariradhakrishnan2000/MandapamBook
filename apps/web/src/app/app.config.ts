@@ -20,6 +20,7 @@ import { AuthService } from './core/auth/auth.service';
 import { serverWakeInterceptor } from './core/server-status';
 import { AppErrorHandler } from './core/app-error-handler';
 import { Connectivity, isChunkLoadError } from './core/connectivity';
+import { ErrorTracking } from './core/error-tracking';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -33,7 +34,10 @@ export const appConfig: ApplicationConfig = {
       withNavigationErrorHandler((e) => {
         const connectivity = inject(Connectivity);
         if (isChunkLoadError(e.error)) connectivity.updateAvailable.set(true);
-        else connectivity.navigationFailed.set(true);
+        else {
+          inject(ErrorTracking).capture(e.error);
+          connectivity.navigationFailed.set(true);
+        }
       }),
     ),
     { provide: ErrorHandler, useClass: AppErrorHandler },

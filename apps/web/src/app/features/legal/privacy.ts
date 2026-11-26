@@ -77,6 +77,10 @@ import { LegalShell } from './legal-shell';
         <li><strong>Razorpay:</strong> to process payments and refunds.</li>
         <li><strong>Brevo:</strong> to deliver our emails.</li>
         <li>
+          <strong>Sentry:</strong> technical reports when something breaks on the website, so we can
+          fix it. These never include your name, contact details, IP address or payment details.
+        </li>
+        <li>
           <strong>Hosting providers:</strong> our servers and database run with Render and Neon.
           Some of these services store data outside India, under their security and contractual
           safeguards.

@@ -174,6 +174,8 @@ export function siteStatusRouter(deps: {
   bookingsPause: BookingsPauseService;
   audit: AuditService;
   authenticate: RequestHandler;
+  /** Browser error tracking (Sentry). The DSN is public by design; null = off. */
+  webErrorTracking?: { dsn: string | null; environment: string };
 }): Router {
   const { maintenance, bookingsPause, audit, authenticate } = deps;
   const r = Router();
@@ -181,7 +183,11 @@ export function siteStatusRouter(deps: {
   /** Public: the web app, the maintenance page and the banners read this. */
   r.get('/status', async (_req, res) => {
     const [m, b] = await Promise.all([maintenance.get(), bookingsPause.get()]);
-    res.set('Cache-Control', 'no-store').json({ maintenance: m, bookings: b });
+    res.set('Cache-Control', 'no-store').json({
+      maintenance: m,
+      bookings: b,
+      errorTracking: deps.webErrorTracking ?? { dsn: null, environment: 'development' },
+    });
   });
 
   const audited = <T>(
