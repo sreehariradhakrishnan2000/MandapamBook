@@ -61,7 +61,7 @@
     </div>
   }
 
-  @if (server.waking()) {
+  @if (showWakeBanner && server.waking()) {
     <div
       class="flex items-center justify-center gap-2 bg-marigold-100 px-4 py-2 text-center text-sm text-ink"
       role="status"
