@@ -406,7 +406,7 @@ describe('RazorpayProvider', () => {
         reason: 'Owner declined',
       }),
     ).toMatchObject({ providerRefundId: 'rfnd_C', status: 'PROCESSED' });
-    expect(calls[0]?.body).toMatchObject({ amount: 50_000, speed: 'normal' });
+    expect(calls[0]?.body).toMatchObject({ amount: 50_000, speed: 'optimum' });
     expect((calls[0]?.body as { receipt: string }).receipt).toHaveLength(40);
   });
 

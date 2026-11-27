@@ -57,7 +57,7 @@ Test and live mode each have their **own** keys and **own** webhook (with its ow
    - `createOrder`: `POST /v1/orders` `{ amount, currency: 'INR', receipt: bookingRef, notes: { paymentId } }`; return `checkout: { kind: 'razorpay', keyId, orderId }`.
    - `verifyPayment`: `HMAC_SHA256(keySecret, order_id|payment_id)` vs `razorpay_signature`, constant-time.
    - `handleWebhook`: `X-Razorpay-Signature = HMAC_SHA256(webhookSecret, rawBody)`; event id from `X-Razorpay-Event-Id`; map `payment.captured`, `payment.failed`, `refund.processed`, `refund.failed`.
-   - `refund`: `POST /v1/payments/{id}/refund` `{ amount, speed: 'normal', receipt: idempotencyKey }`.
+   - `refund`: `POST /v1/payments/{id}/refund` `{ amount, speed: 'optimum', receipt: idempotencyKey }` (instant where the bank supports it, else normal).
    - `getStatus`: `GET /v1/orders/{id}/payments`.
      Use `fetch` with a timeout; no SDK is required. Copy `test/unit/payment-providers.test.ts` for the new provider using recorded fixtures.
 3. **Web adapter**: in `payment-adapter.ts` add a `case 'razorpay'` that loads `https://checkout.razorpay.com/v1/checkout.js`, opens it with `key: checkout.keyId, order_id: checkout.orderId`, and in the `handler` calls `PaymentsService.verify({ providerOrderId: razorpay_order_id, providerPaymentId: razorpay_payment_id, signature: razorpay_signature })`, then navigates to `/payments/return`. Add `https://checkout.razorpay.com` to `script-src` and `frame-src`, and `https://api.razorpay.com` / `https://lumberjack.razorpay.com` to `connect-src`, in `docker/security-headers.inc.template`.

@@ -31,8 +31,8 @@ import { LEGAL } from '../legal/legal-info';
           <p>
             <strong class="tabular-nums">{{ r.amountPaise | inr }}</strong> was sent back to the
             card, UPI or bank account you paid with on
-            <strong>{{ r.completedAt | date: 'd MMMM y' }}</strong>. Depending on your bank, it can
-            take a few working days to show on your statement.
+            <strong>{{ r.completedAt | date: 'd MMMM y' }}</strong>. Instant refunds usually show
+            within minutes; with some banks it can take a few working days.
           </p>
         } @else {
           <h2 id="refund-h" class="flex items-center gap-2 text-base font-semibold text-slate-900">
@@ -72,7 +72,7 @@ import { LEGAL } from '../legal/legal-info';
               <span class="text-slate-400" aria-hidden="true">○</span>
               <span
                 >Money back in your account
-                <span class="text-slate-600">· usually within 5–7 working days</span></span
+                <span class="text-slate-600">· usually within minutes</span></span
               >
             }
           </li>
@@ -86,7 +86,7 @@ import { LEGAL } from '../legal/legal-info';
         </p>
         <p class="text-xs text-slate-600">
           @if (r.status === 'COMPLETED') {
-            Can't see it after 7 working days? Write to
+            Can't see it after 2 working days? Write to
           } @else {
             Questions about your refund? Write to
           }
