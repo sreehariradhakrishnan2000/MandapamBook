@@ -12,6 +12,7 @@ import { PaymentsService } from './core/payments.service';
 import { Connectivity } from './core/connectivity';
 import { ServerStatus } from './core/server-status';
 import { MaintenancePage } from './shared/maintenance-page';
+import { SHOW_WAKE_BANNER } from './core/site-flags';
 import { RefundNotice } from './shared/refund-notice';
 
 @Component({
@@ -26,6 +27,8 @@ export class App {
   protected readonly payments = inject(PaymentsService);
   protected readonly server = inject(ServerStatus);
   protected readonly net = inject(Connectivity);
+  /** See core/site-flags.ts: the "starting up the server" bar is switched off for now. */
+  protected readonly showWakeBanner = SHOW_WAKE_BANNER;
   /** The phone menu (below md); the header shows its links inline on wider screens. */
   protected readonly menuOpen = signal(false);
   private readonly url = signal('/');
