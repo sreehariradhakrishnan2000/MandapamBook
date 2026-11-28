@@ -12,3 +12,10 @@ onlyBuiltDependencies:
   - lmdb
   - msgpackr-extract
   - '@parcel/watcher'
+
+# Security fixes for dev-only tools (Dependabot alerts). Remove once the parents update.
+overrides:
+  # drizzle-kit's loader pins esbuild 0.18 (dev-server CORS advisory, fixed in 0.25).
+  '@esbuild-kit/core-utils>esbuild': '^0.25.12'
+  # typescript-eslint pins minimatch 10 (glob ReDoS advisory, fixed in 11.0.1).
+  '@typescript-eslint/typescript-estree>minimatch': '^11.0.1'
