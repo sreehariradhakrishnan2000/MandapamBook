@@ -64,9 +64,14 @@ import { LegalShell } from './legal-shell';
         <li>Refunds go back to the card, UPI account or bank account you paid with.</li>
         <li>We start the refund as soon as it is due, through Razorpay.</li>
         <li>
-          Banks usually take <strong>5 to 7 working days</strong> to show it in your account. You
-          receive an email when the refund is processed.
+          We use <strong>instant refunds</strong>: most UPI, card and net banking refunds reach your
+          account <strong>within minutes</strong>.
         </li>
+        <li>
+          If your bank or payment method does not support instant refunds, the refund goes the
+          standard way and can take <strong>5 to 7 working days</strong>.
+        </li>
+        <li>You receive an email when the refund is processed.</li>
       </ul>
 
       <h2>Changing a date</h2>
@@ -77,7 +82,8 @@ import { LegalShell } from './legal-shell';
 
       <h2>Problems with a refund</h2>
       <p>
-        If a refund has not arrived 7 working days after our refund email, write to
+        If a refund has not arrived 2 working days after our refund email (7 working days if your
+        bank does not support instant refunds), write to
         <a [href]="'mailto:' + L.supportEmail">{{ L.supportEmail }}</a> with your booking reference
         (for example MB-ABC234). We reply within 2 working days.
       </p>

@@ -5,14 +5,14 @@ import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
 import type { Env } from '../config/env.js';
-import { clientIp } from './middleware/client-ip.js';
+import { clientIp, onlyViaWebProxy } from './middleware/client-ip.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { requestId } from './middleware/requestId.js';
 import { healthRouter, type ReadinessCheck } from './routes/health.js';
 
 export interface AppDeps {
   env: Pick<Env, 'CORS_ORIGINS' | 'BODY_LIMIT' | 'TRUST_PROXY_HOPS'> &
-    Partial<Pick<Env, 'CLIENT_IP_HEADER' | 'PROXY_SHARED_SECRET'>>;
+    Partial<Pick<Env, 'CLIENT_IP_HEADER' | 'PROXY_SHARED_SECRET' | 'ONLY_VIA_WEB_PROXY'>>;
   logger: Logger;
   readinessChecks: Record<string, ReadinessCheck>;
   /** Versioned API routes, mounted at /api/v1. */
@@ -28,6 +28,9 @@ export function createApp({ env, logger, readinessChecks, api }: AppDeps): Expre
   app.use(requestId);
   // Before anything reads req.ip (rate limits, audit context, request logs).
   app.use(clientIp({ edgeHeader: env.CLIENT_IP_HEADER, proxySecret: env.PROXY_SHARED_SECRET }));
+  if (env.ONLY_VIA_WEB_PROXY && env.PROXY_SHARED_SECRET) {
+    app.use(onlyViaWebProxy(env.PROXY_SHARED_SECRET));
+  }
   app.use(
     pinoHttp({
       logger,

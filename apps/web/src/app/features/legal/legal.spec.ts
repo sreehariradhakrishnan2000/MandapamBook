@@ -41,6 +41,7 @@ describe('legal pages', () => {
     const text = render(RefundPolicy).textContent ?? '';
     expect(text).toContain('platform fee is not refundable');
     expect(text).toContain('does not answer your request within 24 hours');
+    expect(text).toContain('instant refunds');
     expect(text).toContain('5 to 7 working days');
   });
 

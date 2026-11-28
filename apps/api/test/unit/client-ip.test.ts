@@ -5,6 +5,7 @@ import {
   PROXY_CLIENT_IP_HEADER,
   PROXY_SECRET_HEADER,
   clientIp,
+  onlyViaWebProxy,
 } from '../../src/http/middleware/client-ip.js';
 
 const SECRET = 'x'.repeat(43);
@@ -75,5 +76,47 @@ describe('clientIp', () => {
     ).toBe('198.51.100.1');
     expect(await ipOf(app, { 'cf-connecting-ip': 'not-an-ip' })).toMatch(/127\.0\.0\.1|::1/);
     expect(await ipOf(app, { 'cf-connecting-ip': '2001:db8::7' })).toBe('2001:db8::7');
+  });
+});
+
+describe('onlyViaWebProxy', () => {
+  const app = express();
+  app.use(onlyViaWebProxy(SECRET));
+  for (const path of [
+    '/health',
+    '/ready',
+    '/api/v1/status',
+    '/api/v1/payments/webhooks/razorpay',
+  ]) {
+    app.all(path, (_req, res) => {
+      res.json({ ok: true });
+    });
+  }
+
+  it('refuses direct calls that skip the web proxy', async () => {
+    for (const path of ['/api/v1/status', '/api/v1/payments/webhooks/razorpay']) {
+      const res = await request(app).get(path);
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    }
+    const forged = await request(app)
+      .get('/api/v1/status')
+      .set(PROXY_SECRET_HEADER, 'y'.repeat(43));
+    expect(forged.status).toBe(403);
+  });
+
+  it('lets the web proxy through, and keeps health checks open', async () => {
+    expect((await request(app).get('/api/v1/status').set(PROXY_SECRET_HEADER, SECRET)).status).toBe(
+      200,
+    );
+    expect(
+      (
+        await request(app)
+          .post('/api/v1/payments/webhooks/razorpay')
+          .set(PROXY_SECRET_HEADER, SECRET)
+      ).status,
+    ).toBe(200);
+    expect((await request(app).get('/health')).status).toBe(200);
+    expect((await request(app).get('/ready')).status).toBe(200);
   });
 });

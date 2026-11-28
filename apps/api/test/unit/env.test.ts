@@ -153,6 +153,16 @@ describe('loadEnv', () => {
       ).toThrow(/TLS/);
     });
 
+    it('only closes the direct API address when the proxy secret is there to check', () => {
+      const base = { ...prodLike, APP_ENV: 'staging' };
+      expect(loadEnv(base).ONLY_VIA_WEB_PROXY).toBe(false);
+      expect(() => loadEnv({ ...base, ONLY_VIA_WEB_PROXY: 'true' })).toThrow(/ONLY_VIA_WEB_PROXY/);
+      expect(
+        loadEnv({ ...base, ONLY_VIA_WEB_PROXY: 'true', PROXY_SHARED_SECRET: 's'.repeat(43) })
+          .ONLY_VIA_WEB_PROXY,
+      ).toBe(true);
+    });
+
     describe('payments mode', () => {
       const razorpay = (key: string, extra: Record<string, string> = {}) => ({
         ...prodLike,

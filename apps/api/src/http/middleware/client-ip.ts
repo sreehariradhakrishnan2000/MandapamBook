@@ -42,3 +42,25 @@ function valid(value: string | undefined): string | undefined {
   const v = value?.trim();
   return v && isIP(v) ? v : undefined;
 }
+
+/** Platform health checks and uptime monitors call these directly. */
+const OPEN_PATHS = new Set(['/health', '/ready']);
+
+/**
+ * Refuses requests that did not come through our own web proxy (no valid shared secret):
+ * calling the API at its hosting address would skip the domain's edge protection
+ * (firewall, rate limits). Constant-time compare; health checks stay open.
+ */
+export function onlyViaWebProxy(secret: string): RequestHandler {
+  return (req, res, next) => {
+    const presented = req.get(PROXY_SECRET_HEADER);
+    if (OPEN_PATHS.has(req.path) || (presented && safeEqual(presented, secret))) {
+      next();
+      return;
+    }
+    res
+      .status(403)
+      .set('Cache-Control', 'no-store')
+      .json({ error: { code: 'FORBIDDEN', message: 'Use the website address' } });
+  };
+}
