@@ -80,6 +80,14 @@ next to Neon us-east-1).
   - API and web: the same `PROXY_SHARED_SECRET`. nginx sends the browser's IP in
     `X-MB-Client-IP` with the secret, and the API trusts that header only when it matches.
   - The API logs the resolved address as `clientIp`. Check it shows real visitor IPs.
+- **Only through the domain** (keeps everyone behind Cloudflare's protection):
+  - API `ONLY_VIA_WEB_PROXY=true`: the API answers only requests that carry
+    `PROXY_SHARED_SECRET` (forwarded by the web nginx). Direct calls to `…-api-….onrender.com`
+    get 403, except `/health` and `/ready` (Render's check and the deploy pipeline).
+  - Web `CANONICAL_HOST=mandapambooking.in`: visits to `…-web-….onrender.com` get a 301 to the
+    domain, except `/api/v1/payments/webhooks/` (Razorpay doesn't follow redirects) and
+    `/healthz`. Set the web service's health check path to `/healthz`.
+  - Roll back: set either to `false`/empty and redeploy with the running image.
 - **Free services sleep** after 15 minutes idle and take about a minute to wake; sweeps pause
   while asleep. Expired holds still free their slot on the next request, and queued email is
   sent after waking. Fine for staging; production needs paid instances.

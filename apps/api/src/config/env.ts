@@ -84,6 +84,12 @@ export const envSchema = z.object({
     .string()
     .regex(/^[A-Za-z0-9_-]{32,}$/, 'at least 32 base64url characters')
     .optional(),
+  /**
+   * true: the API answers only requests forwarded by our own web proxy (they carry
+   * PROXY_SHARED_SECRET), so nobody can reach it directly at its hosting address and skip
+   * the domain's edge protection. /health and /ready stay open for the platform's checks.
+   */
+  ONLY_VIA_WEB_PROXY: booleanString.default(false),
   /** Comma-separated exact origins allowed by CORS. No wildcards. */
   CORS_ORIGINS: csv.pipe(z.array(z.url()).min(1)),
   /** Public URL of the web app, used in email links. */
@@ -255,6 +261,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     if (staging && env.PAYMENTS_MODE === 'live')
       problems.push('PAYMENTS_MODE: live payments are not allowed in staging');
   }
+  if (env.ONLY_VIA_WEB_PROXY && !env.PROXY_SHARED_SECRET)
+    problems.push('ONLY_VIA_WEB_PROXY: needs PROXY_SHARED_SECRET (shared with the web proxy)');
   if (env.PAYMENTS_MODE === 'live') {
     if (env.NODE_ENV !== 'production')
       problems.push('PAYMENTS_MODE: live payments need NODE_ENV=production');

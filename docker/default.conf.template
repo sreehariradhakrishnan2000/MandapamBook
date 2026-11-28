@@ -19,6 +19,15 @@ map $http_user_agent $link_preview_bot {
   "~*(facebookexternalhit|facebot|whatsapp|twitterbot|linkedinbot|slackbot|telegrambot|discordbot|pinterest|skypeuripreview|redditbot|embedly|applebot)" 1;
 }
 
+# CANONICAL_HOST (e.g. mandapambooking.in): visits that arrive at the hosting platform's own
+# address (*.onrender.com) are sent to the real domain, so nobody browses around the domain's
+# edge protection. Kept open: payment webhooks (the gateway may still call the old address;
+# it does not follow redirects) and /healthz (the platform's health check). Empty = off.
+map "$host|$uri|${CANONICAL_HOST}" $canonical_redirect {
+  default "";
+  "~*^[^|]+\.onrender\.com\|(?!/api/v1/payments/webhooks/|/healthz\|)[^|]*\|(?<canon>[^|]+)$" $canon;
+}
+
 server {
   listen 8080;
   server_name _;
@@ -26,6 +35,17 @@ server {
   index index.html;
   server_tokens off;
   client_max_body_size 1m;
+
+  if ($canonical_redirect) {
+    return 301 https://$canonical_redirect$request_uri;
+  }
+
+  # For the hosting platform's health check (kept open by the redirect above).
+  location = /healthz {
+    access_log off;
+    add_header Cache-Control "no-store";
+    return 200 "ok\n";
+  }
 
   # Same-origin API proxy keeps the refresh cookie SameSite=Strict-friendly.
   # API_UPSTREAM may be internal (http://api:4000) or a public https URL (a host without
