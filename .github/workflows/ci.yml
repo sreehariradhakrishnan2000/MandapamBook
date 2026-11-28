@@ -233,9 +233,26 @@ jobs:
           uid=$(docker exec web-smoke id -u)
           case "$uid" in ''|*[!0-9]*|0) echo "::error::nginx must run as a non-root uid (got '$uid')"; exit 1 ;; esac
           echo "web image serves correctly as uid $uid"
+          # With CANONICAL_HOST set, the platform's own address redirects to the domain,
+          # except payment webhooks and the platform's /healthz check.
+          docker run -d --name web-canon -p 127.0.0.1:8081:8080 \
+            -e API_UPSTREAM=http://127.0.0.1:9 -e CANONICAL_HOST=mandapambooking.in mandapambook-web:ci
+          for i in $(seq 1 30); do curl -sS -o /dev/null http://127.0.0.1:8081/healthz && break; sleep 1; done
+          onr='Host: mandapambook-web-staging.onrender.com'
+          loc=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' -H "$onr" 'http://127.0.0.1:8081/search?city=kochi')
+          [ "$loc" = "301 https://mandapambooking.in/search?city=kochi" ] || { echo "::error::onrender host not redirected (got '$loc')"; exit 1; }
+          hz=$(curl -sS -o /dev/null -w '%{http_code}' -H "$onr" http://127.0.0.1:8081/healthz)
+          [ "$hz" = 200 ] || { echo "::error::/healthz must stay open (got $hz)"; exit 1; }
+          wh=$(curl -sS -o /dev/null -w '%{http_code}' -X POST -H "$onr" http://127.0.0.1:8081/api/v1/payments/webhooks/razorpay)
+          [ "$wh" != 301 ] || { echo "::error::payment webhooks must not be redirected"; exit 1; }
+          own=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Host: mandapambooking.in' http://127.0.0.1:8081/)
+          [ "$own" = 200 ] || { echo "::error::the domain itself must not redirect (got $own)"; exit 1; }
+          echo "canonical-host redirect works"
       - name: Web container logs
         if: always() && matrix.image == 'web'
-        run: docker logs web-smoke 2>&1 | tail -50 || true
+        run: |
+          docker logs web-smoke 2>&1 | tail -50 || true
+          docker logs web-canon 2>&1 | tail -20 || true
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: mandapambook-${{ matrix.image }}:ci

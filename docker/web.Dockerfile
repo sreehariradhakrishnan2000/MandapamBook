@@ -37,6 +37,9 @@ ENV PROXY_SHARED_SECRET=""
 # "noindex, nofollow" keeps the whole site out of search engines (e.g. while only test
 # venues are listed). Empty sends no header.
 ENV ROBOTS_TAG=""
+# The site's real domain (e.g. mandapambooking.in). Visits to the platform's *.onrender.com
+# address are redirected there, except payment webhooks and /healthz. Empty = no redirect.
+ENV CANONICAL_HOST=""
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY --chmod=0755 docker/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
 # web-entrypoint.sh renders /etc/nginx/templates/*.template into /etc/nginx/conf.d/ at start.
