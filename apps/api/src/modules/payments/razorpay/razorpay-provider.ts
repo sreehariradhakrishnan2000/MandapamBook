@@ -182,7 +182,9 @@ export class RazorpayProvider implements PaymentProvider {
       `/v1/payments/${encodeURIComponent(input.providerPaymentId)}/refund`,
       {
         amount: input.amountPaise,
-        speed: 'normal',
+        // Instant refund where the bank supports it, otherwise Razorpay falls back to normal
+        // speed by itself. A request's speed overrides the dashboard's default refund speed.
+        speed: 'optimum',
         receipt: receipt(input.idempotencyKey),
         notes: { reason: input.reason.slice(0, 250) },
       },

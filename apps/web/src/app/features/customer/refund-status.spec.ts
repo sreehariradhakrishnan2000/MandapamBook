@@ -40,7 +40,7 @@ describe('refund status card', () => {
     expect(el).toContain('Your refund is on its way');
     expect(el).toContain('₹6,739.50 is being returned');
     expect(el).toContain('Refund started · 27 Nov 2026');
-    expect(el).toContain('usually within 5–7 working days');
+    expect(el).toContain('usually within minutes');
     expect(el).toContain('Refund reference rfnd_ABC123');
     expect(el).toContain('support@mandapambooking.in');
   });

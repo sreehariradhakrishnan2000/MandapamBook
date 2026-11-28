@@ -55,7 +55,7 @@ function readSeen(): Set<string> {
           } @else {
             <strong>Your refund of {{ u.refund.amountPaise | inr }} is being processed.</strong>
             It goes back to your original payment method for booking {{ u.refCode }}, usually within
-            5–7 working days.
+            minutes.
           }
           <a
             [routerLink]="['/account/bookings', u.bookingId]"

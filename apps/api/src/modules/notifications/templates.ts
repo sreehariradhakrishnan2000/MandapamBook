@@ -139,7 +139,7 @@ function bookingContent(
         greetingName,
         paragraphs: [
           `The venue could not accept your request for ${what}.`,
-          `We are refunding ${formatInr(d.refundPaise)} to your original payment method; banks usually take 5-7 working days.`,
+          `We are refunding ${formatInr(d.refundPaise)} to your original payment method. Most refunds arrive within minutes; with some banks it can take up to 5-7 working days.`,
         ],
         details: [...details, { label: 'Refund', value: formatInr(d.refundPaise) }],
         action: search,
@@ -162,10 +162,10 @@ function bookingContent(
     case 'refund_processed':
       return {
         subject: `Refund processed (${d.refCode})`,
-        heading: 'Your refund is on its way',
+        heading: 'Your refund is done',
         greetingName,
         paragraphs: [
-          `We have refunded ${formatInr(d.refundPaise)} for ${what}. It should reach your account in 5-7 working days.`,
+          `We have refunded ${formatInr(d.refundPaise)} for ${what}. It usually reaches your account within minutes; with some banks it can take up to 5-7 working days.`,
         ],
         details: [...details, { label: 'Refund', value: formatInr(d.refundPaise) }],
         action: viewBooking,
